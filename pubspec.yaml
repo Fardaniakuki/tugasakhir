@@ -1,0 +1,39 @@
+name: tes_flutter
+description: A new Flutter project.
+
+publish_to: 'none' 
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.1.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  loading_animation_widget: ^1.2.0 
+  dropdown_search: ^5.0.6
+  table_calendar: ^3.0.9
+  timeline_tile: ^2.0.0
+  lottie: ^2.6.0
+  http: ^0.13.5
+  shared_preferences: ^2.2.0
+  dio: ^5.3.3
+  flutter_dotenv: ^5.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets: 
+    - assets/images/pp.jpeg                    
+    - assets/images/
+    - assets/icons/
+    - assets/logos/
+    - assets/animations/
+    - .env
