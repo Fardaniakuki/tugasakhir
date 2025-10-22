@@ -1,11 +1,9 @@
-// ignore_for_file: use_build_context_synchronously
-
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'edit_class_page.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'edit_class_page.dart';
 import '../../popup_helper.dart';
 
 class ClassDetailPage extends StatefulWidget {
@@ -30,9 +28,29 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
     fetchClassDetail();
   }
 
+  // Ambil nama jurusan
+  Future<String> getJurusanName(int jurusanId, String token) async {
+    final response = await http.get(
+      Uri.parse('${dotenv.env['API_BASE_URL']}/api/jurusan/$jurusanId'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['data']?['nama'] ?? '-';
+    } else {
+      return '-';
+    }
+  }
+
   Future<void> fetchClassDetail() async {
+    setState(() => isLoading = true);
+
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
+    final token = prefs.getString('access_token') ?? '';
 
     final response = await http.get(
       Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/${widget.classId}'),
@@ -42,10 +60,20 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
       },
     );
 
+    if (!mounted) return;
+
     if (response.statusCode == 200) {
       final decoded = json.decode(response.body);
+      final kelas = decoded['data'];
+
+      // Ambil nama jurusan
+      String jurusanNama = '-';
+      if (kelas['jurusan_id'] != null) {
+        jurusanNama = await getJurusanName(kelas['jurusan_id'], token);
+      }
+
       setState(() {
-        classData = decoded['data'];
+        classData = {...kelas, 'jurusan_nama': jurusanNama};
         isLoading = false;
       });
     } else {
@@ -66,13 +94,14 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
       },
     );
 
+    if (!mounted) return;
+
     if (response.statusCode == 200) {
-      if (!mounted) return;
-      PopupHelper.showSuccessDialog(context, 'Kelas berhasil dihapus', onOk: () {
+      PopupHelper.showSuccessDialog(context, 'Kelas berhasil dihapus',
+          onOk: () {
         Navigator.pop(context, {'deleted': true});
       });
     } else {
-      if (!mounted) return;
       PopupHelper.showErrorDialog(
         context,
         'Gagal menghapus kelas: ${response.statusCode}\n${response.body}',
@@ -196,6 +225,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                       const SizedBox(height: 24),
 
                       _buildProfileItem(Icons.class_, 'Nama Kelas', classData!['nama']),
+                      _buildProfileItem(Icons.school, 'Jurusan', classData!['jurusan_nama'] ?? '-'),
 
                       const SizedBox(height: 30),
                       Row(
@@ -222,7 +252,11 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                                     builder: (_) => EditClassPage(classData: classData!),
                                   ),
                                 );
-                                if (result == true) fetchClassDetail();
+
+                                // **Refresh data dari server setelah edit**
+                                if (result == true && mounted) {
+                                  fetchClassDetail();
+                                }
                               },
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: brown,

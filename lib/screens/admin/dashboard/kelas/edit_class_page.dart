@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:dropdown_search/dropdown_search.dart';
+import '../../popup_helper.dart';
 
 class EditClassPage extends StatefulWidget {
   final Map<String, dynamic> classData;
@@ -16,13 +18,78 @@ class EditClassPage extends StatefulWidget {
 class _EditClassPageState extends State<EditClassPage> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _namaController;
+  
+  // PERBAIKAN: Gunakan Map untuk selected jurusan seperti di industry
+  Map<String, dynamic>? _selectedJurusan;
+  bool _isLoadingJurusan = true;
+  bool _hasJurusanError = false;
 
   final Color brown = const Color(0xFF5B1A1A);
+  List<Map<String, dynamic>> _jurusanList = []; // PERBAIKAN: Tambah underscore untuk konsistensi
 
   @override
   void initState() {
     super.initState();
     _namaController = TextEditingController(text: widget.classData['nama']);
+    
+    // PERBAIKAN: Load data jurusan dulu, baru set selected jurusan
+    _fetchJurusan();
+  }
+
+  Future<void> _fetchJurusan() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token') ?? '';
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
+
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/jurusan?limit=1000'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          if (data['data'] is List) {
+            _jurusanList = List<Map<String, dynamic>>.from(data['data']);
+          } else if (data['data']['data'] is List) {
+            _jurusanList = List<Map<String, dynamic>>.from(data['data']['data']);
+          }
+          _isLoadingJurusan = false;
+        });
+
+        // PERBAIKAN: Set selected jurusan setelah data loaded
+        _setSelectedJurusan();
+      } else {
+        print('Gagal fetch jurusan: ${res.statusCode}');
+        setState(() {
+          _isLoadingJurusan = false;
+          _hasJurusanError = true;
+        });
+      }
+    } catch (e) {
+      print('Error fetch jurusan: $e');
+      setState(() {
+        _isLoadingJurusan = false;
+        _hasJurusanError = true;
+      });
+    }
+  }
+
+  void _setSelectedJurusan() {
+    final currentJurusanId = widget.classData['jurusan']?['id'] ?? widget.classData['jurusan_id'];
+    if (currentJurusanId != null) {
+      final foundJurusan = _jurusanList.firstWhere(
+        (jurusan) => jurusan['id'] == currentJurusanId,
+        orElse: () => <String, dynamic>{},
+      );
+      
+      if (foundJurusan.isNotEmpty) {
+        setState(() {
+          _selectedJurusan = foundJurusan;
+        });
+      }
+    }
   }
 
   Future<void> _updateClass() async {
@@ -31,36 +98,61 @@ class _EditClassPageState extends State<EditClassPage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
-    final response = await http.put(
-      Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/${widget.classData['id']}'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: json.encode({'nama': _namaController.text}),
-    );
+    // PERBAIKAN: Struktur data yang benar
+    final Map<String, dynamic> updateData = {
+      'nama': _namaController.text.trim(),
+    };
 
-    if (!mounted) return;
-
-    if (response.statusCode == 200) {
-      _showSuccessDialog();
+    // PERBAIKAN: Tambahkan jurusan_id jika dipilih
+    if (_selectedJurusan != null) {
+      updateData['jurusan_id'] = _selectedJurusan!['id'];
     } else {
-      print('Gagal update kelas: ${response.statusCode}');
-      print('Body: ${response.body}');
-      String errorMessage = 'Gagal memperbarui kelas.';
-      try {
-        final data = json.decode(response.body);
-        if (data['message'] != null) {
-          errorMessage = data['message'];
-        } else if (data['errors'] != null) {
-          errorMessage = data['errors'].values.first[0];
-        }
-      } catch (_) {
-        errorMessage = 'Terjadi kesalahan tidak dikenal.';
-      }
-      _showErrorDialog(errorMessage);
+      // Jika tidak ada jurusan yang dipilih, set ke null
+      updateData['jurusan_id'] = null;
     }
+
+    print('=== START UPDATE CLASS ===');
+    print('Update URL: ${dotenv.env['API_BASE_URL']}/api/kelas/${widget.classData['id']}');
+    print('Update Data: $updateData');
+
+    try {
+      final response = await http.put(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/${widget.classData['id']}'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(updateData),
+      );
+
+      print('Update Response Status: ${response.statusCode}');
+      print('Update Response Body: ${response.body}');
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        _showSuccessDialog();
+      } else {
+        // PERBAIKAN: Handle error response dengan lebih baik
+        String errorMessage = 'Gagal memperbarui kelas.';
+        try {
+          final errorData = json.decode(response.body);
+          if (errorData['message'] != null) {
+            errorMessage = errorData['message'];
+          } else if (errorData['errors'] != null) {
+            errorMessage = errorData['errors'].values.first[0];
+          }
+        } catch (e) {
+          errorMessage = 'Error: ${response.statusCode}';
+        }
+        _showErrorDialog(errorMessage);
+      }
+    } catch (e) {
+      print('Error during update: $e');
+      _showErrorDialog('Terjadi kesalahan jaringan: $e');
+    }
+    print('=== END UPDATE CLASS ===');
   }
 
   void _showSuccessDialog() {
@@ -80,10 +172,8 @@ class _EditClassPageState extends State<EditClassPage> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 12),
-            Text(
-              'Data kelas berhasil diperbarui.',
-              textAlign: TextAlign.center,
-            ),
+            Text('Data kelas berhasil diperbarui.',
+                textAlign: TextAlign.center),
           ],
         ),
         actions: [
@@ -91,13 +181,14 @@ class _EditClassPageState extends State<EditClassPage> {
             child: TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                Navigator.pop(context, true);
+                Navigator.pop(context, true); // kembali ke detail page dengan refresh
               },
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
                 backgroundColor: brown,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Kembali'),
             ),
@@ -109,42 +200,7 @@ class _EditClassPageState extends State<EditClassPage> {
   }
 
   void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.all(24),
-        titlePadding: const EdgeInsets.only(top: 24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
-            const SizedBox(height: 16),
-            const Text(
-              'Gagal!',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center),
-          ],
-        ),
-        actions: [
-          Center(
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.red,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Tutup'),
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-      ),
-    );
+    PopupHelper.showErrorDialog(context, message);
   }
 
   Widget _buildTextField() {
@@ -157,27 +213,113 @@ class _EditClassPageState extends State<EditClassPage> {
           const SizedBox(height: 8),
           TextFormField(
             controller: _namaController,
-            validator: (value) => value == null || value.isEmpty ? 'Nama kelas wajib diisi' : null,
+            validator: (value) => value == null || value.isEmpty
+                ? 'Nama kelas wajib diisi'
+                : null,
             decoration: InputDecoration(
               prefixIcon: Icon(Icons.class_, color: brown),
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.grey), // Warna default
+                borderSide: const BorderSide(color: Colors.grey),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.grey), // Saat tidak fokus
+                borderSide: const BorderSide(color: Colors.grey),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.grey, width: 1.5), // Saat fokus
+                borderSide: BorderSide(color: brown, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             ),
-
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJurusanDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Jurusan', style: TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
+          _isLoadingJurusan
+              ? Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.school, color: brown),
+                      const SizedBox(width: 12),
+                      const Text('Loading jurusan...'),
+                    ],
+                  ),
+                )
+              : _hasJurusanError
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.error_outline, color: Colors.red),
+                          SizedBox(width: 12),
+                          Text('Error loading jurusan'),
+                        ],
+                      ),
+                    )
+                  : DropdownSearch<Map<String, dynamic>>(
+                      popupProps: PopupProps.menu(
+                        showSearchBox: true,
+                        searchFieldProps: const TextFieldProps(
+                          decoration: InputDecoration(
+                            prefixIcon: Icon(Icons.search),
+                            hintText: 'Cari jurusan...',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        menuProps: MenuProps(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      items: _jurusanList,
+                      itemAsString: (item) => item['nama']?.toString() ?? '-',
+                      dropdownDecoratorProps: DropDownDecoratorProps(
+                        dropdownSearchDecoration: InputDecoration(
+                          hintText: 'Pilih Jurusan (Opsional)',
+                          prefixIcon: Icon(Icons.school, color: brown),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.grey),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: brown, width: 1.5),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                      ),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedJurusan = val;
+                        });
+                      },
+                      selectedItem: _selectedJurusan,
+                    ),
         ],
       ),
     );
@@ -204,21 +346,17 @@ class _EditClassPageState extends State<EditClassPage> {
                     ),
                     borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
                   ),
-                  child: Column(
+                  child: const Column(
                     children: [
-                      const Text(
+                      Text(
                         'Ubah Kelas',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       CircleAvatar(
                         radius: 50,
                         backgroundColor: Colors.white,
-                        child: Icon(Icons.class_, size: 50, color: brown),
+                        child: Icon(Icons.class_, size: 50, color: Color(0xFF5B1A1A)),
                       ),
                     ],
                   ),
@@ -233,7 +371,6 @@ class _EditClassPageState extends State<EditClassPage> {
                 ),
               ],
             ),
-
             // Form
             Padding(
               padding: const EdgeInsets.all(24),
@@ -242,20 +379,19 @@ class _EditClassPageState extends State<EditClassPage> {
                 child: Column(
                   children: [
                     _buildTextField(),
+                    _buildJurusanDropdown(),
                     const SizedBox(height: 30),
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
+                      child: ElevatedButton(
                         onPressed: _updateClass,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Simpan Perubahan'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: brown,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
+                        child: const Text('Simpan Perubahan'),
                       ),
                     ),
                   ],
@@ -266,5 +402,11 @@ class _EditClassPageState extends State<EditClassPage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _namaController.dispose();
+    super.dispose();
   }
 }

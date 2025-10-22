@@ -3,8 +3,14 @@ import 'package:flutter/material.dart';
 class StatGrid extends StatelessWidget {
   final VoidCallback onAddPressed;
   final Map<String, dynamic>? data;
+  final void Function(String)? onBoxTap;
 
-  const StatGrid({super.key, required this.onAddPressed, this.data});
+  const StatGrid({
+    super.key,
+    required this.onAddPressed,
+    this.data,
+    this.onBoxTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +37,7 @@ class StatGrid extends StatelessWidget {
                     count: totalJurusan,
                     icon: Icons.school,
                     iconColor: Colors.blue,
+                    onTap: () => onBoxTap?.call('Jurusan'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -40,6 +47,7 @@ class StatGrid extends StatelessWidget {
                     count: totalSiswa,
                     icon: Icons.menu_book,
                     iconColor: Colors.green,
+                    onTap: () => onBoxTap?.call('Murid'),
                   ),
                 ),
               ],
@@ -53,6 +61,7 @@ class StatGrid extends StatelessWidget {
                     count: totalGuru,
                     icon: Icons.people,
                     iconColor: Colors.purple,
+                    onTap: () => onBoxTap?.call('Guru'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -62,6 +71,7 @@ class StatGrid extends StatelessWidget {
                     count: totalIndustri,
                     icon: Icons.handshake,
                     iconColor: Colors.deepOrange,
+                    onTap: () => onBoxTap?.call('Industri'),
                   ),
                 ),
               ],
@@ -77,6 +87,7 @@ class StatGrid extends StatelessWidget {
                     icon: Icons.class_,
                     iconColor: Colors.teal,
                     height: 90,
+                    onTap: () => onBoxTap?.call('Kelas'),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -109,6 +120,7 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final double height;
+  final VoidCallback? onTap;
 
   const _StatCard({
     required this.title,
@@ -116,33 +128,41 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     this.height = 75,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.orange, width: 1),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: iconColor, size: 32),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(count, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ],
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: height,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.orange, width: 1),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 32),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(title,
+                      style:
+                          const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(count,
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

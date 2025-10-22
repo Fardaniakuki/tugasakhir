@@ -2,9 +2,21 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 class DashboardService {
   String get _baseUrl => dotenv.env['API_BASE_URL'] ?? '';
+
+  // Cache untuk menghindari request berulang
+  final Map<String, dynamic> _cache = {};
+  final Map<String, DateTime> _cacheTimestamps = {};
+  final Duration _cacheDuration = const Duration(minutes: 5);
+
+  // Cache untuk bulk counts
+  Map<String, int>? _studentCountsCache;
+  Map<String, int>? _classCountsCache;
+  DateTime? _bulkCacheTimestamp;
+  final Duration _bulkCacheDuration = const Duration(minutes: 10);
 
   Uri _buildUri(String endpoint, [Map<String, String>? query]) {
     final base = Uri.parse(_baseUrl);
@@ -22,13 +34,39 @@ class DashboardService {
     return prefs.getString('access_token');
   }
 
-  Future<Map<String, dynamic>?> fetchDashboardData() async {
+  // Generic method untuk fetch data dengan cache
+  Future<dynamic> _fetchWithCache(String cacheKey, Future<dynamic> Function() fetchFunction) async {
+    final now = DateTime.now();
+    final cachedData = _cache[cacheKey];
+    final cachedTimestamp = _cacheTimestamps[cacheKey];
+
+    if (cachedData != null && cachedTimestamp != null) {
+      if (now.difference(cachedTimestamp) < _cacheDuration) {
+        return cachedData;
+      }
+    }
+
+    final data = await fetchFunction();
+    _cache[cacheKey] = data;
+    _cacheTimestamps[cacheKey] = now;
+    return data;
+  }
+
+  // METHOD BARU: Hitung jumlah murid untuk semua kelas sekaligus (BULK)
+  Future<Map<String, int>> _getAllStudentCounts() async {
+    final now = DateTime.now();
+    if (_studentCountsCache != null && 
+        _bulkCacheTimestamp != null && 
+        now.difference(_bulkCacheTimestamp!) < _bulkCacheDuration) {
+      return _studentCountsCache!;
+    }
+
     try {
       final token = await _getToken();
-      if (token == null) return null;
+      if (token == null) return {};
 
       final response = await http.get(
-        Uri.parse('$_baseUrl/api/admin/dashboard'),
+        _buildUri('/api/siswa', {'limit': '1000'}),
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
@@ -37,69 +75,151 @@ class DashboardService {
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-        return decoded['data'] ?? {};
-      } else {
-        throw Exception('Failed to fetch dashboard data: ${response.statusCode}');
+        List data = [];
+        
+        if (decoded['data'] != null && decoded['data']['data'] is List) {
+          data = decoded['data']['data'];
+        } else if (decoded['data'] is List) {
+          data = decoded['data'];
+        }
+
+        // Group by kelas_id dan hitung
+        final Map<String, int> counts = {};
+        for (var student in data) {
+          final kelasId = (student['kelas_id'] ?? '').toString();
+          if (kelasId.isNotEmpty) {
+            counts[kelasId] = (counts[kelasId] ?? 0) + 1;
+          }
+        }
+        
+        _studentCountsCache = counts;
+        _bulkCacheTimestamp = now;
+        return counts;
       }
+      return {};
     } catch (e) {
-      throw Exception('Failed to fetch dashboard data: $e');
+      debugPrint('Error counting all students: $e');
+      return {};
     }
+  }
+
+  // METHOD BARU: Hitung jumlah kelas untuk semua jurusan sekaligus (BULK)
+  Future<Map<String, int>> _getAllClassCounts() async {
+    final now = DateTime.now();
+    if (_classCountsCache != null && 
+        _bulkCacheTimestamp != null && 
+        now.difference(_bulkCacheTimestamp!) < _bulkCacheDuration) {
+      return _classCountsCache!;
+    }
+
+    try {
+      final token = await _getToken();
+      if (token == null) return {};
+
+      final response = await http.get(
+        _buildUri('/api/kelas', {'limit': '1000'}),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        List data = [];
+        
+        if (decoded['data'] != null && decoded['data']['data'] is List) {
+          data = decoded['data']['data'];
+        } else if (decoded['data'] is List) {
+          data = decoded['data'];
+        }
+
+        // Group by jurusan_id dan hitung
+        final Map<String, int> counts = {};
+        for (var kelas in data) {
+          final jurusanId = (kelas['jurusan_id'] ?? '').toString();
+          if (jurusanId.isNotEmpty) {
+            counts[jurusanId] = (counts[jurusanId] ?? 0) + 1;
+          }
+        }
+        
+        _classCountsCache = counts;
+        _bulkCacheTimestamp = now;
+        return counts;
+      }
+      return {};
+    } catch (e) {
+      debugPrint('Error counting all classes: $e');
+      return {};
+    }
+  }
+
+  Future<Map<String, dynamic>?> fetchDashboardData() async {
+    return await _fetchWithCache('dashboard', () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return null;
+
+        final response = await http.get(
+          Uri.parse('$_baseUrl/api/admin/dashboard'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          return decoded['data'] ?? {};
+        } else {
+          throw Exception('Failed to fetch dashboard data: ${response.statusCode}');
+        }
+      } catch (e) {
+        throw Exception('Failed to fetch dashboard data: $e');
+      }
+    });
   }
 
   Future<List<Map<String, String>>> fetchKelas() async {
-    try {
-      final token = await _getToken();
-      if (token == null) return [];
+    return await _fetchWithCache('kelas', () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/kelas'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+        final response = await http.get(
+          Uri.parse('$_baseUrl/api/kelas?page=1&limit=100'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
 
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data = decoded['data'] ?? [];
-        return data
-            .map<Map<String, String>>((k) => {
-                  'id': (k['id'] ?? '').toString(),
-                  'name': (k['nama'] ?? '').toString(),
-                })
-            .where((m) => m['name']!.isNotEmpty)
-            .toList();
-      } else {
-        throw Exception('Failed to fetch kelas: ${response.statusCode}');
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          
+          if (decoded['data'] is List) {
+            data = decoded['data'];
+          } else if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          } else if (decoded is List) {
+            data = decoded;
+          }
+          
+          final result = data
+              .map<Map<String, String>>((k) => {
+                    'id': (k['id'] ?? '').toString(),
+                    'name': (k['nama'] ?? '').toString(),
+                  })
+              .where((m) => m['name']!.isNotEmpty)
+              .toList();
+
+          return result;
+        } else {
+          throw Exception('Failed to fetch kelas: ${response.statusCode}');
+        }
+      } catch (e) {
+        throw Exception('Failed to fetch kelas: $e');
       }
-    } catch (e) {
-      throw Exception('Failed to fetch kelas: $e');
-    }
-  }
-
-  Future<List<Map<String, String>>> fetchJurusan() async {
-    try {
-      final token = await _getToken();
-      if (token == null) return [];
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/jurusan'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data = decoded['data'] ?? [];
-        return data
-            .map<Map<String, String>>((j) => {
-                  'id': (j['id'] ?? '').toString(),
-                  'name': (j['nama'] ?? '').toString(),
-                })
-            .where((m) => m['name']!.isNotEmpty)
-            .toList();
-      } else {
-        throw Exception('Failed to fetch jurusan: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to fetch jurusan: $e');
-    }
+    });
   }
 
   Future<List<Map<String, dynamic>>> fetchSiswaData({
@@ -107,242 +227,406 @@ class DashboardService {
     String jurusanId = '',
     String searchQuery = '',
   }) async {
-    try {
-      final token = await _getToken();
-      if (token == null) return [];
+    final normalizedKelasId = kelasId.isEmpty ? 'all' : kelasId;
+    final normalizedJurusanId = jurusanId.isEmpty ? 'all' : jurusanId;
+    final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
+    
+    final cacheKey = 'siswa-$normalizedSearchQuery-$normalizedKelasId-$normalizedJurusanId';
+    
+    return await _fetchWithCache(cacheKey, () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
 
-      final Map<String, String> queryParams = {
-        'page': '1',
-        'limit': '100',
-      };
+        final Map<String, String> queryParams = {
+          'page': '1',
+          'limit': '100',
+          'with_detail': 'true',
+        };
 
-      if (kelasId.isNotEmpty) queryParams['kelas_id'] = kelasId;
-      if (jurusanId.isNotEmpty) queryParams['jurusan_id'] = jurusanId;
-      if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+        if (kelasId.isNotEmpty) queryParams['kelas_id'] = kelasId;
+        if (jurusanId.isNotEmpty) queryParams['jurusan_id'] = jurusanId;
+        if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
 
-      final uri = _buildUri('/api/siswa', queryParams);
+        final uri = _buildUri('/api/siswa', queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+        final response = await http.get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
 
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data = decoded['data']['data'] ?? [];
-        return data.map<Map<String, dynamic>>((m) {
-          final String nama = (m['nama_lengkap'] ?? m['nama'] ?? m['name'] ?? '').toString();
-          final String kelasName = (m['kelas_name'] ?? m['kelas'] ?? '').toString();
-          final String jurusanName = (m['jurusan_name'] ?? m['jurusan'] ?? '').toString();
-          return {
-            'name': nama,
-            'role': 'Murid',
-            'kelas': kelasName,
-            'jurusan': jurusanName,
-            'id': (m['id'] ?? '').toString(),
-            'type': 'siswa',
-          };
-        }).toList();
-      } else {
-        throw Exception('Failed to fetch siswa data: ${response.statusCode}');
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+
+          List data = [];
+          if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          } else if (decoded['data'] is List) {
+            data = decoded['data'];
+          }
+
+          final List<Map<String, String>> kelasList = await fetchKelas();
+
+          final List<Map<String, dynamic>> siswaList = [];
+
+          for (var m in data) {
+            final String nama = (m['nama_lengkap'] ?? 'Unknown').toString();
+            final String nisn = (m['nisn'] ?? '').toString();
+            final String siswaId = (m['id'] ?? '').toString();
+            
+            final String kelasIdStr = (m['kelas_id'] ?? '').toString();
+            String kelasName = '-';
+            
+            if (kelasIdStr.isNotEmpty && kelasList.isNotEmpty) {
+              try {
+                final kelasData = kelasList.firstWhere(
+                  (k) => k['id'] == kelasIdStr,
+                  orElse: () => {'name': 'Kelas $kelasIdStr'},
+                );
+                kelasName = kelasData['name']!;
+              } catch (e) {
+                kelasName = 'Kelas $kelasIdStr';
+              }
+            }
+            
+            final String tanggalLahir = (m['tanggal_lahir'] ?? 
+                                  m['tgl_lahir'] ?? 
+                                  m['birth_date'] ?? 
+                                  m['profile']?['tanggal_lahir'] ??
+                                  m['profile']?['tgl_lahir'] ??
+                                  '-').toString();
+
+            siswaList.add({
+              'name': nama,
+              'role': 'Murid',
+              'kelas': kelasName,
+              'jurusan': '-',
+              'nisn': nisn,
+              'tgl_lahir': tanggalLahir,
+              'id': siswaId,
+              'type': 'siswa',
+              'original_kelas_id': kelasIdStr,
+            });
+          }
+
+          return siswaList;
+        } else {
+          throw Exception('Failed to fetch siswa data: ${response.statusCode}');
+        }
+      } catch (e) {
+        throw Exception('Failed to fetch siswa data: $e');
       }
-    } catch (e) {
-      throw Exception('Failed to fetch siswa data: $e');
-    }
+    });
   }
 
   Future<List<Map<String, dynamic>>> fetchGuruData({String searchQuery = ''}) async {
-    try {
-      final token = await _getToken();
-      if (token == null) return [];
+    final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
+    final cacheKey = 'guru-$normalizedSearchQuery';
+    
+    return await _fetchWithCache(cacheKey, () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
 
-      final Map<String, String> queryParams = {
-        'page': '1',
-        'limit': '100',
-      };
+        final Map<String, String> queryParams = {
+          'page': '1',
+          'limit': '100',
+        };
 
-      if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+        if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
 
-      final uri = _buildUri('/api/guru', queryParams);
+        final uri = _buildUri('/api/guru', queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+        final response = await http.get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
 
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data = decoded['data']['data'] ?? [];
-        return data.map<Map<String, dynamic>>((g) {
-          final String nama = (g['nama_lengkap'] ?? g['nama'] ?? g['name'] ?? '').toString();
-          return {
-            'name': nama,
-            'role': 'Guru',
-            'id': (g['id'] ?? '').toString(),
-            'type': 'guru',
-          };
-        }).toList();
-      } else {
-        throw Exception('Failed to fetch guru data: ${response.statusCode}');
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          
+          if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          } else if (decoded['data'] is List) {
+            data = decoded['data'];
+          } else {
+            return [];
+          }
+
+          final List<Map<String, dynamic>> guruList = [];
+          
+          for (var g in data) {
+            final String nama = (g['nama_lengkap'] ?? g['nama'] ?? 'Unknown').toString();
+            final String nip = (g['nip'] ?? '').toString();
+            final String kodeGuru = (g['kode_guru'] ?? '').toString();
+            final String userId = (g['user_id'] ?? '').toString();
+            
+            guruList.add({
+              'name': nama,
+              'role': 'Guru',
+              'nisn': nip,
+              'kode_guru': kodeGuru,
+              'user_id': userId,
+              'id': (g['id'] ?? '').toString(),
+              'type': 'guru',
+            });
+          }
+          
+          return guruList;
+        } else {
+          throw Exception('Failed to fetch guru data: ${response.statusCode}');
+        }
+      } catch (e) {
+        throw Exception('Failed to fetch guru data: $e');
       }
-    } catch (e) {
-      throw Exception('Failed to fetch guru data: $e');
-    }
+    });
   }
 
   Future<List<Map<String, dynamic>>> fetchJurusanData({String searchQuery = ''}) async {
-    try {
-      final token = await _getToken();
-      if (token == null) return [];
+    final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
+    final cacheKey = 'jurusan-$normalizedSearchQuery';
+    
+    return await _fetchWithCache(cacheKey, () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
 
-      final Map<String, String> queryParams = {
-        'page': '1',
-        'limit': '100',
-      };
+        final Map<String, String> queryParams = {
+          'page': '1',
+          'limit': '100',
+        };
 
-      if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+        if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
 
-      final uri = _buildUri('/api/jurusan', queryParams);
+        final uri = _buildUri('/api/jurusan', queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+        final response = await http.get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
 
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data = decoded['data']['data'] ?? [];
-        return data.map<Map<String, dynamic>>((j) {
-          final String nama = (j['nama'] ?? j['name'] ?? '').toString();
-          return {
-            'name': nama,
-            'role': 'Jurusan',
-            'id': (j['id'] ?? '').toString(),
-            'type': 'jurusan',
-          };
-        }).toList();
-      } else {
-        throw Exception('Failed to fetch jurusan data: ${response.statusCode}');
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          if (decoded['data'] is List) {
+            data = decoded['data'];
+          } else if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          }
+
+          // OPTIMASI: Gunakan bulk counting
+          final Map<String, int> classCounts = await _getAllClassCounts();
+          
+          final List<Map<String, dynamic>> jurusanList = [];
+          
+          for (var j in data) {
+            final String jurusanId = (j['id'] ?? '').toString();
+            final int jumlahKelas = classCounts[jurusanId] ?? 0;
+            
+            jurusanList.add({
+              'name': (j['nama'] ?? 'Unknown').toString(),
+              'kode': (j['kode'] ?? '').toString(),
+              'role': 'Jurusan',
+              'id': jurusanId,
+              'type': 'jurusan',
+              'jumlah_kelas': jumlahKelas,
+            });
+          }
+          
+          return jurusanList;
+        } else {
+          throw Exception('Failed to fetch jurusan data: ${response.statusCode}');
+        }
+      } catch (e) {
+        throw Exception('Failed to fetch jurusan data: $e');
       }
-    } catch (e) {
-      throw Exception('Failed to fetch jurusan data: $e');
-    }
+    });
   }
 
   Future<List<Map<String, dynamic>>> fetchIndustriData({String searchQuery = ''}) async {
-    try {
-      final token = await _getToken();
-      if (token == null) return [];
+    final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
+    final cacheKey = 'industri-$normalizedSearchQuery';
+    
+    return await _fetchWithCache(cacheKey, () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
 
-      final Map<String, String> queryParams = {
-        'page': '1',
-        'limit': '100',
-      };
+        final Map<String, String> queryParams = {
+          'page': '1',
+          'limit': '100',
+        };
 
-      if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+        if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
 
-      final uri = _buildUri('/api/industri', queryParams);
+        final uri = _buildUri('/api/industri', queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+        final response = await http.get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
 
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data = decoded['data']['data'] ?? [];
-        return data.map<Map<String, dynamic>>((i) {
-          final String nama = (i['nama'] ?? i['name'] ?? '').toString();
-          return {
-            'name': nama,
-            'role': 'Industri',
-            'id': (i['id'] ?? '').toString(),
-            'type': 'industri',
-          };
-        }).toList();
-      } else {
-        throw Exception('Failed to fetch industri data: ${response.statusCode}');
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          if (decoded['data'] is List) {
+            data = decoded['data'];
+          } else if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          }
+
+          return data.map<Map<String, dynamic>>((i) {
+            final String nama = (i['nama'] ?? 'Unknown').toString();
+            final String noTelp = (i['no_telp'] ?? '').toString();
+            final String alamat = (i['alamat'] ?? '').toString();
+            final String bidang = (i['bidang'] ?? '').toString();
+            
+            return {
+              'name': nama,
+              'no_telp': noTelp,
+              'alamat': alamat,
+              'bidang': bidang,
+              'role': 'Industri',
+              'id': (i['id'] ?? '').toString(),
+              'type': 'industri',
+            };
+          }).toList();
+        } else {
+          throw Exception('Failed to fetch industri data: ${response.statusCode}');
+        }
+      } catch (e) {
+        throw Exception('Failed to fetch industri data: $e');
       }
-    } catch (e) {
-      throw Exception('Failed to fetch industri data: $e');
-    }
+    });
   }
 
   Future<List<Map<String, dynamic>>> fetchKelasData({String searchQuery = ''}) async {
-    try {
-      final token = await _getToken();
-      if (token == null) return [];
+    final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
+    final cacheKey = 'kelas-data-$normalizedSearchQuery';
+    
+    return await _fetchWithCache(cacheKey, () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
 
-      final Map<String, String> queryParams = {
-        'page': '1',
-        'limit': '100',
-      };
+        final Map<String, String> queryParams = {
+          'page': '1',
+          'limit': '100',
+        };
 
-      if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+        if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
 
-      final uri = _buildUri('/api/kelas', queryParams);
+        final uri = _buildUri('/api/kelas', queryParams);
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+        final response = await http.get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
 
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        final List data = decoded['data']['data'] ?? [];
-        return data.map<Map<String, dynamic>>((k) {
-          final String nama = (k['nama'] ?? k['name'] ?? '').toString();
-          return {
-            'name': nama,
-            'role': 'Kelas',
-            'id': (k['id'] ?? '').toString(),
-            'type': 'kelas',
-          };
-        }).toList();
-      } else {
-        throw Exception('Failed to fetch kelas data: ${response.statusCode}');
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          if (decoded['data'] is List) {
+            data = decoded['data'];
+          } else if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          }
+
+          // Ambil data jurusan untuk mapping nama jurusan
+          final List<Map<String, dynamic>> jurusanList = await fetchJurusanData();
+
+          // OPTIMASI: Gunakan bulk counting
+          final Map<String, int> studentCounts = await _getAllStudentCounts();
+
+          final List<Map<String, dynamic>> kelasList = [];
+          
+          for (var k in data) {
+            final String kelasId = (k['id'] ?? '').toString();
+            final String jurusanId = (k['jurusan_id'] ?? '').toString();
+            final int jumlahMurid = studentCounts[kelasId] ?? 0;
+            
+            // Cari nama jurusan berdasarkan jurusan_id
+            String jurusanNama = 'Tidak ada jurusan';
+            if (jurusanId.isNotEmpty) {
+              try {
+                final jurusanData = jurusanList.firstWhere(
+                  (j) => j['id'] == jurusanId,
+                  orElse: () => {'name': 'Jurusan $jurusanId'},
+                );
+                jurusanNama = jurusanData['name'] ?? 'Jurusan $jurusanId';
+              } catch (e) {
+                jurusanNama = 'Jurusan $jurusanId';
+              }
+            }
+            
+            kelasList.add({
+              'name': (k['nama'] ?? 'Unknown').toString(),
+              'jurusan_id': jurusanId,
+              'jurusan_nama': jurusanNama,
+              'role': 'Kelas',
+              'id': kelasId,
+              'type': 'kelas',
+              'jumlah_murid': jumlahMurid,
+            });
+          }
+          
+          return kelasList;
+        } else {
+          throw Exception('Failed to fetch kelas data: ${response.statusCode}');
+        }
+      } catch (e) {
+        throw Exception('Failed to fetch kelas data: $e');
       }
-    } catch (e) {
-      throw Exception('Failed to fetch kelas data: $e');
+    });
+  }
+
+  // Method untuk clear cache ketika diperlukan
+  void clearCache([String? specificKey]) {
+    if (specificKey != null) {
+      _cache.remove(specificKey);
+      _cacheTimestamps.remove(specificKey);
+    } else {
+      _cache.clear();
+      _cacheTimestamps.clear();
+      _studentCountsCache = null;
+      _classCountsCache = null;
+      _bulkCacheTimestamp = null;
     }
   }
 
-  Future<Map<String, dynamic>?> fetchKelasById(String kelasId) async {
-    try {
-      final token = await _getToken();
-      if (token == null) return null;
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/kelas/$kelasId'),
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        return decoded['data'];
-      } else {
-        throw Exception('Failed to fetch kelas by id: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to fetch kelas by id: $e');
+  // Method untuk clear cache berdasarkan pattern
+  void clearCacheByPattern(String pattern) {
+    final keysToRemove = _cache.keys.where((key) => key.contains(pattern)).toList();
+    for (final key in keysToRemove) {
+      _cache.remove(key);
+      _cacheTimestamps.remove(key);
     }
+  }
+
+  // Method untuk clear bulk cache
+  void clearBulkCache() {
+    _studentCountsCache = null;
+    _classCountsCache = null;
+    _bulkCacheTimestamp = null;
   }
 }

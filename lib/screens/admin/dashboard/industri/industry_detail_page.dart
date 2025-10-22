@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'edit_industry_page.dart';
-import '../../popup_helper.dart'; // Pastikan sudah buat popup_helper.dart
+import '../../popup_helper.dart';
 
 class IndustryDetailPage extends StatefulWidget {
   final String industryId;
@@ -17,6 +17,7 @@ class IndustryDetailPage extends StatefulWidget {
 
 class _IndustryDetailPageState extends State<IndustryDetailPage> {
   Map<String, dynamic>? industryData;
+  String? jurusanName;
   bool isLoading = true;
 
   final Color brown = const Color(0xFF5B1A1A);
@@ -32,23 +33,123 @@ class _IndustryDetailPageState extends State<IndustryDetailPage> {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
-    final response = await http.get(
-      Uri.parse('${dotenv.env['API_BASE_URL']}/api/industri/${widget.industryId}'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    print('=== START FETCH INDUSTRY DETAIL ===');
+    print('Industry ID: ${widget.industryId}');
+    print('Token: ${token != null ? "Ada" : "Tidak ada"}');
 
-    if (response.statusCode == 200) {
-      final decoded = json.decode(response.body);
-      setState(() {
-        industryData = decoded['data'];
-        isLoading = false;
-      });
-    } else {
+    try {
+      final industryUrl = '${dotenv.env['API_BASE_URL']}/api/industri/${widget.industryId}';
+      print('Industry URL: $industryUrl');
+
+      final industryResponse = await http.get(
+        Uri.parse(industryUrl),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Industry Response Status: ${industryResponse.statusCode}');
+      print('Industry Response Body: ${industryResponse.body}');
+
+      if (industryResponse.statusCode == 200) {
+        final decoded = json.decode(industryResponse.body);
+        print('Industry Decoded: $decoded');
+        
+        setState(() {
+          industryData = decoded['data'];
+        });
+
+        // Debug jurusan_id dari data industri
+        final jurusanId = industryData!['jurusan_id'];
+        print('Jurusan ID from industry: $jurusanId');
+        print('Type of jurusan_id: ${jurusanId?.runtimeType}');
+
+        if (jurusanId != null) {
+          await fetchJurusanName(jurusanId);
+        } else {
+          setState(() {
+            jurusanName = 'Tidak ada jurusan';
+          });
+          print('Jurusan ID is NULL');
+        }
+      } else {
+        print('Industry fetch FAILED with status: ${industryResponse.statusCode}');
+      }
+      
       setState(() => isLoading = false);
+    } catch (e) {
+      setState(() => isLoading = false);
+      print('Error fetching industry detail: $e');
     }
+    print('=== END FETCH INDUSTRY DETAIL ===');
+  }
+
+  Future<void> fetchJurusanName(int jurusanId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    print('=== START FETCH JURUSAN ===');
+    print('Jurusan ID to fetch: $jurusanId');
+
+    try {
+      final jurusanUrl = '${dotenv.env['API_BASE_URL']}/api/jurusan/$jurusanId';
+      print('Jurusan URL: $jurusanUrl');
+
+      final response = await http.get(
+        Uri.parse(jurusanUrl),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('Jurusan Response Status: ${response.statusCode}');
+      print('Jurusan Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        print('Jurusan Decoded: $decoded');
+        
+        // Coba berbagai kemungkinan struktur response
+        if (decoded['nama'] != null) {
+          print('Found jurusan name in decoded["nama"]: ${decoded["nama"]}');
+          setState(() {
+            jurusanName = decoded['nama'];
+          });
+        } 
+        else if (decoded['data'] != null && decoded['data']['nama'] != null) {
+          print('Found jurusan name in decoded["data"]["nama"]: ${decoded["data"]["nama"]}');
+          setState(() {
+            jurusanName = decoded['data']['nama'];
+          });
+        }
+        else if (decoded is Map<String, dynamic> && decoded.containsKey('nama')) {
+          print('Found jurusan name in root: ${decoded["nama"]}');
+          setState(() {
+            jurusanName = decoded['nama'];
+          });
+        }
+        else {
+          print('Jurusan name NOT FOUND in response. Available keys: ${decoded.keys}');
+          setState(() {
+            jurusanName = 'Struktur data tidak dikenali';
+          });
+        }
+      } else {
+        print('Jurusan fetch FAILED with status: ${response.statusCode}');
+        setState(() {
+          jurusanName = 'Jurusan tidak ditemukan (${response.statusCode})';
+        });
+      }
+    } catch (e) {
+      print('Error fetching jurusan: $e');
+      setState(() {
+        jurusanName = 'Error: $e';
+      });
+    }
+    print('Final jurusanName: $jurusanName');
+    print('=== END FETCH JURUSAN ===');
   }
 
   Future<void> deleteIndustry() async {
@@ -66,7 +167,6 @@ class _IndustryDetailPageState extends State<IndustryDetailPage> {
     if (!mounted) return;
 
     if (response.statusCode == 200) {
-      // Gunakan popup helper
       PopupHelper.showSuccessDialog(context, 'Industri berhasil dihapus.', onOk: () {
         Navigator.pop(context, {'deleted': true});
       });
@@ -194,6 +294,7 @@ class _IndustryDetailPageState extends State<IndustryDetailPage> {
                       _buildProfileItem(Icons.phone, 'No. Telp', industryData!['no_telp']),
                       _buildProfileItem(Icons.email, 'Email', industryData!['email']),
                       _buildProfileItem(Icons.work, 'Bidang', industryData!['bidang']),
+                      _buildProfileItem(Icons.school, 'Jurusan', jurusanName ?? 'Loading...'),
                       _buildProfileItem(Icons.person, 'PIC', industryData!['pic']),
                       _buildProfileItem(Icons.phone_android, 'No. Telp PIC', industryData!['pic_telp']),
                       const SizedBox(height: 30),

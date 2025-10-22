@@ -40,7 +40,8 @@ class _AdminMainState extends State<AdminMain> {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Beranda'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Akun'),
           BottomNavigationBarItem(icon: Icon(Icons.folder), label: 'Data'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Pengaturan'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.settings), label: 'Pengaturan'),
         ],
       ),
     );

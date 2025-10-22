@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 
 class EditStudentPage extends StatefulWidget {
   final Map<String, dynamic> studentData;
@@ -21,9 +22,11 @@ class _EditStudentPageState extends State<EditStudentPage> {
   late TextEditingController alamatController;
   late TextEditingController noTelpController;
   late TextEditingController tanggalLahirController;
-  late TextEditingController kelasIdController;
 
   final Color brown = const Color(0xFF5B1A1A);
+
+  List<Map<String, dynamic>> kelasList = [];
+  Map<String, dynamic>? selectedKelas;
 
   @override
   void initState() {
@@ -38,9 +41,44 @@ class _EditStudentPageState extends State<EditStudentPage> {
     tanggalLahirController = TextEditingController(
       text: _formatDateForDisplay(widget.studentData['tanggal_lahir']),
     );
-    kelasIdController = TextEditingController(
-      text: widget.studentData['kelas_id']?.toString() ?? '',
-    );
+
+    _fetchKelas();
+  }
+
+  Future<void> _fetchKelas() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token') ?? '';
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
+
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/kelas?limit=1000'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        setState(() {
+          if (data['data'] is List) {
+            kelasList = List<Map<String, dynamic>>.from(data['data']);
+          } else if (data['data']['data'] is List) {
+            kelasList =
+                List<Map<String, dynamic>>.from(data['data']['data']);
+          }
+selectedKelas = kelasList.isNotEmpty
+    ? kelasList.firstWhere(
+        (k) => k['id'] == widget.studentData['kelas_id'],
+        orElse: () => kelasList[0],
+      )
+    : null;
+
+        });
+      } else {
+        print('Gagal fetch kelas: ${res.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetch kelas: $e');
+    }
   }
 
   String _formatDateForDisplay(String? rawDate) {
@@ -99,16 +137,6 @@ class _EditStudentPageState extends State<EditStudentPage> {
 
     final url =
         '${dotenv.env['API_BASE_URL']}/api/siswa/${widget.studentData['id']}';
-    print('Mencoba update student di URL: $url'); // debug URL
-    print('Data dikirim: ${json.encode({
-          'nama_lengkap': namaController.text.trim(),
-          'nisn': nisnController.text.trim(),
-          'alamat': alamatController.text.trim(),
-          'no_telp': noTelpController.text.trim(),
-          'kelas_id': int.tryParse(kelasIdController.text.trim()) ?? 0,
-          'tanggal_lahir':
-              _convertDisplayDateToISO(tanggalLahirController.text.trim()),
-        })}'); // debug body
 
     try {
       final response = await http.put(
@@ -122,14 +150,11 @@ class _EditStudentPageState extends State<EditStudentPage> {
           'nisn': nisnController.text.trim(),
           'alamat': alamatController.text.trim(),
           'no_telp': noTelpController.text.trim(),
-          'kelas_id': int.tryParse(kelasIdController.text.trim()) ?? 0,
+          'kelas_id': selectedKelas?['id'] ?? 0,
           'tanggal_lahir':
               _convertDisplayDateToISO(tanggalLahirController.text.trim()),
         }),
       );
-
-      print('Status code: ${response.statusCode}'); // debug status
-      print('Response body: ${response.body}'); // debug response
 
       if (!mounted) return;
 
@@ -268,22 +293,72 @@ class _EditStudentPageState extends State<EditStudentPage> {
               fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Colors.grey), // Warna border default
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Colors.grey), // Warna saat tidak fokus
+                borderSide: const BorderSide(color: Colors.grey),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Colors.grey, width: 1.5), // Warna saat fokus
+                borderSide:
+                    const BorderSide(color: Colors.grey, width: 1.5),
               ),
               contentPadding:
                   const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKelasDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Kelas', style: TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
+          DropdownSearch<Map<String, dynamic>>(
+            popupProps: PopupProps.menu(
+              showSearchBox: true,
+              searchFieldProps: const TextFieldProps(
+                decoration: InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  hintText: 'Cari kelas...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              menuProps: MenuProps(borderRadius: BorderRadius.circular(12)),
+            ),
+            items: kelasList,
+            itemAsString: (item) => item['nama'] ?? '-',
+            dropdownDecoratorProps: DropDownDecoratorProps(
+              dropdownSearchDecoration: InputDecoration(
+                hintText: 'Pilih Kelas',
+                prefixIcon: Icon(Icons.class_, color: brown),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.grey),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            ),
+            onChanged: (val) {
+              setState(() {
+                selectedKelas = val;
+              });
+            },
+            selectedItem: selectedKelas,
           ),
         ],
       ),
@@ -297,7 +372,6 @@ class _EditStudentPageState extends State<EditStudentPage> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Header
             Stack(
               children: [
                 Container(
@@ -341,23 +415,19 @@ class _EditStudentPageState extends State<EditStudentPage> {
                 ),
               ],
             ),
-
-            // Form
             Padding(
               padding: const EdgeInsets.all(24),
               child: Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    _buildTextField(
-                        Icons.person, 'Nama Lengkap', namaController),
+                    _buildTextField(Icons.person, 'Nama Lengkap', namaController),
                     _buildTextField(Icons.numbers, 'NISN', nisnController,
                         keyboard: TextInputType.number),
                     _buildTextField(Icons.home, 'Alamat', alamatController),
                     _buildTextField(Icons.phone, 'No Telepon', noTelpController,
                         keyboard: TextInputType.phone),
-                    _buildTextField(Icons.class_, 'Kelas ID', kelasIdController,
-                        keyboard: TextInputType.number),
+                    _buildKelasDropdown(),
                     _buildTextField(Icons.calendar_today,
                         'Tanggal Lahir (DD-MM-YYYY)', tanggalLahirController,
                         readOnly: true, onTap: _pickTanggalLahir),

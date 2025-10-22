@@ -1,5 +1,3 @@
-// ignore_for_file: use_build_context_synchronously
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final token = prefs.getString('access_token');
     final role = prefs.getString('user_role');
 
-    if (token != null && role != null) {
+    if (token != null && role != null && mounted) {
       Widget targetPage;
       switch (role) {
         case 'Siswa':
@@ -57,7 +55,6 @@ class _LoginScreenState extends State<LoginScreen> {
           targetPage = const AdminMain();
       }
 
-      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => targetPage),
@@ -74,12 +71,21 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Capitalize first letter
+  String capitalize(String s) =>
+      s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '';
+
   /// 🔥 POPUP pilih peran Guru (klik luar area bisa close)
   Future<void> _showRoleSelectionDialog(
-      BuildContext context, List<String> rolesAvailable, SharedPreferences prefs) async {
+    BuildContext context,
+    List<String> rolesAvailable,
+    SharedPreferences prefs,
+    String userName,
+  ) async {
+    if (!mounted) return;
     return showDialog(
       context: context,
-      barrierDismissible: true, // ✅ klik luar langsung close
+      barrierDismissible: true,
       builder: (context) {
         return Dialog(
           shape: RoundedRectangleBorder(
@@ -91,11 +97,11 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.account_circle, size: 60, color:  Color(0xFF5B1A1A)),
+                const Icon(Icons.account_circle, size: 60, color: Color(0xFF5B1A1A)),
                 const SizedBox(height: 12),
-                const Text(
-                  'Pilih Peran',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                Text(
+                  'Halo, $userName',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -122,7 +128,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         label: Text(role, style: const TextStyle(fontSize: 16)),
                         onPressed: () async {
                           Navigator.pop(context);
-
                           Widget targetPage;
                           switch (role) {
                             case 'Pembimbing':
@@ -139,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           }
 
                           await prefs.setString('user_role', role);
-
+                          if (!mounted) return;
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(builder: (_) => targetPage),
@@ -182,15 +187,18 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString('user_role', user['role']);
 
         if (endpoint == '/auth/guru/login') {
-          // 🔥 handle multi role guru (koordinator sudah dihapus)
           final List<String> rolesAvailable = ['Guru'];
           if (user['is_pembimbing'] == true) rolesAvailable.add('Pembimbing');
           if (user['is_wali_kelas'] == true) rolesAvailable.add('Wali Kelas');
           if (user['is_kaprog'] == true) rolesAvailable.add('Kaprog');
 
-          await _showRoleSelectionDialog(context, rolesAvailable, prefs);
+          await _showRoleSelectionDialog(
+            context,
+            rolesAvailable,
+            prefs,
+            capitalize(user['nama']),
+          );
         } else {
-          // 🔥 selain guru langsung masuk
           Widget targetPage;
           if (selectedRole == 'Siswa') {
             targetPage = const SiswaDashboard();
@@ -200,12 +208,14 @@ class _LoginScreenState extends State<LoginScreen> {
             targetPage = const AdminMain();
           }
 
+          if (!mounted) return;
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => targetPage),
           );
         }
       } else {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Login gagal: ${response.body}')),
         );
@@ -227,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       } else if (selectedRole == 'Guru') {
         loginToAPI('/auth/guru/login', {
-          'kode_guru': guruController.text.trim(), // ✅ sesuai API
+          'kode_guru': guruController.text.trim(),
           'password': passwordController.text.trim(),
         });
       } else {
@@ -289,7 +299,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 120),
                   Center(
                     child: Image.asset(
-                      'assets/images/inorasi.png',
+                      'assets/images/ino.webp',
                       width: 240,
                     ),
                   ),
@@ -389,8 +399,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               : null,
                     ),
                   ],
-                  const SizedBox(height: 7),
-                  
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: _handleLogin,

@@ -62,12 +62,79 @@ class _AddPersonPageState extends State<AddPersonPage> {
   final FocusNode _picFocus = FocusNode();
   final FocusNode _picTelpFocus = FocusNode();
 
+  // State untuk melacak status validasi setiap field
+  final Map<String, String> _fieldErrorMessages = {};
+
   @override
   void initState() {
     super.initState();
     _fetchKelas();
     _fetchJurusan();
     _setupFocusListeners();
+    _setupTextControllers();
+  }
+
+  void _setupTextControllers() {
+    // Setup listener untuk real-time validation
+    namaController.addListener(() => _validateField('nama', namaController.text, 3));
+    alamatController.addListener(() => _validateField('alamat', alamatController.text, 10));
+    noTelpController.addListener(() => _validatePhone('noTelp', noTelpController.text));
+    nisnController.addListener(() => _validateNISN('nisn', nisnController.text));
+    nipController.addListener(() => _validateField('nip', nipController.text, 8));
+    kodeGuruController.addListener(() => _validateField('kodeGuru', kodeGuruController.text, 3));
+    passwordController.addListener(() => _validateField('password', passwordController.text, 6));
+    kodeJurusanController.addListener(() => _validateField('kodeJurusan', kodeJurusanController.text, 2));
+    bidangController.addListener(() => _validateField('bidang', bidangController.text, 3));
+    emailController.addListener(() => _validateEmail('email', emailController.text));
+    picController.addListener(() => _validateField('pic', picController.text, 3));
+    picTelpController.addListener(() => _validatePhone('picTelp', picTelpController.text));
+  }
+
+  void _validateField(String fieldName, String value, int minLength) {
+    final bool isValid = value.trim().length >= minLength;
+    final String errorMessage = value.trim().isEmpty 
+      ? '$fieldName harus diisi'
+      : 'Minimal $minLength karakter';
+
+    setState(() {
+      _fieldErrorMessages[fieldName] = isValid ? '' : errorMessage;
+    });
+  }
+
+  void _validatePhone(String fieldName, String value) {
+    final bool isValid = value.trim().length >= 10 && RegExp(r'^\d+$').hasMatch(value.trim());
+    final String errorMessage = value.trim().isEmpty 
+      ? 'No. Telp harus diisi'
+      : value.trim().length < 10 
+        ? 'Minimal 10 digit'
+        : 'Harus berupa angka';
+
+    setState(() {
+      _fieldErrorMessages[fieldName] = isValid ? '' : errorMessage;
+    });
+  }
+
+  void _validateNISN(String fieldName, String value) {
+    final bool isValid = value.trim().length == 10 && RegExp(r'^\d+$').hasMatch(value.trim());
+    final String errorMessage = value.trim().isEmpty 
+      ? 'NISN harus diisi'
+      : value.trim().length != 10 
+        ? 'Harus tepat 10 digit'
+        : 'Harus berupa angka';
+
+    setState(() {
+      _fieldErrorMessages[fieldName] = isValid ? '' : errorMessage;
+    });
+  }
+
+  void _validateEmail(String fieldName, String value) {
+    final bool isValid = value.trim().isEmpty || 
+        RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim());
+    const String errorMessage = 'Format email tidak valid';
+
+    setState(() {
+      _fieldErrorMessages[fieldName] = isValid ? '' : errorMessage;
+    });
   }
 
   @override
@@ -86,6 +153,22 @@ class _AddPersonPageState extends State<AddPersonPage> {
     _emailFocus.dispose();
     _picFocus.dispose();
     _picTelpFocus.dispose();
+
+    // Dispose controllers
+    namaController.dispose();
+    alamatController.dispose();
+    noTelpController.dispose();
+    nisnController.dispose();
+    tanggalLahirController.dispose();
+    nipController.dispose();
+    kodeGuruController.dispose();
+    passwordController.dispose();
+    kodeJurusanController.dispose();
+    bidangController.dispose();
+    emailController.dispose();
+    picController.dispose();
+    picTelpController.dispose();
+    
     super.dispose();
   }
 
@@ -452,9 +535,13 @@ Future<void> _fetchJurusan() async {
       String? hint,
       int? minLength,
       String? additionalHint,
-      required FocusNode focusNode}) {
+      required FocusNode focusNode,
+      required String fieldName}) {
     
     final bool isFocused = focusNode.hasFocus;
+    final bool hasError = _fieldErrorMessages[fieldName]?.isNotEmpty ?? false;
+    final String errorMessage = _fieldErrorMessages[fieldName] ?? '';
+    final bool showError = isFocused && hasError;
     
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -471,6 +558,9 @@ Future<void> _fetchJurusan() async {
             keyboardType: type,
             readOnly: readOnly,
             onTap: onTap,
+            onChanged: (value) {
+              // Real-time validation sudah di-handle oleh listener di initState
+            },
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return '$label harus diisi';
@@ -519,26 +609,29 @@ Future<void> _fetchJurusan() async {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                borderSide: BorderSide(
+                  color: showError ? Colors.red : Colors.red,
+                  width: 1.5,
+                ),
               ),
               errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.orange),
+                borderSide: const BorderSide(color: Colors.red),
               ),
               focusedErrorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.orange, width: 1.5),
+                borderSide: const BorderSide(color: Colors.red, width: 1.5),
               ),
               filled: true,
               fillColor: Colors.white,
             ),
           ),
-          // Alert info di bawah box input - HANYA muncul saat focused
-          if (isFocused && (minLength != null || additionalHint != null))
+          // Alert info di bawah box input - HANYA muncul saat focused dan ada error
+          if (showError)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 8),
               child: Text(
-                additionalHint ?? 'Minimal $minLength karakter',
+                errorMessage,
                 style: const TextStyle(
                   color: Colors.red,
                   fontSize: 12,
@@ -706,7 +799,8 @@ Future<void> _fetchJurusan() async {
                       buildInputField(
                           Icons.person, 'Nama Lengkap', namaController,
                           minLength: 3,
-                          focusNode: _namaFocus),
+                          focusNode: _namaFocus,
+                          fieldName: 'nama'),
                       
                       // Pilih Kelas
                       _buildDropdownSearch(
@@ -724,17 +818,20 @@ Future<void> _fetchJurusan() async {
 
                       buildInputField(Icons.home, 'Alamat', alamatController,
                           minLength: 10,
-                          focusNode: _alamatFocus),
+                          focusNode: _alamatFocus,
+                          fieldName: 'alamat'),
                       buildInputField(Icons.numbers, 'NISN', nisnController,
                           type: TextInputType.number, 
                           minLength: 10,
                           additionalHint: 'Tepat 10 digit',
-                          focusNode: _nisnFocus),
+                          focusNode: _nisnFocus,
+                          fieldName: 'nisn'),
                       buildInputField(Icons.phone, 'No. Telp', noTelpController,
                           type: TextInputType.phone, 
                           minLength: 10,
                           additionalHint: 'Minimal 10 digit',
-                          focusNode: _noTelpFocus),
+                          focusNode: _noTelpFocus,
+                          fieldName: 'noTelp'),
 
                       // Tanggal Lahir
                       Padding(
@@ -771,11 +868,11 @@ Future<void> _fetchJurusan() async {
                                 ),
                                 errorBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Colors.orange),
+                                  borderSide: const BorderSide(color: Colors.red),
                                 ),
                                 focusedErrorBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Colors.orange, width: 1.5),
+                                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
                                 ),
                                 filled: true,
                                 fillColor: Colors.white,
@@ -802,25 +899,30 @@ Future<void> _fetchJurusan() async {
                     ] else if (jenis == 'Guru') ...[
                       buildInputField(Icons.person, 'Nama Guru', namaController,
                           minLength: 3,
-                          focusNode: _namaFocus),
+                          focusNode: _namaFocus,
+                          fieldName: 'nama'),
                       buildInputField(Icons.badge, 'NIP', nipController,
                           minLength: 8,
                           additionalHint: 'Minimal 8 digit',
-                          focusNode: _nipFocus),
+                          focusNode: _nipFocus,
+                          fieldName: 'nip'),
                       buildInputField(
                           Icons.code, 'Kode Guru', kodeGuruController,
                           minLength: 3,
-                          focusNode: _kodeGuruFocus),
+                          focusNode: _kodeGuruFocus,
+                          fieldName: 'kodeGuru'),
                       buildInputField(Icons.phone, 'No. Telp', noTelpController,
                           type: TextInputType.phone, 
                           minLength: 10,
                           additionalHint: 'Minimal 10 digit',
-                          focusNode: _noTelpFocus),
+                          focusNode: _noTelpFocus,
+                          fieldName: 'noTelp'),
                       buildInputField(Icons.lock, 'Password', passwordController,
                           obscure: true, 
                           minLength: 6,
                           additionalHint: 'Minimal 6 karakter',
-                          focusNode: _passwordFocus),
+                          focusNode: _passwordFocus,
+                          fieldName: 'password'),
 
                       // Checkbox untuk peran guru
                       const SizedBox(height: 16),
@@ -850,14 +952,17 @@ Future<void> _fetchJurusan() async {
                       buildInputField(
                           Icons.code, 'Kode Jurusan', kodeJurusanController,
                           minLength: 2,
-                          focusNode: _kodeJurusanFocus),
+                          focusNode: _kodeJurusanFocus,
+                          fieldName: 'kodeJurusan'),
                       buildInputField(Icons.book, 'Nama Jurusan', namaController,
                           minLength: 3,
-                          focusNode: _namaFocus),
+                          focusNode: _namaFocus,
+                          fieldName: 'nama'),
                     ] else if (jenis == 'Kelas') ...[
                       buildInputField(Icons.class_, 'Nama Kelas', namaController,
                           minLength: 2,
-                          focusNode: _namaFocus),
+                          focusNode: _namaFocus,
+                          fieldName: 'nama'),
                       const SizedBox(height: 16),
                       // Dropdown Jurusan untuk Kelas
                       _buildDropdownSearch(
@@ -876,17 +981,21 @@ Future<void> _fetchJurusan() async {
                       buildInputField(
                           Icons.business, 'Nama Industri', namaController,
                           minLength: 3,
-                          focusNode: _namaFocus),
+                          focusNode: _namaFocus,
+                          fieldName: 'nama'),
                       buildInputField(Icons.home, 'Alamat', alamatController,
                           minLength: 10,
-                          focusNode: _alamatFocus),
+                          focusNode: _alamatFocus,
+                          fieldName: 'alamat'),
                       buildInputField(Icons.work, 'Bidang', bidangController,
                           minLength: 3,
-                          focusNode: _bidangFocus),
+                          focusNode: _bidangFocus,
+                          fieldName: 'bidang'),
                       buildInputField(Icons.email, 'Email', emailController,
                           type: TextInputType.emailAddress, 
                           additionalHint: 'Format email yang valid (opsional)',
-                          focusNode: _emailFocus),
+                          focusNode: _emailFocus,
+                          fieldName: 'email'),
                       // Dropdown Jurusan untuk Industri
                       _buildDropdownSearch(
                         label: 'Jurusan',
@@ -904,15 +1013,18 @@ Future<void> _fetchJurusan() async {
                           type: TextInputType.phone, 
                           minLength: 10,
                           additionalHint: 'Minimal 10 digit',
-                          focusNode: _noTelpFocus),
+                          focusNode: _noTelpFocus,
+                          fieldName: 'noTelp'),
                       buildInputField(Icons.person, 'PIC', picController,
                           minLength: 3,
-                          focusNode: _picFocus),
+                          focusNode: _picFocus,
+                          fieldName: 'pic'),
                       buildInputField(Icons.phone, 'PIC Telp', picTelpController,
                           type: TextInputType.phone, 
                           minLength: 10,
                           additionalHint: 'Minimal 10 digit',
-                          focusNode: _picTelpFocus),
+                          focusNode: _picTelpFocus,
+                          fieldName: 'picTelp'),
                     ],
                     const SizedBox(height: 20),
                     SizedBox(
