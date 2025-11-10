@@ -1,634 +1,168 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import '../crud/add_person_page.dart';
-import 'murid/student_detail_page.dart';
-import 'guru/teacher_detail_page.dart';
-import 'jurusan/major_detail_page.dart';
-import 'industri/industry_detail_page.dart';
-import 'kelas/class_detail_page.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'dashboard_service.dart';
 import 'stat_grid.dart';
-import 'person_tile.dart';
+import '../crud/add_person_page.dart';
 
 class AdminDashboard extends StatefulWidget {
-  const AdminDashboard({super.key});
+  final Function(String)? onNavigateToData;
+  
+  const AdminDashboard({super.key, this.onNavigateToData});
 
   @override
   State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminDashboardState extends State<AdminDashboard> {
+class _AdminDashboardState extends State<AdminDashboard> 
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  
   final DashboardService _service = DashboardService();
-  String selectedStatus = 'Murid';
-  String selectedKelasDisplay = 'Semua Kelas';
-  final TextEditingController searchController = TextEditingController();
-  String searchQuery = '';
   
-  // Cache untuk data yang sudah di-fetch
-  final Map<String, List<Map<String, dynamic>>> _dataCache = {};
-  final Map<String, Map<String, dynamic>> _dashboardCache = {};
-  
-  List<Map<String, dynamic>> get muridList => _dataCache['murid'] ?? [];
-  List<Map<String, dynamic>> get guruList => _dataCache['guru'] ?? [];
-  List<Map<String, dynamic>> get jurusanDataList => _dataCache['jurusan'] ?? [];
-  List<Map<String, dynamic>> get industriList => _dataCache['industri'] ?? [];
-  List<Map<String, dynamic>> get kelasDataList => _dataCache['kelas'] ?? [];
-  
-  Map<String, dynamic>? dashboardData;
-  bool isLoading = true;
-  Timer? _debounce;
+  Map<String, dynamic>? _dashboardData;
+  bool _isLoading = true;
+  bool _isAppPaused = false;
 
-  // Untuk filter kelas
-  List<Map<String, String>> availableKelas = [];
-  String selectedKelasId = '';
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
-    _initAll();
-
-    searchController.addListener(_onSearchChanged);
-  }
-
-  void _onSearchChanged() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
-    _debounce = Timer(const Duration(milliseconds: 800), () {
-      final newQuery = searchController.text.trim();
-      if (newQuery != searchQuery) {
-        _fetchDataWithCache(newQuery);
-      }
-    });
-  }
-
-  Future<void> _initAll() async {
-    await Future.wait([
-      fetchDashboardData(),
-      fetchKelasOptions(),
-    ]);
-    await _fetchDataWithCache(searchQuery);
-  }
-
-  Future<void> fetchKelasOptions() async {
-    try {
-      final kelasData = await _service.fetchKelas();
-      setState(() {
-        availableKelas = kelasData;
-      });
-    } catch (e) {
-      debugPrint('❌ Error fetching kelas options: $e');
-      setState(() {
-        availableKelas = [];
-      });
-    }
-  }
-
-  Future<void> refreshData() async {
-    // Clear cache saat refresh
-    _dataCache.clear();
-    _dashboardCache.clear();
-    _service.clearCache();
-    
-    setState(() => isLoading = true);
-    await _fetchDataWithCache(searchQuery, forceRefresh: true);
-    setState(() => isLoading = false);
-  }
-
-  Future<void> fetchDashboardData() async {
-    const String cacheKey = 'dashboard';
-    if (_dashboardCache.containsKey(cacheKey) && !isLoading) {
-      setState(() {
-        dashboardData = _dashboardCache[cacheKey];
-      });
-      return;
-    }
-
-    try {
-      final data = await _service.fetchDashboardData();
-      _dashboardCache[cacheKey] = data!;
-      setState(() {
-        dashboardData = data;
-      });
-    } catch (e) {
-      debugPrint('Exception fetchDashboardData: $e');
-    }
-  }
-
-  Future<void> _fetchDataWithCache(String query, {bool forceRefresh = false}) async {
-    final cacheKey = _getCacheKey(query);
-    
-    if (!forceRefresh && _dataCache.containsKey(cacheKey)) {
-      setState(() {
-        searchQuery = query;
-        isLoading = false;
-      });
-      return;
-    }
-
-    setState(() {
-      searchQuery = query;
-      isLoading = true;
-    });
-
-    try {
-      List<Map<String, dynamic>> data;
-      
-      switch (selectedStatus) {
-        case 'Murid':
-          data = await _service.fetchSiswaData(
-            searchQuery: query,
-            kelasId: selectedKelasId,
-            jurusanId: '',
-          );
-          break;
-        case 'Guru':
-          data = await _service.fetchGuruData(searchQuery: query);
-          break;
-        case 'Jurusan':
-          data = await _service.fetchJurusanData(searchQuery: query);
-          break;
-        case 'Industri':
-          data = await _service.fetchIndustriData(searchQuery: query);
-          break;
-        case 'Kelas':
-          data = await _service.fetchKelasData(searchQuery: query);
-          break;
-        default:
-          data = [];
-      }
-
-      // Cache the data
-      _dataCache[cacheKey] = data;
-      
-      setState(() {
-        isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Exception fetching $selectedStatus: $e');
-      setState(() {
-        isLoading = false;
-      });
-    }
-  }
-
-  String _getCacheKey(String query) {
-    if (selectedStatus == 'Murid') {
-      return '${selectedStatus.toLowerCase()}-$query-$selectedKelasId';
-    }
-    return '${selectedStatus.toLowerCase()}-$query';
-  }
-
-  List<Map<String, dynamic>> get _currentList {
-    final cacheKey = _getCacheKey(searchQuery);
-    return _dataCache[cacheKey] ?? [];
-  }
-
-  void _handleItemTap(Map<String, dynamic> item) async {
-    final String itemId = item['id'] ?? '';
-    if (itemId.isEmpty) return;
-
-    Widget? targetPage;
-
-    switch (selectedStatus) {
-      case 'Murid':
-        targetPage = StudentDetailPage(studentId: itemId);
-        break;
-      case 'Guru':
-        targetPage = TeacherDetailPage(teacherId: itemId);
-        break;
-      case 'Jurusan':
-        targetPage = MajorDetailPage(majorId: itemId);
-        break;
-      case 'Industri':
-        targetPage = IndustryDetailPage(industryId: itemId);
-        break;
-      case 'Kelas':
-        targetPage = ClassDetailPage(classId: itemId);
-        break;
-    }
-
-    if (targetPage != null) {
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => targetPage!),
-      );
-      
-      if (!mounted) return;
-      
-      // PERBAIKAN: Handle semua jenis perubahan data (update dan delete)
-      if (result != null) {
-        if (result['deleted'] == true || result['updated'] == true) {
-          // Clear cache untuk type yang berubah
-          final cacheKeysToRemove = _dataCache.keys.where(
-            (key) => key.startsWith('${selectedStatus.toLowerCase()}-')
-          ).toList();
-          
-          for (final key in cacheKeysToRemove) {
-            _dataCache.remove(key);
-          }
-          
-          // Juga clear dashboard cache karena statistik mungkin berubah
-          _dashboardCache.clear();
-          _service.clearCache();
-          
-          // Refresh data
-          await Future.wait([
-            fetchDashboardData(),
-            _fetchDataWithCache(searchQuery, forceRefresh: true),
-          ]);
-        }
-      }
-    }
-  }
-
-  // Method untuk handle perubahan role
-  Future<void> _handleRoleChange(String newRole) async {
-    if (newRole == selectedStatus) return;
-    
-    // Clear cache untuk role sebelumnya dan role baru
-    _clearRoleCache(selectedStatus, newRole);
-    
-    setState(() {
-      selectedStatus = newRole;
-      selectedKelasDisplay = 'Semua Kelas';
-      selectedKelasId = '';
-      searchQuery = '';
-      searchController.text = '';
-      isLoading = true;
-    });
-    
-    await _fetchDataWithCache('');
-  }
-
-  void _clearRoleCache(String previousRole, String newRole) {
-    // Clear cache untuk role sebelumnya
-    final previousRoleKeys = _dataCache.keys.where(
-      (key) => key.startsWith('${previousRole.toLowerCase()}-')
-    ).toList();
-    
-    for (final key in previousRoleKeys) {
-      _dataCache.remove(key);
-    }
-    
-    // Clear cache untuk role baru (jika ada)
-    final newRoleKeys = _dataCache.keys.where(
-      (key) => key.startsWith('${newRole.toLowerCase()}-')
-    ).toList();
-    
-    for (final key in newRoleKeys) {
-      _dataCache.remove(key);
-    }
-    
-    // Clear service cache untuk role-role tersebut
-    _service.clearCacheByPattern(previousRole.toLowerCase());
-    _service.clearCacheByPattern(newRole.toLowerCase());
-  }
-
-  Widget _buildSearchAndFilter() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: TextField(
-                  controller: searchController,
-                  decoration: InputDecoration(
-                    icon: const Icon(Icons.search),
-                    hintText: 'Cari ${selectedStatus.toLowerCase()}',
-                    border: InputBorder.none,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              flex: 1,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: selectedStatus,
-                    icon: const Icon(Icons.keyboard_arrow_down),
-                    isExpanded: true,
-                    dropdownColor: Colors.grey[100],
-                    style: const TextStyle(
-                      color: Color.fromARGB(255, 129, 129, 129),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    items: const [
-                      'Murid',
-                      'Guru',
-                      'Jurusan',
-                      'Industri',
-                      'Kelas'
-                    ].map((item) => DropdownMenuItem(
-                          value: item,
-                          child: Text(item),
-                        )).toList(),
-                    onChanged: (value) async {
-                      if (value != null) {
-                        await _handleRoleChange(value);
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        // Kelas filter hanya untuk Murid
-        if (selectedStatus == 'Murid') _buildKelasFilter(),
-      ],
-    );
-  }
-
-  Widget _buildKelasFilter() {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: PopupMenuButton<String>(
-        constraints: BoxConstraints(
-          minWidth: MediaQuery.of(context).size.width * 0.6,
-          maxWidth: MediaQuery.of(context).size.width * 0.8,
-          maxHeight: 250,
-        ),
-        position: PopupMenuPosition.under,
-        offset: const Offset(0, 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.grey[300]!),
-        ),
-        onSelected: (value) async {
-          setState(() {
-            selectedKelasDisplay = value;
-            selectedKelasId = value == 'Semua Kelas' ? '' : 
-                availableKelas.firstWhere(
-                  (k) => k['name'] == value,
-                  orElse: () => {'id': ''},
-                )['id'] ?? '';
-            isLoading = true;
-          });
-          
-          await _fetchDataWithCache(searchQuery, forceRefresh: true);
-        },
-        itemBuilder: (context) {
-          // FIX: Gunakan List biasa, bukan PopupMenuItem dengan enabled: false
-          final menuItems = <PopupMenuEntry<String>>[];
-
-          // Tambahkan "Semua Kelas"
-          menuItems.add(
-            PopupMenuItem<String>(
-              value: 'Semua Kelas',
-              height: 40,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    alignment: Alignment.centerLeft,
-                    child: const Text(
-                      'Semua Kelas',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color.fromARGB(255, 129, 129, 129),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    height: 1,
-                    margin: const EdgeInsets.only(top: 8),
-                    color: Colors.grey[300],
-                  ),
-                ],
-              ),
-            ),
-          );
-
-          // Tambahkan semua kelas
-          for (var kelas in availableKelas) {
-            menuItems.add(
-              PopupMenuItem<String>(
-                value: kelas['name']!,
-                height: 40,
-                child: Container(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    kelas['name']!,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color.fromARGB(255, 129, 129, 129),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }
-
-          return menuItems;
-        },
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                selectedKelasDisplay,
-                style: const TextStyle(
-                  color: Color.fromARGB(255, 129, 129, 129),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-            const Icon(
-              Icons.arrow_drop_down,
-              color: Color.fromARGB(255, 129, 129, 129),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent() {
-    if (isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    final currentList = _currentList;
-    
-    if (currentList.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20.0),
-          child: Text(
-            'Tidak ada data ditemukan',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: currentList.length,
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      itemBuilder: (context, index) {
-        final item = currentList[index];
-        
-        final String name = item['name'] ?? item['nama'] ?? '';
-        
-        // Untuk Jurusan, gunakan JurusanTile dengan jumlah kelas
-        if (selectedStatus == 'Jurusan') {
-          final String kode = item['kode'] ?? '';
-          final int jumlahKelas = item['jumlah_kelas'] ?? 0;
-          return JurusanTile(
-            nama: name,
-            kode: kode,
-            jumlahKelas: jumlahKelas,
-            onTap: () => _handleItemTap(item),
-          );
-        }
-        
-        // Untuk Industri, gunakan IndustriTile
-        if (selectedStatus == 'Industri') {
-          final String noTelp = item['no_telp'] ?? '';
-          final String alamat = item['alamat'] ?? '';
-          final String bidang = item['bidang'] ?? '';
-          
-          return IndustriTile(
-            nama: name,
-            noTelp: noTelp,
-            alamat: alamat,
-            bidang: bidang,
-            onTap: () => _handleItemTap(item),
-          );
-        }
-        
-        // Untuk Kelas, gunakan KelasTile dengan jumlah murid
-        if (selectedStatus == 'Kelas') {
-          final String jurusanNama = item['jurusan_nama'] ?? '';
-          final int jumlahMurid = item['jumlah_murid'] ?? 0;
-          return KelasTile(
-            nama: name,
-            jurusanNama: jurusanNama,
-            jumlahMurid: jumlahMurid,
-            onTap: () => _handleItemTap(item),
-          );
-        }
-        
-        // Untuk Murid dan Guru, gunakan PersonTile
-        final String nisn = item['nisn'] ?? item['no_induk'] ?? item['nomor_induk'] ?? '';
-        
-        String tglLahir = item['tgl_lahir'] ?? 
-                        item['tanggal_lahir'] ?? 
-                        item['tglLahir'] ?? 
-                        item['tanggalLahir'] ?? 
-                        item['birth_date'] ?? 
-                        item['date_of_birth'] ?? 
-                        item['lahir'] ?? 
-                        '-';
-        
-        if (tglLahir == '-') {
-          tglLahir = item['profile']?['tgl_lahir'] ?? 
-                    item['data']?['tgl_lahir'] ?? 
-                    '-';
-        }
-        
-        final String? jurusan = item['jurusan'] ?? item['major'] ?? item['jurusan_nama'];
-        final String? kelas = item['kelas'] ?? item['class'] ?? item['kelas_nama'];
-        final String role = selectedStatus;
-
-        // PASS DATA GURU YANG LENGKAP
-        final String? kodeGuru = item['kode_guru'];
-        final String? userId = item['user_id'];
-
-        return PersonTile(
-          name: name,
-          nisn: nisn,
-          tglLahir: tglLahir,
-          jurusan: jurusan,
-          kelas: kelas,
-          role: role,
-          kodeGuru: kodeGuru,
-          userId: userId,
-          onTap: () => _handleItemTap(item),
-        );
-      },
-    );
+    WidgetsBinding.instance.addObserver(this);
+    _loadDashboard();
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF5B1A1A),
-        title: const Text('Dashboard', style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-        elevation: 0,
-      ),
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: refreshData,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (dashboardData != null) 
-                  StatGrid(
-                    data: dashboardData!,
-                    onAddPressed: _showAddOptions,
-                    onBoxTap: (type) async {
-                      await _handleRoleChange(type);
-                    },
-                  ),
-                const SizedBox(height: 20),
-                _buildSearchAndFilter(),
-                const SizedBox(height: 16),
-                _buildContent(),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _isAppPaused = true;
+    } else if (state == AppLifecycleState.resumed && _isAppPaused) {
+      _isAppPaused = false;
+      _refreshSilently();
+    }
+  }
+
+  Future<void> _loadDashboard() async {
+    if (_dashboardData != null) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    try {
+      final cachedData = _service.getCachedData('dashboard');
+      if (cachedData != null && mounted) {
+        setState(() {
+          _dashboardData = cachedData;
+          _isLoading = false;
+        });
+        _fetchDashboardData(silent: true);
+        return;
+      }
+
+      await _fetchDashboardData();
+    } catch (e) {
+      debugPrint('Error loading dashboard: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchDashboardData({bool silent = false}) async {
+    try {
+      final data = await _service.fetchDashboardData();
+      if (mounted) {
+        setState(() {
+          _dashboardData = data;
+          if (!silent) {
+            _isLoading = false;
+          }
+        });
+      }
+      
+      _service.setCacheData('dashboard', data);
+    } catch (e) {
+      debugPrint('Error fetching dashboard: $e');
+      if (mounted && !silent) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshSilently() async {
+    try {
+      final data = await _service.fetchDashboardData(forceRefresh: true);
+      if (mounted && data != null) {
+        setState(() {
+          _dashboardData = data;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error silent refresh: $e');
+    }
+  }
+
+  Future<void> _refreshData() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+    
+    await _fetchDashboardData();
+  }
+
+  void _handleStatBoxTap(String type) {
+    widget.onNavigateToData?.call(type);
   }
 
   void _showAddOptions() {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
       builder: (BuildContext context) {
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildAddTile(Icons.menu_book, 'Tambah Murid', 'Siswa'),
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: const Text(
+                  'Tambah Data Baru',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF5B1A1A),
+                  ),
+                ),
+              ),
+              _buildAddTile(Icons.school, 'Tambah Murid', 'Siswa'),
               _buildAddTile(Icons.person, 'Tambah Guru', 'Guru'),
-              _buildAddTile(Icons.school, 'Tambah Jurusan', 'Jurusan'),
+              _buildAddTile(Icons.category, 'Tambah Jurusan', 'Jurusan'),
+              _buildAddTile(Icons.business, 'Tambah Industri', 'Industri'),
               _buildAddTile(Icons.class_, 'Tambah Kelas', 'Kelas'),
-              _buildAddTile(Icons.factory, 'Tambah Industri', 'Industri'),
+              const SizedBox(height: 20),
             ],
           ),
         );
@@ -636,40 +170,458 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  ListTile _buildAddTile(IconData icon, String title, String jenis) {
+  ListTile _buildAddTile(IconData icon, String title, String type) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      onTap: () async {
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: const Color(0xFF5B1A1A).withAlpha(13),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: const Color(0xFF5B1A1A)),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Colors.black87,
+        ),
+      ),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      onTap: () {
         Navigator.pop(context);
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => AddPersonPage(jenisData: jenis)),
-        );
-        
-        if (!mounted) return;
-        
-        if (result != null) {
-          // Clear cache untuk jenis data yang baru ditambahkan
-          final cacheKeysToRemove = _dataCache.keys.where(
-            (key) => key.startsWith('${jenis.toLowerCase()}-')
-          ).toList();
-          
-          for (final key in cacheKeysToRemove) {
-            _dataCache.remove(key);
-          }
-          
-          await _fetchDataWithCache(searchQuery, forceRefresh: true);
-        }
+        _navigateToAddPersonPage(type);
       },
     );
   }
 
+  void _navigateToAddPersonPage(String jenisData) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddPersonPage(jenisData: jenisData),
+      ),
+    );
+  }
+
+  // CHART SEDERHANA - Distribusi Data
+  Widget _buildSimpleDistributionChart() {
+    if (_dashboardData == null) return const SizedBox();
+
+    final siswaCount = _dashboardData!['total_siswa'] ?? 0;
+    final guruCount = _dashboardData!['total_guru'] ?? 0;
+    final kelasCount = _dashboardData!['total_kelas'] ?? 0;
+    final jurusanCount = _dashboardData!['total_jurusan'] ?? 0;
+    final industriCount = _dashboardData!['total_industri'] ?? 0;
+
+    final maxValue = [siswaCount, guruCount, kelasCount, jurusanCount, industriCount]
+        .reduce((a, b) => a > b ? a : b)
+        .toDouble();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 24, bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.analytics, color: Color(0xFF5B1A1A)),
+              SizedBox(width: 8),
+              Text(
+                'Distribusi Data',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF5B1A1A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 200,
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: maxValue * 1.2,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    tooltipBgColor: const Color(0xFF5B1A1A),
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final titles = ['Murid', 'Guru', 'Kelas', 'Jurusan', 'Industri'];
+                      return BarTooltipItem(
+                        '${titles[groupIndex]}\n${rod.toY.toInt()}',
+                        const TextStyle(color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final titles = ['Murid', 'Guru', 'Kelas', 'Jurusan', 'Industri'];
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(
+                            titles[value.toInt()],
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        return Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        );
+                      },
+                      reservedSize: 40,
+                    ),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                gridData: const FlGridData(show: false),
+                borderData: FlBorderData(show: false),
+                barGroups: [
+                  BarChartGroupData(
+                    x: 0,
+                    barRods: [
+                      BarChartRodData(
+                        toY: siswaCount.toDouble(),
+                        color: const Color(0xFF8B0000),
+                        width: 20,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  ),
+                  BarChartGroupData(
+                    x: 1,
+                    barRods: [
+                      BarChartRodData(
+                        toY: guruCount.toDouble(),
+                        color: const Color(0xFFB22222),
+                        width: 20,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  ),
+                  BarChartGroupData(
+                    x: 2,
+                    barRods: [
+                      BarChartRodData(
+                        toY: kelasCount.toDouble(),
+                        color: const Color(0xFFDC143C),
+                        width: 20,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  ),
+                  BarChartGroupData(
+                    x: 3,
+                    barRods: [
+                      BarChartRodData(
+                        toY: jurusanCount.toDouble(),
+                        color: const Color(0xFFCD5C5C),
+                        width: 20,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  ),
+                  BarChartGroupData(
+                    x: 4,
+                    barRods: [
+                      BarChartRodData(
+                        toY: industriCount.toDouble(),
+                        color: const Color(0xFFF08080),
+                        width: 20,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // STATISTIK RINGKAS
+  Widget _buildQuickStats() {
+    if (_dashboardData == null) return const SizedBox();
+
+    final siswaCount = _dashboardData!['total_siswa'] ?? 0;
+    final guruCount = _dashboardData!['total_guru'] ?? 0;
+    final kelasCount = _dashboardData!['total_kelas'] ?? 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.trending_up, color: Color(0xFF5B1A1A)),
+              SizedBox(width: 8),
+              Text(
+                'Statistik Ringkas',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF5B1A1A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildStatItem('Rata Murid/Kelas', _calculateAverageStudentsPerClass(), Icons.people),
+              const SizedBox(width: 16),
+              _buildStatItem('Rasio Guru:Murid', _calculateTeacherStudentRatio(), Icons.balance),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF5B1A1A).withAlpha(10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildMiniStat('Murid', siswaCount, Icons.school),
+                _buildMiniStat('Guru', guruCount, Icons.person),
+                _buildMiniStat('Kelas', kelasCount, Icons.class_),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String title, String value, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF5B1A1A).withAlpha(10),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: const Color(0xFF5B1A1A), size: 24),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF5B1A1A),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniStat(String title, int value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: const Color(0xFF5B1A1A), size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value.toString(),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF5B1A1A),
+          ),
+        ),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _calculateAverageStudentsPerClass() {
+    if (_dashboardData == null) return '-';
+    final siswaCount = _dashboardData!['total_siswa'] ?? 0;
+    final kelasCount = _dashboardData!['total_kelas'] ?? 0;
+    
+    if (kelasCount == 0) return '0';
+    final average = (siswaCount / kelasCount).round();
+    return average.toString();
+  }
+
+  String _calculateTeacherStudentRatio() {
+    if (_dashboardData == null) return '-';
+    final siswaCount = _dashboardData!['total_siswa'] ?? 0;
+    final guruCount = _dashboardData!['total_guru'] ?? 0;
+    
+    if (guruCount == 0) return '-';
+    final ratio = (siswaCount / guruCount).round();
+    return '1:$ratio';
+  }
+
+  Widget _buildLoading() {
+    return const Padding(
+      padding: EdgeInsets.all(40.0),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5B1A1A)),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Memuat data...',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildError() {
+    return Padding(
+      padding: const EdgeInsets.all(40.0),
+      child: Column(
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Colors.grey[400],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Gagal memuat dashboard',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: _refreshData,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF5B1A1A),
+            ),
+            child: const Text('Coba Lagi'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
-  void dispose() {
-    _debounce?.cancel();
-    searchController.removeListener(_onSearchChanged);
-    searchController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    super.build(context);
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF5B1A1A),
+        title: const Text('Dashboard', style: TextStyle(color: Colors.white)),
+        centerTitle: true,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _refreshData,
+          color: const Color(0xFF5B1A1A),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 24),
+                
+                if (_isLoading && _dashboardData == null)
+                  _buildLoading()
+                else if (_dashboardData != null) ...[
+                  StatGrid(
+                    data: _dashboardData!,
+                    onAddPressed: _showAddOptions,
+                    onBoxTap: _handleStatBoxTap,
+                  ),
+                  
+                  // CHART SEDERHANA & STATISTIK
+                  _buildSimpleDistributionChart(),
+                  _buildQuickStats(),
+                  
+                  const SizedBox(height: 20),
+                ]
+                else
+                  _buildError(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

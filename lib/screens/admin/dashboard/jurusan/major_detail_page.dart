@@ -17,7 +17,9 @@ class MajorDetailPage extends StatefulWidget {
 
 class _MajorDetailPageState extends State<MajorDetailPage> {
   Map<String, dynamic>? majorData;
+  List<dynamic> classes = [];
   bool isLoading = true;
+  bool isLoadingClasses = true;
 
   final Color brown = const Color(0xFF5B1A1A);
   final Color danger = const Color(0xFF8B0000);
@@ -26,6 +28,7 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
   void initState() {
     super.initState();
     fetchMajorDetail();
+    fetchClasses();
   }
 
   Future<void> fetchMajorDetail() async {
@@ -52,6 +55,45 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
       setState(() => isLoading = false);
       // ignore: use_build_context_synchronously
       PopupHelper.showErrorDialog(context, 'Gagal mengambil data jurusan');
+    }
+  }
+
+  Future<void> fetchClasses() async {
+    setState(() => isLoadingClasses = true);
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    try {
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas?jurusan_id=${widget.majorId}'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        setState(() {
+          if (decoded['data'] != null && decoded['data']['data'] is List) {
+            classes = decoded['data']['data'];
+          } else if (decoded['data'] is List) {
+            classes = decoded['data'];
+          } else {
+            classes = [];
+          }
+          isLoadingClasses = false;
+        });
+      } else {
+        setState(() => isLoadingClasses = false);
+        if (!mounted) return;
+        PopupHelper.showErrorDialog(context, 'Gagal mengambil data kelas');
+      }
+    } catch (e) {
+      setState(() => isLoadingClasses = false);
+      if (!mounted) return;
+      PopupHelper.showErrorDialog(context, 'Error: $e');
     }
   }
 
@@ -149,6 +191,107 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
     );
   }
 
+  Widget _buildClassesSection() {
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: brown,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.class_, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Kelas dalam Jurusan',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (isLoadingClasses)
+            const Center(child: CircularProgressIndicator())
+          else if (classes.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text(
+                  'Tidak ada kelas dalam jurusan ini',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            )
+          else
+            Column(
+              children: classes.map((classData) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.class_, color: Colors.grey, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              classData['nama'] ?? '-',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                            if (classData['tingkat'] != null)
+                              Text(
+                                'Tingkat ${classData['tingkat']}',
+                                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (classData['jumlah_siswa'] != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: brown.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            '${classData['jumlah_siswa']} siswa',
+                            style: TextStyle(fontSize: 12, color: brown, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,6 +335,9 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
                       _buildProfileItem(Icons.code, 'Kode Jurusan', majorData!['kode']),
                       _buildProfileItem(Icons.school, 'Nama Jurusan', majorData!['nama']),
 
+                      // Tambahkan section kelas di sini
+                      _buildClassesSection(),
+
                       const SizedBox(height: 30),
                       Row(
                         children: [
@@ -219,6 +365,7 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
                                 );
                                 if (result == true) {
                                   fetchMajorDetail();
+                                  fetchClasses(); // Refresh data kelas setelah edit
                                 }
                               },
                               style: OutlinedButton.styleFrom(
