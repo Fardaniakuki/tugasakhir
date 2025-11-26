@@ -513,74 +513,94 @@ class DashboardService {
     }, forceRefresh: forceRefresh);
   }
 
-  // JURUSAN DATA
-  Future<List<Map<String, dynamic>>> fetchJurusanData({
-    String searchQuery = '',
-    bool forceRefresh = false,
-  }) async {
-    final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
-    final cacheKey = 'jurusan-$normalizedSearchQuery';
-    
-    return await _fetchWithCache(cacheKey, () async {
-      try {
-        final token = await _getToken();
-        if (token == null) return [];
+ // JURUSAN DATA - DIPERBAIKI DENGAN NAMA KAPROG
+Future<List<Map<String, dynamic>>> fetchJurusanData({
+  String searchQuery = '',
+  bool forceRefresh = false,
+}) async {
+  final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
+  final cacheKey = 'jurusan-$normalizedSearchQuery';
+  
+  return await _fetchWithCache(cacheKey, () async {
+    try {
+      final token = await _getToken();
+      if (token == null) return [];
 
-        final Map<String, String> queryParams = {
-          'page': '1',
-          'limit': '100',
-        };
+      final Map<String, String> queryParams = {
+        'page': '1',
+        'limit': '100',
+      };
 
-        if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+      if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
 
-        final uri = _buildUri('/api/jurusan', queryParams);
+      final uri = _buildUri('/api/jurusan', queryParams);
 
-        final response = await http.get(
-          uri,
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-        );
+      final response = await http.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
-        if (response.statusCode == 200) {
-          final decoded = json.decode(response.body);
-          
-          List data = [];
-          if (decoded['data'] is List) {
-            data = decoded['data'];
-          } else if (decoded['data'] != null && decoded['data']['data'] is List) {
-            data = decoded['data']['data'];
-          }
-
-          final Map<String, int> classCounts = await _getAllClassCounts(forceRefresh: forceRefresh);
-          
-          final List<Map<String, dynamic>> jurusanList = [];
-          
-          for (var j in data) {
-            final String jurusanId = (j['id'] ?? '').toString();
-            final int jumlahKelas = classCounts[jurusanId] ?? 0;
-            
-            jurusanList.add({
-              'name': (j['nama'] ?? 'Unknown').toString(),
-              'kode': (j['kode'] ?? '').toString(),
-              'role': 'Jurusan',
-              'id': jurusanId,
-              'type': 'jurusan',
-              'jumlah_kelas': jumlahKelas,
-            });
-          }
-          
-          return jurusanList;
-        } else {
-          throw Exception('Failed to fetch jurusan data: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        
+        List data = [];
+        if (decoded['data'] is List) {
+          data = decoded['data'];
+        } else if (decoded['data'] != null && decoded['data']['data'] is List) {
+          data = decoded['data']['data'];
         }
-      } catch (e) {
-        throw Exception('Failed to fetch jurusan data: $e');
-      }
-    }, forceRefresh: forceRefresh);
-  }
 
+        // PERUBAHAN: Fetch data guru untuk mapping kaprog
+        final List<Map<String, dynamic>> allGuru = await fetchGuruData(forceRefresh: forceRefresh);
+        final Map<String, int> classCounts = await _getAllClassCounts(forceRefresh: forceRefresh);
+        
+        final List<Map<String, dynamic>> jurusanList = [];
+        
+        for (var j in data) {
+          final String jurusanId = (j['id'] ?? '').toString();
+          final int jumlahKelas = classCounts[jurusanId] ?? 0;
+          
+          // PERUBAHAN: Cari nama kaprog berdasarkan kaprog_guru_id
+          String? kaprogNama;
+          final kaprogGuruId = j['kaprog_guru_id'];
+          
+          if (kaprogGuruId != null) {
+            try {
+              final kaprog = allGuru.firstWhere(
+                (guru) => guru['id'] == kaprogGuruId.toString(), // ← PERUBAHAN: Gunakan id guru
+                orElse: () => {},
+              );
+              kaprogNama = kaprog['name'];
+            } catch (e) {
+              debugPrint('Error finding kaprog for jurusan $jurusanId: $e');
+            }
+          }
+          
+          jurusanList.add({
+            'name': (j['nama'] ?? 'Unknown').toString(),
+            'kode': (j['kode'] ?? '').toString(),
+            'role': 'Jurusan',
+            'id': jurusanId,
+            'type': 'jurusan',
+            'jumlah_kelas': jumlahKelas,
+            // PERUBAHAN: Tambahkan field kaprog
+            'kaprog_guru_id': kaprogGuruId?.toString(),
+            'kaprog_nama': kaprogNama, // ← INI YANG DITAMPILKAN DI CARD
+          });
+        }
+        
+        return jurusanList;
+      } else {
+        throw Exception('Failed to fetch jurusan data: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Failed to fetch jurusan data: $e');
+    }
+  }, forceRefresh: forceRefresh);
+}
   // INDUSTRI DATA
   Future<List<Map<String, dynamic>>> fetchIndustriData({
     String searchQuery = '',

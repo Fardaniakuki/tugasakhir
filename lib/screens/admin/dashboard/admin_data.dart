@@ -9,7 +9,7 @@ import 'dashboard_service.dart';
 
 class AdminData extends StatefulWidget {
   final String? initialFilter;
-  
+
   const AdminData({super.key, this.initialFilter});
 
   @override
@@ -23,10 +23,10 @@ class AdminDataState extends State<AdminData> {
 
   Timer? _debounceTimer;
   bool _isLoading = true;
-  
+
   // Warna konsisten untuk semua tab
   final Color _primaryColor = const Color(0xFF641E20);
-  
+
   // Data untuk tab selector
   final List<Map<String, dynamic>> _tabData = [
     {
@@ -35,7 +35,7 @@ class AdminDataState extends State<AdminData> {
       'stats': {'total': 0, 'active': 0, 'baru': 0}
     },
     {
-      'type': 'Guru', 
+      'type': 'Guru',
       'icon': Icons.school,
       'stats': {'total': 0, 'active': 0, 'baru': 0}
     },
@@ -60,11 +60,11 @@ class AdminDataState extends State<AdminData> {
   String _selectedKelasDisplay = 'Semua Kelas';
   String _selectedKelasId = '';
   String _searchQuery = '';
-  
+
   // Cache untuk data yang sudah di-fetch
   final Map<String, List<Map<String, dynamic>>> _dataCache = {};
   final int _maxCacheSize = 3;
-  
+
   // Pagination variables
   int _currentPage = 1;
   final int _itemsPerPage = 10;
@@ -78,7 +78,7 @@ class AdminDataState extends State<AdminData> {
   @override
   void initState() {
     super.initState();
-    
+
     // Set initial filter jika ada
     if (widget.initialFilter != null) {
       final initialType = _mapFilterToType(widget.initialFilter!);
@@ -87,7 +87,7 @@ class AdminDataState extends State<AdminData> {
         _currentTab = index;
       }
     }
-    
+
     _initAll();
     _searchController.addListener(_onSearchChanged);
   }
@@ -163,7 +163,7 @@ class AdminDataState extends State<AdminData> {
     // Clear cache untuk tab yang sedang aktif
     _clearCacheForCurrentType();
     _resetPagination();
-    
+
     setState(() => _isLoading = true);
     await _fetchDataWithCache(_searchQuery, forceRefresh: true);
     setState(() => _isLoading = false);
@@ -171,40 +171,41 @@ class AdminDataState extends State<AdminData> {
 
   void _clearCacheForCurrentType() {
     final currentType = _tabData[_currentTab]['type'];
-    final keysToRemove = _dataCache.keys.where(
-      (key) => key.startsWith('${currentType.toLowerCase()}-')
-    ).toList();
-    
+    final keysToRemove = _dataCache.keys
+        .where((key) => key.startsWith('${currentType.toLowerCase()}-'))
+        .toList();
+
     for (final key in keysToRemove) {
       _dataCache.remove(key);
     }
-    
+
     _service.clearCacheByPattern(currentType.toLowerCase());
   }
 
   void _cleanCacheIfNeeded() {
     final currentType = _tabData[_currentTab]['type'];
-    final currentTypeKeys = _dataCache.keys.where(
-      (key) => key.startsWith('${currentType.toLowerCase()}-')
-    ).toList();
-    
+    final currentTypeKeys = _dataCache.keys
+        .where((key) => key.startsWith('${currentType.toLowerCase()}-'))
+        .toList();
+
     if (currentTypeKeys.length > _maxCacheSize) {
       _dataCache.remove(currentTypeKeys.first);
     }
   }
 
-  Future<void> _fetchDataWithCache(String query, {bool forceRefresh = false}) async {
+  Future<void> _fetchDataWithCache(String query,
+      {bool forceRefresh = false}) async {
     final cacheKey = _getCacheKey(query);
-    
+
     _cleanCacheIfNeeded();
-    
+
     if (!forceRefresh && _dataCache.containsKey(cacheKey)) {
       final cachedData = _dataCache[cacheKey]!;
       _setupPaginationData(cachedData);
-      
+
       // ✅ PERBAIKAN: Update statistik juga ketika menggunakan cache
       _updateStats(cachedData);
-      
+
       setState(() {
         _searchQuery = query;
         _isLoading = false;
@@ -220,7 +221,7 @@ class AdminDataState extends State<AdminData> {
     try {
       List<Map<String, dynamic>> data;
       final currentType = _tabData[_currentTab]['type'];
-      
+
       switch (currentType) {
         case 'Murid':
           data = await _service.fetchSiswaData(
@@ -247,12 +248,12 @@ class AdminDataState extends State<AdminData> {
 
       // Cache the data
       _dataCache[cacheKey] = data;
-      
+
       // Update stats
       _updateStats(data);
-      
+
       _setupPaginationData(data);
-      
+
       setState(() {
         _isLoading = false;
       });
@@ -275,13 +276,13 @@ class AdminDataState extends State<AdminData> {
     _allData = allData;
     _totalPages = (allData.length / _itemsPerPage).ceil();
     if (_totalPages == 0) _totalPages = 1;
-    
+
     _goToPage(_currentPage);
   }
 
   void _goToPage(int page) {
     if (page < 1 || page > _totalPages) return;
-    
+
     setState(() {
       _currentPage = page;
       final startIndex = (page - 1) * _itemsPerPage;
@@ -352,15 +353,15 @@ class AdminDataState extends State<AdminData> {
         context,
         MaterialPageRoute(builder: (_) => targetPage!),
       );
-      
+
       if (!mounted) return;
-      
+
       if (result != null) {
         if (result['deleted'] == true || result['updated'] == true) {
           // Clear cache untuk type yang berubah
           _clearCacheForCurrentType();
           _resetPagination();
-          
+
           // Refresh data
           await _fetchDataWithCache(_searchQuery, forceRefresh: true);
         }
@@ -371,28 +372,28 @@ class AdminDataState extends State<AdminData> {
   // ✅ PERBAIKAN: Method _handleTabChange yang sudah diperbaiki
   void _handleTabChange(int newIndex) {
     if (newIndex == _currentTab) return;
-    
+
     setState(() {
       _currentTab = newIndex;
       _selectedKelasDisplay = 'Semua Kelas';
       _selectedKelasId = '';
       _searchQuery = '';
       _searchController.text = '';
-      
+
       // ✅ PERBAIKAN: Reset statistik untuk tab baru
       _resetStatsForTab(newIndex);
     });
-    
+
     // Reset pagination
     _resetPagination();
-    
+
     // Cek dulu apakah data sudah ada di cache
     final cacheKey = _getCacheKey('');
     if (_dataCache.containsKey(cacheKey)) {
       // Data ada di cache, langsung pakai tanpa loading
       final cachedData = _dataCache[cacheKey]!;
       _setupPaginationData(cachedData);
-      
+
       // ✅ PERBAIKAN: Update statistik dengan data cache
       _updateStats(cachedData);
     } else {
@@ -406,7 +407,7 @@ class AdminDataState extends State<AdminData> {
   Widget _buildHeaderStats() {
     final currentStats = _tabData[_currentTab]['stats'] as Map<String, dynamic>;
     final currentType = _tabData[_currentTab]['type'];
-    
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -422,33 +423,25 @@ class AdminDataState extends State<AdminData> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildStatItem(
-              currentStats['total'].toString(), 
-              'Total $currentType', 
-              Icons.data_array,
-              isPrimary: true
-            ),
+            _buildStatItem(currentStats['total'].toString(),
+                'Total $currentType', Icons.data_array,
+                isPrimary: true),
             const SizedBox(width: 20),
             _buildStatItem(
-              currentStats['active'].toString(), 
-              'Aktif', 
-              Icons.check_circle,
-              isPrimary: false
-            ),
+                currentStats['active'].toString(), 'Aktif', Icons.check_circle,
+                isPrimary: false),
             const SizedBox(width: 20),
             _buildStatItem(
-              currentStats['baru'].toString(), 
-              'Baru', 
-              Icons.new_releases,
-              isPrimary: false
-            ),
+                currentStats['baru'].toString(), 'Baru', Icons.new_releases,
+                isPrimary: false),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatItem(String value, String label, IconData icon, {bool isPrimary = false}) {
+  Widget _buildStatItem(String value, String label, IconData icon,
+      {bool isPrimary = false}) {
     return Container(
       constraints: const BoxConstraints(minWidth: 100),
       child: Column(
@@ -457,7 +450,9 @@ class AdminDataState extends State<AdminData> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: isPrimary ? _withOpacity(Colors.white, 0.3) : _withOpacity(Colors.white, 0.2),
+              color: isPrimary
+                  ? _withOpacity(Colors.white, 0.3)
+                  : _withOpacity(Colors.white, 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: Colors.white, size: 24),
@@ -512,7 +507,8 @@ class AdminDataState extends State<AdminData> {
             ..._tabData.asMap().entries.map((entry) {
               final index = entry.key;
               final tab = entry.value;
-              return _buildDataTab(tab['type'] as String, tab['icon'] as IconData, index);
+              return _buildDataTab(
+                  tab['type'] as String, tab['icon'] as IconData, index);
             }),
           ],
         ),
@@ -584,10 +580,12 @@ class AdminDataState extends State<AdminData> {
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
-                      hintText: 'Cari ${_tabData[_currentTab]['type'].toString().toLowerCase()}...',
+                      hintText:
+                          'Cari ${_tabData[_currentTab]['type'].toString().toLowerCase()}...',
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 16),
                       isDense: true,
                     ),
                   ),
@@ -613,7 +611,9 @@ class AdminDataState extends State<AdminData> {
                               ],
                             )
                           : null,
-                      color: _selectedKelasDisplay == 'Semua Kelas' ? Colors.white : null,
+                      color: _selectedKelasDisplay == 'Semua Kelas'
+                          ? Colors.white
+                          : null,
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
@@ -627,8 +627,8 @@ class AdminDataState extends State<AdminData> {
                       children: [
                         Icon(
                           Icons.tune,
-                          color: _selectedKelasDisplay != 'Semua Kelas' 
-                              ? Colors.white 
+                          color: _selectedKelasDisplay != 'Semua Kelas'
+                              ? Colors.white
                               : _primaryColor,
                           size: 20,
                         ),
@@ -651,15 +651,17 @@ class AdminDataState extends State<AdminData> {
                 ),
             ],
           ),
-          
+
           // Tampilkan filter aktif jika ada
-          if (_tabData[_currentTab]['type'] == 'Murid' && _selectedKelasDisplay != 'Semua Kelas')
+          if (_tabData[_currentTab]['type'] == 'Murid' &&
+              _selectedKelasDisplay != 'Semua Kelas')
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: _primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
@@ -756,7 +758,7 @@ class AdminDataState extends State<AdminData> {
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.filter_list_rounded, 
+                      child: const Icon(Icons.filter_list_rounded,
                           color: Colors.white, size: 20),
                     ),
                     const SizedBox(width: 12),
@@ -784,7 +786,8 @@ class AdminDataState extends State<AdminData> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon:
+                          const Icon(Icons.close_rounded, color: Colors.white),
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
@@ -795,7 +798,7 @@ class AdminDataState extends State<AdminData> {
                   ],
                 ),
               ),
-              
+
               // Search Bar untuk kelas
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -813,7 +816,8 @@ class AdminDataState extends State<AdminData> {
                       hintText: 'Cari kelas...',
                       prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14, horizontal: 16),
                       isDense: true,
                     ),
                     onChanged: (value) {
@@ -822,7 +826,7 @@ class AdminDataState extends State<AdminData> {
                   ),
                 ),
               ),
-              
+
               // Kelas List dengan design lebih modern
               ConstrainedBox(
                 constraints: BoxConstraints(
@@ -830,7 +834,7 @@ class AdminDataState extends State<AdminData> {
                 ),
                 child: _buildKelasList(),
               ),
-              
+
               // Footer dengan action buttons
               Container(
                 padding: const EdgeInsets.all(16),
@@ -905,7 +909,7 @@ class AdminDataState extends State<AdminData> {
             Navigator.pop(context);
           },
         ),
-        
+
         // Divider dengan text
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -937,22 +941,20 @@ class AdminDataState extends State<AdminData> {
             ],
           ),
         ),
-        
+
         // Daftar kelas dengan design enhanced
-        ..._availableKelas.map((kelas) => 
-          _buildEnhancedKelasOption(
-            title: kelas['name']!,
-            subtitle: 'Klik untuk memfilter',
-            isSelected: _selectedKelasDisplay == kelas['name'],
-            icon: Icons.class_rounded,
-            iconColor: _primaryColor,
-            onTap: () {
-              _selectKelas(kelas['name']!, kelas['id']!);
-              Navigator.pop(context);
-            },
-          )
-        ),
-        
+        ..._availableKelas.map((kelas) => _buildEnhancedKelasOption(
+              title: kelas['name']!,
+              subtitle: 'Klik untuk memfilter',
+              isSelected: _selectedKelasDisplay == kelas['name'],
+              icon: Icons.class_rounded,
+              iconColor: _primaryColor,
+              onTap: () {
+                _selectKelas(kelas['name']!, kelas['id']!);
+                Navigator.pop(context);
+              },
+            )),
+
         // Empty state jika tidak ada kelas
         if (_availableKelas.isEmpty)
           Container(
@@ -999,7 +1001,9 @@ class AdminDataState extends State<AdminData> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: isSelected ? _primaryColor.withValues(alpha: 0.08) : Colors.transparent,
+      color: isSelected
+          ? _primaryColor.withValues(alpha: 0.08)
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -1013,7 +1017,9 @@ class AdminDataState extends State<AdminData> {
               width: 1.5,
             ),
             borderRadius: BorderRadius.circular(12),
-            color: isSelected ? _primaryColor.withValues(alpha: 0.05) : Colors.transparent,
+            color: isSelected
+                ? _primaryColor.withValues(alpha: 0.05)
+                : Colors.transparent,
           ),
           child: Row(
             children: [
@@ -1022,7 +1028,9 @@ class AdminDataState extends State<AdminData> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isSelected ? _primaryColor : iconColor.withValues(alpha: 0.1),
+                  color: isSelected
+                      ? _primaryColor
+                      : iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -1031,9 +1039,9 @@ class AdminDataState extends State<AdminData> {
                   color: isSelected ? Colors.white : iconColor,
                 ),
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // Content
               Expanded(
                 child: Column(
@@ -1051,14 +1059,16 @@ class AdminDataState extends State<AdminData> {
                     Text(
                       subtitle,
                       style: TextStyle(
-                        color: isSelected ? _primaryColor.withValues(alpha: 0.8) : Colors.grey[600],
+                        color: isSelected
+                            ? _primaryColor.withValues(alpha: 0.8)
+                            : Colors.grey[600],
                         fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              
+
               // Selection indicator
               if (isSelected)
                 Container(
@@ -1099,7 +1109,7 @@ class AdminDataState extends State<AdminData> {
       _selectedKelasId = kelasId;
       _isLoading = true;
     });
-    
+
     _resetPagination();
     _fetchDataWithCache(_searchQuery, forceRefresh: true);
   }
@@ -1134,7 +1144,7 @@ class AdminDataState extends State<AdminData> {
             const SizedBox(height: 16),
           ],
         ),
-        
+
         // Pagination Controls - ikut scroll
         _buildPaginationControls(),
       ],
@@ -1179,7 +1189,7 @@ class AdminDataState extends State<AdminData> {
               ),
             ),
             const SizedBox(width: 16),
-            
+
             // Skeleton Content
             Expanded(
               child: Column(
@@ -1195,7 +1205,7 @@ class AdminDataState extends State<AdminData> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Skeleton Info Rows
                   Container(
                     width: 150,
@@ -1263,7 +1273,7 @@ class AdminDataState extends State<AdminData> {
   Widget _buildDataCard(Map<String, dynamic> item) {
     final currentType = _tabData[_currentTab]['type'];
     final String name = item['name'] ?? item['nama'] ?? '';
-    
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
@@ -1315,7 +1325,7 @@ class AdminDataState extends State<AdminData> {
                   ),
                 ),
                 const SizedBox(width: 16),
-                
+
                 // Content
                 Expanded(
                   child: _buildCardContent(item, currentType, name),
@@ -1328,7 +1338,8 @@ class AdminDataState extends State<AdminData> {
     );
   }
 
-  Widget _buildCardContent(Map<String, dynamic> item, String currentType, String name) {
+  Widget _buildCardContent(
+      Map<String, dynamic> item, String currentType, String name) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1344,104 +1355,111 @@ class AdminDataState extends State<AdminData> {
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 8),
-        
+
         // Informasi spesifik berdasarkan role
         _buildRoleSpecificInfo(item, currentType),
       ],
     );
   }
 
-  Widget _buildRoleSpecificInfo(Map<String, dynamic> item, String currentType) {
-    switch (currentType) {
-      case 'Murid':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+Widget _buildRoleSpecificInfo(Map<String, dynamic> item, String currentType) {
+  switch (currentType) {
+    case 'Murid':
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildEnhancedInfoRow(
+            Icons.class_outlined,
+            item['kelas'] ?? 'Kelas tidak tersedia',
+          ),
+          if (item['nisn'] != null)
             _buildEnhancedInfoRow(
-              Icons.class_outlined,
-              item['kelas'] ?? 'Kelas tidak tersedia',
+              Icons.confirmation_number,
+              'NISN: ${item['nisn']}',
             ),
-            if (item['nisn'] != null)
-              _buildEnhancedInfoRow(
-                Icons.confirmation_number,
-                'NISN: ${item['nisn']}',
-              ),
-          ],
-        );
-      
-      case 'Guru':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (item['kode_guru'] != null)
-              _buildEnhancedInfoRow(
-                Icons.badge,
-                'Kode: ${item['kode_guru']}',
-              ),
-            if (item['nisn'] != null) // NIP diambil dari field 'nisn'
-              _buildEnhancedInfoRow(
-                Icons.credit_card,
-                'NIP: ${item['nisn']}',
-              ),
-          ],
-        );
-      
-      case 'Jurusan':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (item['kode'] != null)
-              _buildEnhancedInfoRow(
-                Icons.code,
-                'Kode: ${item['kode']}',
-              ),
-            if (item['jumlah_kelas'] != null)
-              _buildEnhancedInfoRow(
-                Icons.class_,
-                '${item['jumlah_kelas']} Kelas',
-              ),
-          ],
-        );
-      
-      case 'Industri':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (item['bidang'] != null)
-              _buildEnhancedInfoRow(
-                Icons.business_center,
-                item['bidang'],
-              ),
-            if (item['alamat'] != null)
-              _buildEnhancedInfoRow(
-                Icons.location_on,
-                item['alamat'],
-                maxLines: 2,
-              ),
-          ],
-        );
-      
-      case 'Kelas':
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (item['jurusan_nama'] != null)
-              _buildEnhancedInfoRow(
-                Icons.category,
-                item['jurusan_nama'],
-              ),
-            if (item['jumlah_murid'] != null)
-              _buildEnhancedInfoRow(
-                Icons.people,
-                '${item['jumlah_murid']} Murid',
-              ),
-          ],
-        );
-      
-      default:
-        return const SizedBox();
-    }
+        ],
+      );
+
+    case 'Guru':
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (item['kode_guru'] != null)
+            _buildEnhancedInfoRow(
+              Icons.badge,
+              'Kode: ${item['kode_guru']}',
+            ),
+          if (item['nisn'] != null) // NIP diambil dari field 'nisn'
+            _buildEnhancedInfoRow(
+              Icons.credit_card,
+              'NIP: ${item['nisn']}',
+            ),
+        ],
+      );
+
+    case 'Jurusan':
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // PERUBAHAN: Tampilkan nama kaprog jika ada
+          if (item['kaprog_nama'] != null && item['kaprog_nama'].isNotEmpty)
+            _buildEnhancedInfoRow(
+              Icons.person,
+              'Kaprog: ${item['kaprog_nama']}',
+            )
+          else
+            _buildEnhancedInfoRow(
+              Icons.person,
+              'Kaprog: Belum ditentukan',
+            ),
+
+          if (item['jumlah_kelas'] != null)
+            _buildEnhancedInfoRow(
+              Icons.class_,
+              '${item['jumlah_kelas']} Kelas',
+            ),
+        ],
+      );
+
+    case 'Industri':
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (item['bidang'] != null)
+            _buildEnhancedInfoRow(
+              Icons.business_center,
+              item['bidang'],
+            ),
+          if (item['alamat'] != null)
+            _buildEnhancedInfoRow(
+              Icons.location_on,
+              item['alamat'],
+              maxLines: 2,
+            ),
+        ],
+      );
+
+    case 'Kelas':
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (item['jurusan_nama'] != null)
+            _buildEnhancedInfoRow(
+              Icons.category,
+              item['jurusan_nama'],
+            ),
+          if (item['jumlah_murid'] != null)
+            _buildEnhancedInfoRow(
+              Icons.people,
+              '${item['jumlah_murid']} Murid',
+            ),
+        ],
+      );
+
+    default:
+      return const SizedBox();
   }
+}
 
   Widget _buildEnhancedInfoRow(IconData icon, String text, {int maxLines = 1}) {
     return Padding(
@@ -1482,7 +1500,7 @@ class AdminDataState extends State<AdminData> {
 
   Widget _buildPaginationControls() {
     if (_totalPages <= 1) return const SizedBox();
-    
+
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -1520,8 +1538,7 @@ class AdminDataState extends State<AdminData> {
                 Row(
                   children: [
                     _buildPageNumber(1),
-
-                    if (_currentPage > 3) 
+                    if (_currentPage > 3)
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
@@ -1532,16 +1549,12 @@ class AdminDataState extends State<AdminData> {
                           ),
                         ),
                       ),
-
                     if (_currentPage > 2 && _currentPage < _totalPages - 1)
                       _buildPageNumber(_currentPage - 1),
-                    
                     if (_currentPage > 1 && _currentPage < _totalPages)
                       _buildPageNumber(_currentPage),
-                    
                     if (_currentPage < _totalPages - 1)
                       _buildPageNumber(_currentPage + 1),
-
                     if (_currentPage < _totalPages - 2)
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4),
@@ -1553,7 +1566,6 @@ class AdminDataState extends State<AdminData> {
                           ),
                         ),
                       ),
-
                     _buildPageNumber(_totalPages),
                   ],
                 ),
@@ -1587,13 +1599,15 @@ class AdminDataState extends State<AdminData> {
         decoration: BoxDecoration(
           color: isEnabled ? _primaryColor : Colors.grey[300],
           borderRadius: BorderRadius.circular(8),
-          boxShadow: isEnabled ? [
-            BoxShadow(
-              color: _withOpacity(_primaryColor, 0.3),
-              blurRadius: 6,
-              offset: const Offset(0, 3),
-            )
-          ] : null,
+          boxShadow: isEnabled
+              ? [
+                  BoxShadow(
+                    color: _withOpacity(_primaryColor, 0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+              : null,
         ),
         child: Icon(
           icon,
@@ -1620,13 +1634,15 @@ class AdminDataState extends State<AdminData> {
             color: isActive ? _primaryColor : Colors.grey[300]!,
             width: isActive ? 0 : 1,
           ),
-          boxShadow: isActive ? [
-            BoxShadow(
-              color: _withOpacity(_primaryColor, 0.3),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            )
-          ] : null,
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: _withOpacity(_primaryColor, 0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
         ),
         child: Center(
           child: Text(
@@ -1644,7 +1660,7 @@ class AdminDataState extends State<AdminData> {
 
   void updateFilter(String newFilter) {
     if (!mounted) return;
-    
+
     final newType = _mapFilterToType(newFilter);
     final index = _tabData.indexWhere((tab) => tab['type'] == newType);
     if (index != -1 && index != _currentTab) {
@@ -1678,13 +1694,13 @@ class AdminDataState extends State<AdminData> {
         children: [
           // Header Stats - Menampilkan jumlah data untuk role yang aktif
           _buildHeaderStats(),
-          
+
           // Tab Bar - Horizontal scroll untuk menghindari overflow
           _buildTabBar(),
-          
+
           // Search Section - Design lebih compact
           _buildSearchSection(),
-          
+
           // Content dengan pagination yang ikut scroll
           _buildContent(),
         ],

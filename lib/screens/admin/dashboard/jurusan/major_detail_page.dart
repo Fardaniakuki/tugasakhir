@@ -18,8 +18,10 @@ class MajorDetailPage extends StatefulWidget {
 class _MajorDetailPageState extends State<MajorDetailPage> {
   Map<String, dynamic>? majorData;
   List<dynamic> classes = [];
+  List<Map<String, dynamic>> _kaprogList = []; // List semua kaprog
   bool isLoading = true;
   bool isLoadingClasses = true;
+  bool isLoadingKaprog = false;
 
   final Color brown = const Color(0xFF5B1A1A);
   final Color danger = const Color(0xFF8B0000);
@@ -29,6 +31,7 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
     super.initState();
     fetchMajorDetail();
     fetchClasses();
+    _loadKaprogData(); // Load data kaprog sekali saja
   }
 
   Future<void> fetchMajorDetail() async {
@@ -55,6 +58,72 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
       setState(() => isLoading = false);
       // ignore: use_build_context_synchronously
       PopupHelper.showErrorDialog(context, 'Gagal mengambil data jurusan');
+    }
+  }
+
+  // Load data semua kaprog (sama seperti di EditMajorPage)
+  Future<void> _loadKaprogData() async {
+    try {
+      setState(() => isLoadingKaprog = true);
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        
+        List data = [];
+        if (decoded['data'] != null && decoded['data']['data'] is List) {
+          data = decoded['data']['data'];
+        } else if (decoded['data'] is List) {
+          data = decoded['data'];
+        }
+
+        // Filter hanya guru yang is_kaprog = true
+        final List<Map<String, dynamic>> kaprogData = [];
+        for (var guru in data) {
+          if (guru['is_kaprog'] == true) {
+            kaprogData.add({
+              'id': guru['id']?.toString(),
+              'nama': guru['nama_lengkap'] ?? guru['nama'] ?? 'Unknown',
+              'kode_guru': guru['kode_guru'] ?? '',
+            });
+          }
+        }
+
+        setState(() {
+          _kaprogList = kaprogData;
+          isLoadingKaprog = false;
+        });
+      } else {
+        throw Exception('Failed to load kaprog data: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error loading kaprog data: $e');
+      setState(() {
+        isLoadingKaprog = false;
+      });
+    }
+  }
+
+  // Method untuk mendapatkan kaprog berdasarkan ID
+  Map<String, dynamic>? _getKaprogById(String? kaprogId) {
+    if (kaprogId == null || kaprogId.isEmpty || kaprogId == 'null') return null;
+    
+    try {
+      return _kaprogList.firstWhere(
+        (kaprog) => kaprog['id'] == kaprogId,
+      );
+    } catch (e) {
+      return null;
     }
   }
 
@@ -188,6 +257,38 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
           )
         ],
       ),
+    );
+  }
+
+  // Widget untuk menampilkan informasi Kaprog - SEDERHANA
+  Widget _buildKaprogInfo() {
+    final kaprogGuruId = majorData?['kaprog_guru_id']?.toString();
+    final kaprog = _getKaprogById(kaprogGuruId);
+
+    // Jika sedang loading data kaprog
+    if (isLoadingKaprog) {
+      return _buildProfileItem(
+        Icons.person,
+        'Kaprog',
+        'Memuat...',
+      );
+    }
+
+    // Jika ada kaprog
+    if (kaprog != null) {
+      final kaprogNama = kaprog['nama'] ?? 'Unknown';
+      return _buildProfileItem(
+        Icons.person,
+        'Kaprog', 
+        kaprogNama, // Hanya nama saja, tanpa kode
+      );
+    }
+
+    // Jika tidak ada kaprog
+    return _buildProfileItem(
+      Icons.person,
+      'Kaprog',
+      'Belum ditentukan',
     );
   }
 
@@ -334,6 +435,9 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
 
                       _buildProfileItem(Icons.code, 'Kode Jurusan', majorData!['kode']),
                       _buildProfileItem(Icons.school, 'Nama Jurusan', majorData!['nama']),
+                      
+                      // Tambahkan informasi Kaprog di sini
+                      _buildKaprogInfo(),
 
                       // Tambahkan section kelas di sini
                       _buildClassesSection(),
@@ -365,7 +469,8 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
                                 );
                                 if (result == true) {
                                   fetchMajorDetail();
-                                  fetchClasses(); // Refresh data kelas setelah edit
+                                  fetchClasses();
+                                  _loadKaprogData(); // Refresh data kaprog juga
                                 }
                               },
                               style: OutlinedButton.styleFrom(

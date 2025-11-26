@@ -47,6 +47,11 @@ class _AddPersonPageState extends State<AddPersonPage> {
   List<Map<String, dynamic>> jurusanList = [];
   int? selectedJurusanId;
 
+  // TAMBAHAN: Untuk kaprog di jurusan
+  List<Map<String, dynamic>> _kaprogList = [];
+  String? _selectedKaprogId;
+  bool _isLoadingKaprog = false;
+
   // Focus nodes untuk melacak field mana yang sedang aktif
   final FocusNode _namaFocus = FocusNode();
   final FocusNode _alamatFocus = FocusNode();
@@ -72,6 +77,182 @@ class _AddPersonPageState extends State<AddPersonPage> {
     _fetchJurusan();
     _setupFocusListeners();
     _setupTextControllers();
+    
+    // TAMBAHAN: Load data kaprog jika jenis data adalah Jurusan
+    if (widget.jenisData == 'Jurusan') {
+      _loadKaprogData();
+    }
+  }
+
+  // TAMBAHAN: Method untuk load data kaprog
+  Future<void> _loadKaprogData() async {
+    try {
+      setState(() => _isLoadingKaprog = true);
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        
+        List data = [];
+        if (decoded['data'] != null && decoded['data']['data'] is List) {
+          data = decoded['data']['data'];
+        } else if (decoded['data'] is List) {
+          data = decoded['data'];
+        }
+
+        // Filter hanya guru yang is_kaprog = true
+        final List<Map<String, dynamic>> kaprogData = [];
+        for (var guru in data) {
+          if (guru['is_kaprog'] == true) {
+            kaprogData.add({
+              'id': guru['id']?.toString(),
+              'nama': guru['nama_lengkap'] ?? guru['nama'] ?? 'Unknown',
+              'kode_guru': guru['kode_guru'] ?? '',
+            });
+          }
+        }
+
+        setState(() {
+          _kaprogList = kaprogData;
+          _isLoadingKaprog = false;
+        });
+      } else {
+        throw Exception('Failed to load kaprog data: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error loading kaprog data: $e');
+      setState(() {
+        _isLoadingKaprog = false;
+      });
+    }
+  }
+
+  // TAMBAHAN: Widget untuk dropdown kaprog
+  Widget _buildKaprogDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Kaprog',
+            style: TextStyle(fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 6),
+          
+          if (_isLoadingKaprog)
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey),
+                color: Colors.white,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              child: const Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Memuat data kaprog...'),
+                ],
+              ),
+            )
+          else
+            DropdownSearch<Map<String, dynamic>>(
+              popupProps: PopupProps.menu(
+                showSearchBox: true,
+                searchFieldProps: TextFieldProps(
+                  decoration: InputDecoration(
+                    hintText: 'Cari kaprog...',
+                    prefixIcon: Icon(Icons.search, color: brown),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                menuProps: MenuProps(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                itemBuilder: (context, item, isSelected) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      item['nama'] ?? '-',
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 14,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              items: [
+                // Opsi "Tidak ada kaprog"
+                const {'id': null, 'nama': 'Tidak ada kaprog'},
+                ..._kaprogList,
+              ],
+              itemAsString: (item) => item['nama'] ?? '-',
+              dropdownDecoratorProps: DropDownDecoratorProps(
+                dropdownSearchDecoration: InputDecoration(
+                  hintText: 'Pilih Kaprog',
+                  prefixIcon: Icon(Icons.person, color: brown),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.grey),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                ),
+              ),
+              onChanged: (selectedItem) {
+                setState(() {
+                  _selectedKaprogId = selectedItem?['id']?.toString();
+                });
+              },
+              selectedItem: _selectedKaprogId != null 
+                  ? _kaprogList.firstWhere(
+                      (kaprog) => kaprog['id'] == _selectedKaprogId,
+                      orElse: () => {'id': null, 'nama': 'Tidak ada kaprog'},
+                    )
+                  : {'id': null, 'nama': 'Tidak ada kaprog'},
+            ),
+          
+          if (!_isLoadingKaprog && _kaprogList.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                'Tidak ada guru yang terdaftar sebagai kaprog',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   void _setupTextControllers() {
@@ -187,75 +368,76 @@ class _AddPersonPageState extends State<AddPersonPage> {
     }
   }
 
-// Fetch kelas - ambil semua data
-Future<void> _fetchKelas() async {
-  final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('access_token') ?? '';
+  // Fetch kelas - ambil semua data
+  Future<void> _fetchKelas() async {
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token') ?? '';
 
-  try {
-    // Gunakan limit yang besar untuk mengambil semua data
-    final res = await http.get(
-      Uri.parse('$baseUrl/api/kelas?limit=1000'), // Tambahkan limit besar
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    try {
+      // Gunakan limit yang besar untuk mengambil semua data
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/kelas?limit=1000'), // Tambahkan limit besar
+        headers: {'Authorization': 'Bearer $token'},
+      );
 
-    if (res.statusCode == 200) {
-      final Map<String, dynamic> jsonData = jsonDecode(res.body);
-      setState(() {
-        if (jsonData['data'] != null) {
-          if (jsonData['data'] is List) {
-            // Jika response langsung array
-            kelasList = List<Map<String, dynamic>>.from(jsonData['data']);
-          } else if (jsonData['data']['data'] is List) {
-            // Jika response dengan pagination
-            final List<dynamic> data = jsonData['data']['data'];
-            kelasList = data.cast<Map<String, dynamic>>();
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> jsonData = jsonDecode(res.body);
+        setState(() {
+          if (jsonData['data'] != null) {
+            if (jsonData['data'] is List) {
+              // Jika response langsung array
+              kelasList = List<Map<String, dynamic>>.from(jsonData['data']);
+            } else if (jsonData['data']['data'] is List) {
+              // Jika response dengan pagination
+              final List<dynamic> data = jsonData['data']['data'];
+              kelasList = data.cast<Map<String, dynamic>>();
+            }
           }
-        }
-      });
-    } else {
-      print('Error fetch kelas: ${res.statusCode}');
+        });
+      } else {
+        print('Error fetch kelas: ${res.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetch kelas: $e');
     }
-  } catch (e) {
-    print('Error fetch kelas: $e');
   }
-}
 
-// Fetch jurusan - ambil semua data
-Future<void> _fetchJurusan() async {
-  final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('access_token') ?? '';
+  // Fetch jurusan - ambil semua data
+  Future<void> _fetchJurusan() async {
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token') ?? '';
 
-  try {
-    // Gunakan limit yang besar untuk mengambil semua data
-    final res = await http.get(
-      Uri.parse('$baseUrl/api/jurusan?limit=1000'), // Tambahkan limit besar
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    try {
+      // Gunakan limit yang besar untuk mengambil semua data
+      final res = await http.get(
+        Uri.parse('$baseUrl/api/jurusan?limit=1000'), // Tambahkan limit besar
+        headers: {'Authorization': 'Bearer $token'},
+      );
 
-    if (res.statusCode == 200) {
-      final Map<String, dynamic> jsonData = jsonDecode(res.body);
-      setState(() {
-        if (jsonData['data'] != null) {
-          if (jsonData['data'] is List) {
-            // Jika response langsung array
-            jurusanList = List<Map<String, dynamic>>.from(jsonData['data']);
-          } else if (jsonData['data']['data'] is List) {
-            // Jika response dengan pagination
-            final List<dynamic> data = jsonData['data']['data'];
-            jurusanList = data.cast<Map<String, dynamic>>();
+      if (res.statusCode == 200) {
+        final Map<String, dynamic> jsonData = jsonDecode(res.body);
+        setState(() {
+          if (jsonData['data'] != null) {
+            if (jsonData['data'] is List) {
+              // Jika response langsung array
+              jurusanList = List<Map<String, dynamic>>.from(jsonData['data']);
+            } else if (jsonData['data']['data'] is List) {
+              // Jika response dengan pagination
+              final List<dynamic> data = jsonData['data']['data'];
+              jurusanList = data.cast<Map<String, dynamic>>();
+            }
           }
-        }
-      });
-    } else {
-      print('Error fetch jurusan: ${res.statusCode}');
+        });
+      } else {
+        print('Error fetch jurusan: ${res.statusCode}');
+      }
+    } catch (e) {
+      print('Error fetch jurusan: $e');
     }
-  } catch (e) {
-    print('Error fetch jurusan: $e');
   }
-}
+
   String _convertTanggalUntukServer(String inputDate) {
     try {
       final parts = inputDate.split('-');
@@ -290,11 +472,9 @@ Future<void> _fetchJurusan() async {
             child: const Text('OK'),
           ),
         ],
-
       ),
     );
   }
-  
 
   // Validasi form sebelum submit
   bool _validateForm() {
@@ -451,6 +631,15 @@ Future<void> _fetchJurusan() async {
           'kode': kodeJurusanController.text.trim(),
           'nama': namaController.text.trim(),
         };
+        // TAMBAHAN: Tambahkan kaprog_guru_id jika dipilih
+        if (_selectedKaprogId != null && 
+            _selectedKaprogId!.isNotEmpty && 
+            _selectedKaprogId != 'null') {
+          final kaprogId = int.tryParse(_selectedKaprogId!);
+          if (kaprogId != null) {
+            payload['kaprog_guru_id'] = kaprogId;
+          }
+        }
         break;
       case 'Kelas':
         endpoint = '/api/kelas';
@@ -958,6 +1147,8 @@ Future<void> _fetchJurusan() async {
                           minLength: 3,
                           focusNode: _namaFocus,
                           fieldName: 'nama'),
+                      // TAMBAHAN: Dropdown Kaprog untuk Jurusan
+                      _buildKaprogDropdown(),
                     ] else if (jenis == 'Kelas') ...[
                       buildInputField(Icons.class_, 'Nama Kelas', namaController,
                           minLength: 2,
