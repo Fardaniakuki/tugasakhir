@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../login/login_screen.dart'; 
+import '../../login/login_screen.dart';
 
-class AdminSetting extends StatelessWidget {
-  const AdminSetting({super.key});
+class SiswaPengaturan extends StatelessWidget {
+  const SiswaPengaturan({super.key});
 
   Future<void> _logout(BuildContext context) async {
-    // Tampilkan dialog konfirmasi
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -38,14 +37,14 @@ class AdminSetting extends StatelessWidget {
         ),
       );
 
-      // Tunggu sebentar untuk animasi
-      await Future.delayed(const Duration(milliseconds: 500));
-
       // Hapus token / session login
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
 
-      // Tutup loading dan navigasi
+      // Tunggu sebentar untuk animasi
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Tutup loading dan navigasi ke login
       if (!context.mounted) return;
       Navigator.pop(context); // Tutup loading dialog
       
@@ -78,7 +77,7 @@ class AdminSetting extends StatelessWidget {
               ),
             ),
 
-            // Konten
+            // Content
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(24),
@@ -89,67 +88,71 @@ class AdminSetting extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    // Profil Admin
+                    // Profile Info
                     const Column(
                       children: [
                         CircleAvatar(
                           radius: 45,
-                          backgroundImage: AssetImage('assets/images/pp.png'),
+                          backgroundColor: Color(0xFF641E20),
+                          child: Icon(Icons.person, size: 40, color: Colors.white),
                         ),
                         SizedBox(height: 10),
                         Text(
-                          'Fardan Lawang',
+                          'Nama Siswa',
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text('Admin', style: TextStyle(color: Colors.grey)),
+                        Text(
+                          'Kelas XII - TKJ',
+                          style: TextStyle(color: Colors.grey),
+                        ),
                       ],
                     ),
 
                     const SizedBox(height: 30),
 
-                    // Menu Pengaturan
-                    _buildMenuCard(
+                    // Settings Menu
+                    _buildMenuTile(
                       icon: Icons.person_outline,
                       title: 'Edit Profil',
                       onTap: () {
-                        // Navigate to edit profile
+                        
                       },
                     ),
-                    _buildMenuCard(
+                    _buildMenuTile(
                       icon: Icons.notifications_outlined,
                       title: 'Notifikasi',
                       onTap: () {
-                        // Navigate to notifications
+                        // 
                       },
                     ),
-                    _buildMenuCard(
-                      icon: Icons.security_outlined,
+                    _buildMenuTile(
+                      icon: Icons.lock_outline,
                       title: 'Privasi & Keamanan',
                       onTap: () {
-                        // Navigate to privacy
+                        // 
                       },
                     ),
-                    _buildMenuCard(
+                    _buildMenuTile(
                       icon: Icons.help_outline,
                       title: 'Bantuan & Dukungan',
                       onTap: () {
-                        // Navigate to help
+                        // 
                       },
                     ),
-                    _buildMenuCard(
+                    _buildMenuTile(
                       icon: Icons.info_outline,
                       title: 'Tentang Aplikasi',
                       onTap: () {
-                        // Navigate to about
+                        // 
                       },
                     ),
 
                     const Spacer(),
 
-                    // Tombol Logout
+                    // Logout Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -168,10 +171,10 @@ class AdminSetting extends StatelessWidget {
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 10),
                     
-                    // Version info
+                    // Version Info
                     const Text(
                       'Versi 1.0.0',
                       style: TextStyle(
@@ -189,7 +192,7 @@ class AdminSetting extends StatelessWidget {
     );
   }
 
-  Widget _buildMenuCard({
+  Widget _buildMenuTile({
     required IconData icon,
     required String title,
     required VoidCallback onTap,

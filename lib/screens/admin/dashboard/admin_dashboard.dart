@@ -205,6 +205,206 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
+  // SIMPLE SKELETON LOADING - NO COMPLEX LAYOUT
+  Widget _buildLoading() {
+    return ListView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      children: [
+        const SizedBox(height: 24),
+        
+        // Stat Grid Skeleton
+        _buildSkeletonContainer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildSkeletonLine(width: 150, height: 20),
+                      const SizedBox(height: 8),
+                      _buildSkeletonLine(width: 200, height: 14),
+                    ],
+                  ),
+                  _buildSkeletonLine(width: 120, height: 40, borderRadius: 20),
+                ],
+              ),
+              const SizedBox(height: 20),
+              
+              // Grid
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1.2,
+                children: List.generate(6, (index) => _buildGridItemSkeleton()),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Chart Skeleton
+        _buildSkeletonContainer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildSkeletonLine(width: 24, height: 24, borderRadius: 12),
+                  const SizedBox(width: 8),
+                  _buildSkeletonLine(width: 120, height: 20),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _buildSkeletonLine(width: double.infinity, height: 200, borderRadius: 8),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Quick Stats Skeleton
+        _buildSkeletonContainer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildSkeletonLine(width: 24, height: 24, borderRadius: 12),
+                  const SizedBox(width: 8),
+                  _buildSkeletonLine(width: 120, height: 20),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: _buildStatItemSkeleton()),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildStatItemSkeleton()),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: List.generate(3, (index) => _buildMiniStatSkeleton()),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildSkeletonContainer({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildGridItemSkeleton() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSkeletonLine(width: 40, height: 40, borderRadius: 20),
+          const SizedBox(height: 12),
+          _buildSkeletonLine(width: 80, height: 16),
+          const SizedBox(height: 8),
+          _buildSkeletonLine(width: 60, height: 20),
+          const SizedBox(height: 4),
+          _buildSkeletonLine(width: 100, height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItemSkeleton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSkeletonLine(width: 24, height: 24, borderRadius: 12),
+          const SizedBox(height: 8),
+          _buildSkeletonLine(width: 60, height: 20),
+          const SizedBox(height: 4),
+          _buildSkeletonLine(width: 80, height: 14),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStatSkeleton() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildSkeletonLine(width: 20, height: 20, borderRadius: 10),
+        const SizedBox(height: 4),
+        _buildSkeletonLine(width: 30, height: 16),
+        const SizedBox(height: 2),
+        _buildSkeletonLine(width: 40, height: 12),
+      ],
+    );
+  }
+
+  Widget _buildSkeletonLine({
+    required double width,
+    required double height,
+    double borderRadius = 4,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+    );
+  }
+
   // CHART SEDERHANA - Distribusi Data
   Widget _buildSimpleDistributionChart() {
     if (_dashboardData == null) return const SizedBox();
@@ -234,6 +434,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
@@ -402,6 +603,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
@@ -421,9 +623,9 @@ class _AdminDashboardState extends State<AdminDashboard>
           const SizedBox(height: 16),
           Row(
             children: [
-              _buildStatItem('Rata Murid/Kelas', _calculateAverageStudentsPerClass(), Icons.people),
+              Expanded(child: _buildStatItem('Rata Murid/Kelas', _calculateAverageStudentsPerClass(), Icons.people)),
               const SizedBox(width: 16),
-              _buildStatItem('Rasio Guru:Murid', _calculateTeacherStudentRatio(), Icons.balance),
+              Expanded(child: _buildStatItem('Rasio Guru:Murid', _calculateTeacherStudentRatio(), Icons.balance)),
             ],
           ),
           const SizedBox(height: 12),
@@ -448,42 +650,42 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _buildStatItem(String title, String value, IconData icon) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: const Color(0xFF5B1A1A).withAlpha(10),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: const Color(0xFF5B1A1A), size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF5B1A1A),
-              ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF5B1A1A).withAlpha(10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFF5B1A1A), size: 24),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF5B1A1A),
             ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.grey,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildMiniStat(String title, int value, IconData icon) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, color: const Color(0xFF5B1A1A), size: 20),
         const SizedBox(height: 4),
@@ -526,31 +728,11 @@ class _AdminDashboardState extends State<AdminDashboard>
     return '1:$ratio';
   }
 
-  Widget _buildLoading() {
-    return const Padding(
-      padding: EdgeInsets.all(40.0),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5B1A1A)),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Memuat data...',
-              style: TextStyle(color: Colors.grey),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildError() {
     return Padding(
       padding: const EdgeInsets.all(40.0),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.error_outline,
@@ -586,40 +768,38 @@ class _AdminDashboardState extends State<AdminDashboard>
         centerTitle: true,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
-        
       ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refreshData,
           color: const Color(0xFF5B1A1A),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 24),
-                
-                if (_isLoading && _dashboardData == null)
-                  _buildLoading()
-                else if (_dashboardData != null) ...[
-                  StatGrid(
-                    data: _dashboardData!,
-                    onAddPressed: _showAddOptions,
-                    onBoxTap: _handleStatBoxTap,
+          child: _isLoading && _dashboardData == null
+              ? _buildLoading()
+              : SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_dashboardData != null) ...[
+                        StatGrid(
+                          data: _dashboardData!,
+                          onAddPressed: _showAddOptions,
+                          onBoxTap: _handleStatBoxTap,
+                        ),
+                        
+                        // CHART SEDERHANA & STATISTIK
+                        _buildSimpleDistributionChart(),
+                        _buildQuickStats(),
+                        
+                        const SizedBox(height: 20),
+                      ]
+                      else
+                        _buildError(),
+                    ],
                   ),
-                  
-                  // CHART SEDERHANA & STATISTIK
-                  _buildSimpleDistributionChart(),
-                  _buildQuickStats(),
-                  
-                  const SizedBox(height: 20),
-                ]
-                else
-                  _buildError(),
-              ],
-            ),
-          ),
+                ),
         ),
       ),
     );

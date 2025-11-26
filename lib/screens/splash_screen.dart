@@ -6,8 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tes_flutter/screens/login/login_screen.dart';
 import 'package:tes_flutter/screens/admin/admin_main.dart';
 import 'package:tes_flutter/screens/guru/guru_dashboard.dart';
-import 'package:tes_flutter/screens/siswa/siswa_dashboard.dart';
+import 'package:tes_flutter/screens/siswa/siswa_main.dart';
 import 'package:tes_flutter/screens/koordinator/koordinator_dashboard.dart';
+import 'package:tes_flutter/screens/pembimbing/pembimbing_dashboard.dart';
+import 'package:tes_flutter/screens/walikelas/wali_kelas_dashboard.dart';
+import 'package:tes_flutter/screens/kapro/kaprog_dashboard.dart';
 
 class SplashScreen1 extends StatefulWidget {
   const SplashScreen1({super.key});
@@ -30,29 +33,53 @@ class _SplashScreen1State extends State<SplashScreen1>
   }
 
   Future<void> _navigateNext() async {
-    await Future.delayed(const Duration(seconds: 3)); // biar animasi jalan dulu
+    await Future.delayed(const Duration(seconds: 3));
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     final role = prefs.getString('user_role');
 
+    print('🔑 Splash Screen Check:');
+    print('   Token: ${token != null ? "ADA" : "TIDAK ADA"}');
+    print('   Role: $role');
+
     Widget nextPage;
 
     if (token != null && role != null) {
-      // Kalau sudah login → ke dashboard sesuai role
-      if (role == 'Siswa') {
-        nextPage = const SiswaDashboard();
-      } else if (role == 'Guru') {
-        nextPage = const GuruDashboard();
-      } else if (role == 'Koordinator') {
-        nextPage = const KoordinatorDashboard();
-      } else {
-        nextPage = const AdminMain();
+      // 🎯 PERBAIKAN: Handle semua role yang mungkin
+      switch (role) {
+        case 'Siswa':
+          nextPage = const SiswaMain();
+          break;
+        case 'Guru':
+          nextPage = const GuruDashboard();
+          break;
+        case 'Pembimbing':
+          nextPage = const PembimbingDashboard();
+          break;
+        case 'Wali Kelas':
+          nextPage = const WaliKelasDashboard();
+          break;
+        case 'Kaprog':
+          nextPage = const KaprogDashboard();
+          break;
+        case 'Koordinator':
+          nextPage = const KoordinatorDashboard();
+          break;
+        case 'Admin':
+          nextPage = const AdminMain();
+          break;
+        default:
+          // 🚨 JIKA ROLE TIDAK DIKENAL, KE LOGIN LAGI
+          print('❌ Role tidak dikenali: $role, redirect ke login');
+          nextPage = const LoginScreen();
       }
     } else {
       // Kalau belum login
       nextPage = const LoginScreen();
     }
+
+    print('🎯 Redirect ke: ${nextPage.runtimeType}');
 
     if (!mounted) return;
     Navigator.pushReplacement(
