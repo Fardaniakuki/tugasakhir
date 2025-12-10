@@ -6,6 +6,7 @@ import 'jurusan/major_detail_page.dart';
 import 'industri/industry_detail_page.dart';
 import 'kelas/class_detail_page.dart';
 import 'dashboard_service.dart';
+import 'skeleton_loading.dart'; // Import file skeleton
 
 class AdminData extends StatefulWidget {
   final String? initialFilter;
@@ -26,39 +27,49 @@ class AdminDataState extends State<AdminData> {
 
   // Warna konsisten untuk semua tab
   final Color _primaryColor = const Color(0xFF641E20);
-
-  // Data untuk tab selector
-  final List<Map<String, dynamic>> _tabData = [
-    {
-      'type': 'Murid',
-      'icon': Icons.person,
-      'stats': {'total': 0, 'active': 0, 'baru': 0}
-    },
-    {
-      'type': 'Guru',
-      'icon': Icons.school,
-      'stats': {'total': 0, 'active': 0, 'baru': 0}
-    },
-    {
-      'type': 'Jurusan',
-      'icon': Icons.category,
-      'stats': {'total': 0, 'active': 0, 'baru': 0}
-    },
-    {
-      'type': 'Industri',
-      'icon': Icons.business,
-      'stats': {'total': 0, 'active': 0, 'baru': 0}
-    },
-    {
-      'type': 'Kelas',
-      'icon': Icons.class_,
-      'stats': {'total': 0, 'active': 0, 'baru': 0}
-    },
-  ];
+// Data untuk tab selector - HAPUS hasFilter dari Jurusan
+final List<Map<String, dynamic>> _tabData = [
+  {
+    'type': 'Murid',
+    'icon': Icons.person,
+    'stats': {'total': 0, 'active': 0, 'baru': 0},
+    'hasFilter': true,
+    'filterType': 'kelas',
+    'filterLabel': 'Filter Kelas',
+  },
+  {
+    'type': 'Guru',
+    'icon': Icons.school,
+    'stats': {'total': 0, 'active': 0, 'baru': 0},
+    'hasFilter': false,
+  },
+  {
+    'type': 'Jurusan',
+    'icon': Icons.category,
+    'stats': {'total': 0, 'active': 0, 'baru': 0},
+    'hasFilter': false, // DIUBAH: dari true menjadi false
+  },
+  {
+    'type': 'Industri',
+    'icon': Icons.business,
+    'stats': {'total': 0, 'active': 0, 'baru': 0},
+    'hasFilter': true,
+    'filterType': 'jurusan',
+    'filterLabel': 'Filter Jurusan',
+  },
+  {
+    'type': 'Kelas',
+    'icon': Icons.class_,
+    'stats': {'total': 0, 'active': 0, 'baru': 0},
+    'hasFilter': true,
+    'filterType': 'jurusan',
+    'filterLabel': 'Filter Jurusan',
+  },
+];
 
   int _currentTab = 0;
-  String _selectedKelasDisplay = 'Semua Kelas';
-  String _selectedKelasId = '';
+  String _selectedFilterDisplay = 'Semua';
+  String _selectedFilterId = '';
   String _searchQuery = '';
 
   // Cache untuk data yang sudah di-fetch
@@ -72,8 +83,9 @@ class AdminDataState extends State<AdminData> {
   List<Map<String, dynamic>> _allData = [];
   List<Map<String, dynamic>> _currentPageData = [];
 
-  // Untuk filter kelas
+  // Untuk filter options
   List<Map<String, String>> _availableKelas = [];
+  List<Map<String, String>> _availableJurusan = [];
 
   @override
   void initState() {
@@ -141,6 +153,7 @@ class AdminDataState extends State<AdminData> {
   Future<void> _initAll() async {
     await Future.wait([
       _fetchKelasOptions(),
+      _fetchJurusanOptions(),
     ]);
     await _fetchDataWithCache(_searchQuery);
   }
@@ -155,6 +168,20 @@ class AdminDataState extends State<AdminData> {
       debugPrint('❌ Error fetching kelas options: $e');
       setState(() {
         _availableKelas = [];
+      });
+    }
+  }
+
+  Future<void> _fetchJurusanOptions() async {
+    try {
+      final jurusanData = await _service.fetchJurusan();
+      setState(() {
+        _availableJurusan = jurusanData;
+      });
+    } catch (e) {
+      debugPrint('❌ Error fetching jurusan options: $e');
+      setState(() {
+        _availableJurusan = [];
       });
     }
   }
@@ -192,78 +219,84 @@ class AdminDataState extends State<AdminData> {
       _dataCache.remove(currentTypeKeys.first);
     }
   }
+Future<void> _fetchDataWithCache(String query,
+    {bool forceRefresh = false}) async {
+  final cacheKey = _getCacheKey(query);
 
-  Future<void> _fetchDataWithCache(String query,
-      {bool forceRefresh = false}) async {
-    final cacheKey = _getCacheKey(query);
+  _cleanCacheIfNeeded();
 
-    _cleanCacheIfNeeded();
+  if (!forceRefresh && _dataCache.containsKey(cacheKey)) {
+    final cachedData = _dataCache[cacheKey]!;
+    _setupPaginationData(cachedData);
 
-    if (!forceRefresh && _dataCache.containsKey(cacheKey)) {
-      final cachedData = _dataCache[cacheKey]!;
-      _setupPaginationData(cachedData);
-
-      // ✅ PERBAIKAN: Update statistik juga ketika menggunakan cache
-      _updateStats(cachedData);
-
-      setState(() {
-        _searchQuery = query;
-        _isLoading = false;
-      });
-      return;
-    }
+    // ✅ PERBAIKAN: Update statistik juga ketika menggunakan cache
+    _updateStats(cachedData);
 
     setState(() {
       _searchQuery = query;
-      _isLoading = true;
+      _isLoading = false;
     });
-
-    try {
-      List<Map<String, dynamic>> data;
-      final currentType = _tabData[_currentTab]['type'];
-
-      switch (currentType) {
-        case 'Murid':
-          data = await _service.fetchSiswaData(
-            searchQuery: query,
-            kelasId: _selectedKelasId,
-            jurusanId: '',
-          );
-          break;
-        case 'Guru':
-          data = await _service.fetchGuruData(searchQuery: query);
-          break;
-        case 'Jurusan':
-          data = await _service.fetchJurusanData(searchQuery: query);
-          break;
-        case 'Industri':
-          data = await _service.fetchIndustriData(searchQuery: query);
-          break;
-        case 'Kelas':
-          data = await _service.fetchKelasData(searchQuery: query);
-          break;
-        default:
-          data = [];
-      }
-
-      // Cache the data
-      _dataCache[cacheKey] = data;
-
-      // Update stats
-      _updateStats(data);
-
-      _setupPaginationData(data);
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Exception fetching ${_tabData[_currentTab]['type']}: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    return;
   }
+
+  setState(() {
+    _searchQuery = query;
+    _isLoading = true;
+  });
+
+  try {
+    List<Map<String, dynamic>> data;
+    final currentType = _tabData[_currentTab]['type'];
+
+    switch (currentType) {
+      case 'Murid':
+        data = await _service.fetchSiswaData(
+          searchQuery: query,
+          kelasId: _selectedFilterId,
+          jurusanId: '',
+        );
+        break;
+      case 'Guru':
+        data = await _service.fetchGuruData(searchQuery: query);
+        break;
+      case 'Jurusan':
+        // DIUBAH: Hapus parameter kelasId karena jurusan tidak perlu filter kelas
+        data = await _service.fetchJurusanData(searchQuery: query);
+        break;
+      case 'Industri':
+        data = await _service.fetchIndustriData(
+          searchQuery: query,
+          jurusanId: _selectedFilterId,
+        );
+        break;
+      case 'Kelas':
+        data = await _service.fetchKelasData(
+          searchQuery: query,
+          jurusanId: _selectedFilterId,
+        );
+        break;
+      default:
+        data = [];
+    }
+
+    // Cache the data
+    _dataCache[cacheKey] = data;
+
+    // Update stats
+    _updateStats(data);
+
+    _setupPaginationData(data);
+
+    setState(() {
+      _isLoading = false;
+    });
+  } catch (e) {
+    debugPrint('Exception fetching ${_tabData[_currentTab]['type']}: $e');
+    setState(() {
+      _isLoading = false;
+    });
+  }
+}
 
   void _updateStats(List<Map<String, dynamic>> data) {
     final currentStats = _tabData[_currentTab]['stats'] as Map<String, dynamic>;
@@ -317,8 +350,8 @@ class AdminDataState extends State<AdminData> {
 
   String _getCacheKey(String query) {
     final currentType = _tabData[_currentTab]['type'];
-    if (currentType == 'Murid') {
-      return '${currentType.toLowerCase()}-$query-$_selectedKelasId';
+    if (_selectedFilterId.isNotEmpty) {
+      return '${currentType.toLowerCase()}-$query-$_selectedFilterId';
     }
     return '${currentType.toLowerCase()}-$query';
   }
@@ -368,40 +401,61 @@ class AdminDataState extends State<AdminData> {
       }
     }
   }
+void _handleTabChange(int newIndex) {
+  if (newIndex == _currentTab) return;
 
-  // ✅ PERBAIKAN: Method _handleTabChange yang sudah diperbaiki
-  void _handleTabChange(int newIndex) {
-    if (newIndex == _currentTab) return;
-
-    setState(() {
-      _currentTab = newIndex;
-      _selectedKelasDisplay = 'Semua Kelas';
-      _selectedKelasId = '';
-      _searchQuery = '';
-      _searchController.text = '';
-
-      // ✅ PERBAIKAN: Reset statistik untuk tab baru
-      _resetStatsForTab(newIndex);
-    });
-
-    // Reset pagination
-    _resetPagination();
-
-    // Cek dulu apakah data sudah ada di cache
-    final cacheKey = _getCacheKey('');
-    if (_dataCache.containsKey(cacheKey)) {
-      // Data ada di cache, langsung pakai tanpa loading
-      final cachedData = _dataCache[cacheKey]!;
-      _setupPaginationData(cachedData);
-
-      // ✅ PERBAIKAN: Update statistik dengan data cache
-      _updateStats(cachedData);
+  setState(() {
+    _currentTab = newIndex;
+    _searchQuery = '';
+    _searchController.text = '';
+    
+    // PERBAIKAN: Reset filter hanya untuk tab yang memiliki filter
+    final newTabData = _tabData[newIndex];
+    if (newTabData['hasFilter'] == true) {
+      // Tab baru memiliki filter, biarkan filter tetap
+      // Tapi cek apakah filter yang ada cocok dengan tipe filter tab baru
+      
+      // Jika filter aktif tapi tidak cocok dengan tab baru, reset
+      if (_selectedFilterId.isNotEmpty) {
+        // Misal: filter aktif adalah kelas, tapi tab baru menggunakan filter jurusan
+        // Untuk sederhana, kita reset dulu
+        // (Bisa juga di-advanced dengan konversi, tapi untuk sekarang reset saja)
+        _selectedFilterDisplay = 'Semua';
+        _selectedFilterId = '';
+      }
     } else {
-      // Data belum di cache, fetch dengan loading
-      setState(() => _isLoading = true);
-      _fetchDataWithCache('');
+      // Tab baru tidak memiliki filter, HARUS reset filter
+      _selectedFilterDisplay = 'Semua';
+      _selectedFilterId = '';
     }
+    
+    // Reset statistik untuk tab baru
+    _resetStatsForTab(newIndex);
+  });
+
+  // Reset pagination
+  _resetPagination();
+
+  // Cek dulu apakah data sudah ada di cache
+  final cacheKey = _getCacheKey('');
+  if (_dataCache.containsKey(cacheKey)) {
+    // Data ada di cache, langsung pakai tanpa loading
+    final cachedData = _dataCache[cacheKey]!;
+    _setupPaginationData(cachedData);
+    _updateStats(cachedData);
+    
+    // PERBAIKAN: Jangan set isLoading ke false di sini karena akan bertentangan
+    if (_isLoading) {
+      setState(() => _isLoading = false);
+    }
+  } else {
+    // Data belum di cache, fetch dengan loading
+    if (!_isLoading) {
+      setState(() => _isLoading = true);
+    }
+    _fetchDataWithCache('');
   }
+}
 
   // HEADER STATS - Menampilkan jumlah data untuk setiap role
   Widget _buildHeaderStats() {
@@ -556,19 +610,78 @@ class AdminDataState extends State<AdminData> {
     );
   }
 
-  // SEARCH SECTION - Fixed untuk menghindari overflow
-  Widget _buildSearchSection() {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
+Widget _buildSearchSection() {
+  final currentTabData = _tabData[_currentTab];
+  final bool hasFilter = currentTabData['hasFilter'] as bool;
+  
+  // PERBAIKAN: Pastikan filter tidak ditampilkan jika tab tidak memiliki filter
+  if (!hasFilter && _selectedFilterDisplay != 'Semua') {
+    // Reset filter jika tab tidak memiliki filter tapi filter aktif
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _selectFilter('Semua', '');
+    });
+  }
+  
+  final String filterType = hasFilter ? currentTabData['filterType'] as String : '';
+  final String filterLabel = hasFilter ? currentTabData['filterLabel'] as String : '';
+
+  return Padding(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: _withOpacity(Colors.grey, 0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Cari ${currentTabData['type'].toString().toLowerCase()}...',
+                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 16),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // PERBAIKAN: Filter button hanya ditampilkan jika tab memiliki filter
+            if (hasFilter)
+              GestureDetector(
+                onTap: () => _showFilterDialog(filterType, filterLabel),
                 child: Container(
+                  width: 48,
+                  height: 48,
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
+                    gradient: _selectedFilterDisplay != 'Semua'
+                        ? LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _primaryColor,
+                              const Color(0xFF8B2A2D),
+                            ],
+                          )
+                        : null,
+                    color: _selectedFilterDisplay == 'Semua'
+                        ? Colors.white
+                        : null,
                     borderRadius: BorderRadius.circular(12),
-                    color: Colors.white,
                     boxShadow: [
                       BoxShadow(
                         color: _withOpacity(Colors.grey, 0.1),
@@ -577,140 +690,104 @@ class AdminDataState extends State<AdminData> {
                       ),
                     ],
                   ),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Cari ${_tabData[_currentTab]['type'].toString().toLowerCase()}...',
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 16),
-                      isDense: true,
-                    ),
+                  child: Stack(
+                    children: [
+                      Icon(
+                        Icons.tune,
+                        color: _selectedFilterDisplay != 'Semua'
+                            ? Colors.white
+                            : _primaryColor,
+                        size: 20,
+                      ),
+                      if (_selectedFilterDisplay != 'Semua')
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.orange,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              // Filter button hanya untuk Murid
-              if (_tabData[_currentTab]['type'] == 'Murid')
-                GestureDetector(
-                  onTap: _showKelasFilterDialog,
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: _selectedKelasDisplay != 'Semua Kelas'
-                          ? LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                _primaryColor,
-                                const Color(0xFF8B2A2D),
-                              ],
-                            )
-                          : null,
-                      color: _selectedKelasDisplay == 'Semua Kelas'
-                          ? Colors.white
-                          : null,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _withOpacity(Colors.grey, 0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        Icon(
-                          Icons.tune,
-                          color: _selectedKelasDisplay != 'Semua Kelas'
-                              ? Colors.white
-                              : _primaryColor,
-                          size: 20,
-                        ),
-                        if (_selectedKelasDisplay != 'Semua Kelas')
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Colors.orange,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                      ],
+          ],
+        ),
+
+        // PERBAIKAN: Tampilkan filter aktif hanya jika tab memiliki filter
+        if (hasFilter && _selectedFilterDisplay != 'Semua')
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _primaryColor.withOpacity(0.3),
+                      width: 1,
                     ),
                   ),
-                ),
-            ],
-          ),
-
-          // Tampilkan filter aktif jika ada
-          if (_tabData[_currentTab]['type'] == 'Murid' &&
-              _selectedKelasDisplay != 'Semua Kelas')
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _primaryColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _primaryColor.withValues(alpha: 0.3),
-                        width: 1,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getFilterIcon(filterType),
+                        size: 14,
+                        color: _primaryColor,
                       ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.class_rounded,
+                      const SizedBox(width: 6),
+                      Text(
+                        _selectedFilterDisplay,
+                        style: TextStyle(
+                          color: _primaryColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          _selectFilter('Semua', '');
+                        },
+                        child: Icon(
+                          Icons.close_rounded,
                           size: 14,
                           color: _primaryColor,
                         ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _selectedKelasDisplay,
-                          style: TextStyle(
-                            color: _primaryColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () {
-                            _selectKelas('Semua Kelas', '');
-                          },
-                          child: Icon(
-                            Icons.close_rounded,
-                            size: 14,
-                            color: _primaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-        ],
-      ),
-    );
+          ),
+      ],
+    ),
+  );
+}
+
+  IconData _getFilterIcon(String filterType) {
+    switch (filterType) {
+      case 'kelas':
+        return Icons.class_rounded;
+      case 'jurusan':
+        return Icons.category;
+      default:
+        return Icons.filter_list;
+    }
   }
 
-  // FILTER KELAS DIALOG YANG LEBIH BAGUS
-  void _showKelasFilterDialog() {
+  // FILTER DIALOG YANG LEBIH BAGUS
+  void _showFilterDialog(String filterType, String filterLabel) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -723,7 +800,7 @@ class AdminDataState extends State<AdminData> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
+                color: Colors.black.withOpacity(0.2),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -755,7 +832,7 @@ class AdminDataState extends State<AdminData> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(Icons.filter_list_rounded,
@@ -766,9 +843,9 @@ class AdminDataState extends State<AdminData> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Filter Kelas',
-                            style: TextStyle(
+                          Text(
+                            filterLabel,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
@@ -776,9 +853,9 @@ class AdminDataState extends State<AdminData> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Pilih kelas untuk memfilter data murid',
+                            'Pilih $filterType untuk memfilter data',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
+                              color: Colors.white.withOpacity(0.8),
                               fontSize: 12,
                             ),
                           ),
@@ -799,7 +876,7 @@ class AdminDataState extends State<AdminData> {
                 ),
               ),
 
-              // Search Bar untuk kelas
+              // Search Bar untuk filter
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Container(
@@ -813,7 +890,7 @@ class AdminDataState extends State<AdminData> {
                   ),
                   child: TextField(
                     decoration: InputDecoration(
-                      hintText: 'Cari kelas...',
+                      hintText: 'Cari $filterType...',
                       prefixIcon: Icon(Icons.search, color: Colors.grey[500]),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
@@ -827,12 +904,12 @@ class AdminDataState extends State<AdminData> {
                 ),
               ),
 
-              // Kelas List dengan design lebih modern
+              // Filter List dengan design lebih modern
               ConstrainedBox(
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.5,
                 ),
-                child: _buildKelasList(),
+                child: _buildFilterList(filterType),
               ),
 
               // Footer dengan action buttons
@@ -851,7 +928,7 @@ class AdminDataState extends State<AdminData> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () {
-                          _selectKelas('Semua Kelas', '');
+                          _selectFilter('Semua', '');
                           Navigator.pop(context);
                         },
                         style: OutlinedButton.styleFrom(
@@ -877,7 +954,7 @@ class AdminDataState extends State<AdminData> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           elevation: 2,
-                          shadowColor: _primaryColor.withValues(alpha: 0.3),
+                          shadowColor: _primaryColor.withOpacity(0.3),
                         ),
                         child: const Text('Selesai'),
                       ),
@@ -892,20 +969,24 @@ class AdminDataState extends State<AdminData> {
     );
   }
 
-  // METHOD BARU untuk build kelas list yang lebih bagus
-  Widget _buildKelasList() {
+  // METHOD BARU untuk build filter list yang lebih bagus
+  Widget _buildFilterList(String filterType) {
+    final List<Map<String, String>> filterOptions = filterType == 'kelas' 
+        ? _availableKelas 
+        : _availableJurusan;
+
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       children: [
-        // Opsi Semua Kelas dengan design khusus
-        _buildEnhancedKelasOption(
-          title: 'Semua Kelas',
-          subtitle: 'Tampilkan semua murid',
-          isSelected: _selectedKelasDisplay == 'Semua Kelas',
+        // Opsi Semua dengan design khusus
+        _buildEnhancedFilterOption(
+          title: 'Semua',
+          subtitle: 'Tampilkan semua data',
+          isSelected: _selectedFilterDisplay == 'Semua',
           icon: Icons.all_inclusive_rounded,
           iconColor: Colors.blue,
           onTap: () {
-            _selectKelas('Semua Kelas', '');
+            _selectFilter('Semua', '');
             Navigator.pop(context);
           },
         ),
@@ -924,7 +1005,7 @@ class AdminDataState extends State<AdminData> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
-                  'Daftar Kelas',
+                  'Daftar $filterType',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 12,
@@ -942,33 +1023,33 @@ class AdminDataState extends State<AdminData> {
           ),
         ),
 
-        // Daftar kelas dengan design enhanced
-        ..._availableKelas.map((kelas) => _buildEnhancedKelasOption(
-              title: kelas['name']!,
+        // Daftar filter dengan design enhanced
+        ...filterOptions.map((item) => _buildEnhancedFilterOption(
+              title: item['name']!,
               subtitle: 'Klik untuk memfilter',
-              isSelected: _selectedKelasDisplay == kelas['name'],
-              icon: Icons.class_rounded,
+              isSelected: _selectedFilterDisplay == item['name'],
+              icon: filterType == 'kelas' ? Icons.class_rounded : Icons.category,
               iconColor: _primaryColor,
               onTap: () {
-                _selectKelas(kelas['name']!, kelas['id']!);
+                _selectFilter(item['name']!, item['id']!);
                 Navigator.pop(context);
               },
             )),
 
-        // Empty state jika tidak ada kelas
-        if (_availableKelas.isEmpty)
+        // Empty state jika tidak ada filter
+        if (filterOptions.isEmpty)
           Container(
             padding: const EdgeInsets.all(40),
             child: Column(
               children: [
                 Icon(
-                  Icons.class_outlined,
+                  filterType == 'kelas' ? Icons.class_outlined : Icons.category_outlined,
                   size: 60,
                   color: Colors.grey[300],
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Tidak ada kelas tersedia',
+                  'Tidak ada $filterType tersedia',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 14,
@@ -977,7 +1058,7 @@ class AdminDataState extends State<AdminData> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Data kelas akan muncul di sini',
+                  'Data $filterType akan muncul di sini',
                   style: TextStyle(
                     color: Colors.grey[500],
                     fontSize: 12,
@@ -991,8 +1072,8 @@ class AdminDataState extends State<AdminData> {
     );
   }
 
-  // METHOD BARU untuk option kelas yang lebih bagus
-  Widget _buildEnhancedKelasOption({
+  // METHOD untuk option filter yang lebih bagus
+  Widget _buildEnhancedFilterOption({
     required String title,
     required String subtitle,
     required bool isSelected,
@@ -1002,7 +1083,7 @@ class AdminDataState extends State<AdminData> {
   }) {
     return Material(
       color: isSelected
-          ? _primaryColor.withValues(alpha: 0.08)
+          ? _primaryColor.withOpacity(0.08)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
@@ -1018,7 +1099,7 @@ class AdminDataState extends State<AdminData> {
             ),
             borderRadius: BorderRadius.circular(12),
             color: isSelected
-                ? _primaryColor.withValues(alpha: 0.05)
+                ? _primaryColor.withOpacity(0.05)
                 : Colors.transparent,
           ),
           child: Row(
@@ -1030,7 +1111,7 @@ class AdminDataState extends State<AdminData> {
                 decoration: BoxDecoration(
                   color: isSelected
                       ? _primaryColor
-                      : iconColor.withValues(alpha: 0.1),
+                      : iconColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -1060,7 +1141,7 @@ class AdminDataState extends State<AdminData> {
                       subtitle,
                       style: TextStyle(
                         color: isSelected
-                            ? _primaryColor.withValues(alpha: 0.8)
+                            ? _primaryColor.withOpacity(0.8)
                             : Colors.grey[600],
                         fontSize: 12,
                       ),
@@ -1103,16 +1184,24 @@ class AdminDataState extends State<AdminData> {
     );
   }
 
-  void _selectKelas(String displayName, String kelasId) {
-    setState(() {
-      _selectedKelasDisplay = displayName;
-      _selectedKelasId = kelasId;
-      _isLoading = true;
-    });
-
-    _resetPagination();
-    _fetchDataWithCache(_searchQuery, forceRefresh: true);
+void _selectFilter(String displayName, String filterId) {
+  // PERBAIKAN: Cek apakah tab saat ini memiliki filter
+  final currentTabData = _tabData[_currentTab];
+  if (currentTabData['hasFilter'] != true) {
+    // Tab saat ini tidak memiliki filter, tidak boleh set filter
+    debugPrint('⚠️ Tab ${currentTabData['type']} tidak mendukung filter');
+    return;
   }
+
+  setState(() {
+    _selectedFilterDisplay = displayName;
+    _selectedFilterId = filterId;
+    _isLoading = true;
+  });
+
+  _resetPagination();
+  _fetchDataWithCache(_searchQuery, forceRefresh: true);
+}
 
   // CONTENT SECTION - Pagination ikut scroll
   Widget _buildContent() {
@@ -1127,7 +1216,8 @@ class AdminDataState extends State<AdminData> {
 
   Widget _buildDataListWithPagination() {
     if (_isLoading) {
-      return _buildSkeletonLoading();
+      // Gunakan skeleton loading dari file terpisah
+      return SkeletonLoading(primaryColor: _primaryColor);
     }
 
     if (_allData.isEmpty) {
@@ -1151,89 +1241,10 @@ class AdminDataState extends State<AdminData> {
     );
   }
 
-  // SKELETON LOADING - Ditambahkan
-  Widget _buildSkeletonLoading() {
-    return ListView.builder(
-      itemCount: 6, // Jumlah skeleton items
-      itemBuilder: (context, index) {
-        return _buildSkeletonCard();
-      },
-    );
-  }
-
-  Widget _buildSkeletonCard() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: _withOpacity(Colors.grey, 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Skeleton Avatar
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            const SizedBox(width: 16),
-
-            // Skeleton Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Skeleton Title
-                  Container(
-                    width: double.infinity,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Skeleton Info Rows
-                  Container(
-                    width: 150,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    width: 200,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildEmptyState() {
+    final currentTabData = _tabData[_currentTab];
+    final bool hasFilter = currentTabData['hasFilter'] as bool;
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1256,7 +1267,9 @@ class AdminDataState extends State<AdminData> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Coba ubah pencarian atau filter yang berbeda',
+              hasFilter && _selectedFilterDisplay != 'Semua'
+                  ? 'Coba ubah pencarian atau pilih filter yang berbeda'
+                  : 'Coba ubah pencarian atau tambahkan data baru',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[500],
@@ -1281,7 +1294,7 @@ class AdminDataState extends State<AdminData> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: _withOpacity(Colors.grey, 0.1),
+            color: Colors.grey.withOpacity(0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1305,14 +1318,14 @@ class AdminDataState extends State<AdminData> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        _withOpacity(_primaryColor, 0.8),
+                        _primaryColor.withOpacity(0.8),
                         _primaryColor,
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: _withOpacity(_primaryColor, 0.3),
+                        color: _primaryColor.withOpacity(0.3),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
                       ),
@@ -1362,104 +1375,105 @@ class AdminDataState extends State<AdminData> {
     );
   }
 
-Widget _buildRoleSpecificInfo(Map<String, dynamic> item, String currentType) {
-  switch (currentType) {
-    case 'Murid':
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildEnhancedInfoRow(
-            Icons.class_outlined,
-            item['kelas'] ?? 'Kelas tidak tersedia',
-          ),
-          if (item['nisn'] != null)
-            _buildEnhancedInfoRow(
-              Icons.confirmation_number,
-              'NISN: ${item['nisn']}',
-            ),
-        ],
-      );
+  Widget _buildRoleSpecificInfo(Map<String, dynamic> item, String currentType) {
+    switch (currentType) {
+      case 'Murid':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (item['kelas'] != null)
+              _buildEnhancedInfoRow(
+                Icons.class_outlined,
+                item['kelas'],
+              ),
+            if (item['nisn'] != null)
+              _buildEnhancedInfoRow(
+                Icons.confirmation_number,
+                'NISN: ${item['nisn']}',
+              ),
+          ],
+        );
 
-    case 'Guru':
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (item['kode_guru'] != null)
-            _buildEnhancedInfoRow(
-              Icons.badge,
-              'Kode: ${item['kode_guru']}',
-            ),
-          if (item['nisn'] != null) // NIP diambil dari field 'nisn'
-            _buildEnhancedInfoRow(
-              Icons.credit_card,
-              'NIP: ${item['nisn']}',
-            ),
-        ],
-      );
+      case 'Guru':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (item['kode_guru'] != null)
+              _buildEnhancedInfoRow(
+                Icons.badge,
+                'Kode: ${item['kode_guru']}',
+              ),
+            if (item['nisn'] != null) // NIP diambil dari field 'nisn'
+              _buildEnhancedInfoRow(
+                Icons.credit_card,
+                'NIP: ${item['nisn']}',
+              ),
+          ],
+        );
 
-    case 'Jurusan':
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // PERUBAHAN: Tampilkan nama kaprog jika ada
-          if (item['kaprog_nama'] != null && item['kaprog_nama'].isNotEmpty)
-            _buildEnhancedInfoRow(
-              Icons.person,
-              'Kaprog: ${item['kaprog_nama']}',
-            )
-          else
-            _buildEnhancedInfoRow(
-              Icons.person,
-              'Kaprog: Belum ditentukan',
-            ),
+      case 'Jurusan':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // PERUBAHAN: Tampilkan nama kaprog jika ada
+            if (item['kaprog_nama'] != null && item['kaprog_nama'].isNotEmpty)
+              _buildEnhancedInfoRow(
+                Icons.person,
+                'Kaprog: ${item['kaprog_nama']}',
+              )
+            else
+              _buildEnhancedInfoRow(
+                Icons.person,
+                'Kaprog: Belum ditentukan',
+              ),
 
-          if (item['jumlah_kelas'] != null)
-            _buildEnhancedInfoRow(
-              Icons.class_,
-              '${item['jumlah_kelas']} Kelas',
-            ),
-        ],
-      );
+            if (item['jumlah_kelas'] != null)
+              _buildEnhancedInfoRow(
+                Icons.class_,
+                '${item['jumlah_kelas']} Kelas',
+              ),
+          ],
+        );
 
-    case 'Industri':
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (item['bidang'] != null)
-            _buildEnhancedInfoRow(
-              Icons.business_center,
-              item['bidang'],
-            ),
-          if (item['alamat'] != null)
-            _buildEnhancedInfoRow(
-              Icons.location_on,
-              item['alamat'],
-              maxLines: 2,
-            ),
-        ],
-      );
+      case 'Industri':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (item['bidang'] != null)
+              _buildEnhancedInfoRow(
+                Icons.business_center,
+                item['bidang'],
+              ),
+            if (item['alamat'] != null)
+              _buildEnhancedInfoRow(
+                Icons.location_on,
+                item['alamat'],
+                maxLines: 2,
+              ),
+          ],
+        );
 
-    case 'Kelas':
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (item['jurusan_nama'] != null)
-            _buildEnhancedInfoRow(
-              Icons.category,
-              item['jurusan_nama'],
-            ),
-          if (item['jumlah_murid'] != null)
-            _buildEnhancedInfoRow(
-              Icons.people,
-              '${item['jumlah_murid']} Murid',
-            ),
-        ],
-      );
+      case 'Kelas':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (item['jurusan_nama'] != null)
+              _buildEnhancedInfoRow(
+                Icons.category,
+                item['jurusan_nama'],
+              ),
+            if (item['jumlah_murid'] != null)
+              _buildEnhancedInfoRow(
+                Icons.people,
+                '${item['jumlah_murid']} Murid',
+              ),
+          ],
+        );
 
-    default:
-      return const SizedBox();
+      default:
+        return const SizedBox();
+    }
   }
-}
 
   Widget _buildEnhancedInfoRow(IconData icon, String text, {int maxLines = 1}) {
     return Padding(
@@ -1471,7 +1485,7 @@ Widget _buildRoleSpecificInfo(Map<String, dynamic> item, String currentType) {
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: _withOpacity(_primaryColor, 0.1),
+              color: _primaryColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
@@ -1602,7 +1616,7 @@ Widget _buildRoleSpecificInfo(Map<String, dynamic> item, String currentType) {
           boxShadow: isEnabled
               ? [
                   BoxShadow(
-                    color: _withOpacity(_primaryColor, 0.3),
+                    color: _primaryColor.withOpacity(0.3),
                     blurRadius: 6,
                     offset: const Offset(0, 3),
                   )
@@ -1637,7 +1651,7 @@ Widget _buildRoleSpecificInfo(Map<String, dynamic> item, String currentType) {
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: _withOpacity(_primaryColor, 0.3),
+                    color: _primaryColor.withOpacity(0.3),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   )

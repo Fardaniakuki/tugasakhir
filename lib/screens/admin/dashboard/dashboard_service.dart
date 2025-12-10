@@ -339,7 +339,52 @@ class DashboardService {
     }, forceRefresh: forceRefresh);
   }
 
-  // SISWA DATA
+  // JURUSAN OPTIONS - Untuk filter dropdown
+  Future<List<Map<String, String>>> fetchJurusan({bool forceRefresh = false}) async {
+    return await _fetchWithCache('jurusan_options', () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
+
+        final response = await http.get(
+          Uri.parse('$_baseUrl/api/jurusan?page=1&limit=100'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          
+          if (decoded['data'] is List) {
+            data = decoded['data'];
+          } else if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          } else if (decoded is List) {
+            data = decoded;
+          }
+          
+          final result = data
+              .map<Map<String, String>>((j) => {
+                    'id': (j['id'] ?? '').toString(),
+                    'name': (j['nama'] ?? '').toString(),
+                  })
+              .where((m) => m['name']!.isNotEmpty)
+              .toList();
+
+          return result;
+        } else {
+          debugPrint('Failed to fetch jurusan: ${response.statusCode}');
+          return [];
+        }
+      } catch (e) {
+        debugPrint('Error fetching jurusan options: $e');
+        return [];
+      }
+    }, forceRefresh: forceRefresh);
+  }
+
+  // SISWA DATA dengan filter kelas dan jurusan
   Future<List<Map<String, dynamic>>> fetchSiswaData({
     String kelasId = '',
     String jurusanId = '',
@@ -422,7 +467,7 @@ class DashboardService {
               'name': nama,
               'role': 'Murid',
               'kelas': kelasName,
-              'jurusan': '-',
+              'jurusan': '-', // Akan diisi nanti jika diperlukan
               'nisn': nisn,
               'tgl_lahir': tanggalLahir,
               'id': siswaId,
@@ -513,101 +558,15 @@ class DashboardService {
     }, forceRefresh: forceRefresh);
   }
 
- // JURUSAN DATA - DIPERBAIKI DENGAN NAMA KAPROG
-Future<List<Map<String, dynamic>>> fetchJurusanData({
-  String searchQuery = '',
-  bool forceRefresh = false,
-}) async {
-  final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
-  final cacheKey = 'jurusan-$normalizedSearchQuery';
-  
-  return await _fetchWithCache(cacheKey, () async {
-    try {
-      final token = await _getToken();
-      if (token == null) return [];
-
-      final Map<String, String> queryParams = {
-        'page': '1',
-        'limit': '100',
-      };
-
-      if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
-
-      final uri = _buildUri('/api/jurusan', queryParams);
-
-      final response = await http.get(
-        uri,
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final decoded = json.decode(response.body);
-        
-        List data = [];
-        if (decoded['data'] is List) {
-          data = decoded['data'];
-        } else if (decoded['data'] != null && decoded['data']['data'] is List) {
-          data = decoded['data']['data'];
-        }
-
-        // PERUBAHAN: Fetch data guru untuk mapping kaprog
-        final List<Map<String, dynamic>> allGuru = await fetchGuruData(forceRefresh: forceRefresh);
-        final Map<String, int> classCounts = await _getAllClassCounts(forceRefresh: forceRefresh);
-        
-        final List<Map<String, dynamic>> jurusanList = [];
-        
-        for (var j in data) {
-          final String jurusanId = (j['id'] ?? '').toString();
-          final int jumlahKelas = classCounts[jurusanId] ?? 0;
-          
-          // PERUBAHAN: Cari nama kaprog berdasarkan kaprog_guru_id
-          String? kaprogNama;
-          final kaprogGuruId = j['kaprog_guru_id'];
-          
-          if (kaprogGuruId != null) {
-            try {
-              final kaprog = allGuru.firstWhere(
-                (guru) => guru['id'] == kaprogGuruId.toString(), // ← PERUBAHAN: Gunakan id guru
-                orElse: () => {},
-              );
-              kaprogNama = kaprog['name'];
-            } catch (e) {
-              debugPrint('Error finding kaprog for jurusan $jurusanId: $e');
-            }
-          }
-          
-          jurusanList.add({
-            'name': (j['nama'] ?? 'Unknown').toString(),
-            'kode': (j['kode'] ?? '').toString(),
-            'role': 'Jurusan',
-            'id': jurusanId,
-            'type': 'jurusan',
-            'jumlah_kelas': jumlahKelas,
-            // PERUBAHAN: Tambahkan field kaprog
-            'kaprog_guru_id': kaprogGuruId?.toString(),
-            'kaprog_nama': kaprogNama, // ← INI YANG DITAMPILKAN DI CARD
-          });
-        }
-        
-        return jurusanList;
-      } else {
-        throw Exception('Failed to fetch jurusan data: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to fetch jurusan data: $e');
-    }
-  }, forceRefresh: forceRefresh);
-}
-  // INDUSTRI DATA
-  Future<List<Map<String, dynamic>>> fetchIndustriData({
+  // JURUSAN DATA dengan filter kelas - FIXED BERDASARKAN REFERENSI
+  Future<List<Map<String, dynamic>>> fetchJurusanData({
     String searchQuery = '',
+    String kelasId = '',
     bool forceRefresh = false,
   }) async {
     final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
-    final cacheKey = 'industri-$normalizedSearchQuery';
+    final normalizedKelasId = kelasId.isEmpty ? 'all' : kelasId;
+    final cacheKey = 'jurusan-$normalizedSearchQuery-$normalizedKelasId';
     
     return await _fetchWithCache(cacheKey, () async {
       try {
@@ -620,6 +579,180 @@ Future<List<Map<String, dynamic>>> fetchJurusanData({
         };
 
         if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+        // Parameter kelas_id untuk filter jurusan berdasarkan kelas
+        if (kelasId.isNotEmpty) queryParams['kelas_id'] = kelasId;
+
+        final uri = _buildUri('/api/jurusan', queryParams);
+
+        final response = await http.get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          if (decoded['data'] is List) {
+            data = decoded['data'];
+          } else if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          }
+
+          // PERUBAHAN: Fetch data guru untuk mapping kaprog
+          final List<Map<String, dynamic>> allGuru = await fetchGuruData(forceRefresh: forceRefresh);
+          final Map<String, int> classCounts = await _getAllClassCounts(forceRefresh: forceRefresh);
+          
+          final List<Map<String, dynamic>> jurusanList = [];
+          
+          for (var j in data) {
+            final String jurusanId = (j['id'] ?? '').toString();
+            final int jumlahKelas = classCounts[jurusanId] ?? 0;
+            
+            // PERUBAHAN: Cari nama kaprog berdasarkan kaprog_guru_id
+            String? kaprogNama;
+            final kaprogGuruId = j['kaprog_guru_id'];
+            
+            if (kaprogGuruId != null) {
+              try {
+                final kaprog = allGuru.firstWhere(
+                  (guru) => guru['id'] == kaprogGuruId.toString(),
+                  orElse: () => {},
+                );
+                kaprogNama = kaprog['name'];
+              } catch (e) {
+                debugPrint('Error finding kaprog for jurusan $jurusanId: $e');
+              }
+            }
+            
+            jurusanList.add({
+              'name': (j['nama'] ?? 'Unknown').toString(),
+              'kode': (j['kode'] ?? '').toString(),
+              'role': 'Jurusan',
+              'id': jurusanId,
+              'type': 'jurusan',
+              'jumlah_kelas': jumlahKelas,
+              // PERUBAHAN: Tambahkan field kaprog
+              'kaprog_guru_id': kaprogGuruId?.toString(),
+              'kaprog_nama': kaprogNama,
+            });
+          }
+          
+          return jurusanList;
+        } else {
+          debugPrint('Failed to fetch jurusan data: ${response.statusCode}');
+          return [];
+        }
+      } catch (e) {
+        debugPrint('Error fetching jurusan data: $e');
+        return [];
+      }
+    }, forceRefresh: forceRefresh);
+  }
+
+  // GET JURUSAN BY ID - Untuk detail jurusan
+  Future<Map<String, dynamic>?> getJurusanById(String jurusanId, {bool forceRefresh = false}) async {
+    final cacheKey = 'jurusan_detail_$jurusanId';
+    
+    return await _fetchWithCache(cacheKey, () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return null;
+
+        final response = await http.get(
+          _buildUri('/api/jurusan/$jurusanId'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          return decoded['data'] ?? {};
+        } else {
+          debugPrint('Failed to fetch jurusan detail: ${response.statusCode}');
+          return null;
+        }
+      } catch (e) {
+        debugPrint('Error fetching jurusan detail: $e');
+        return null;
+      }
+    }, forceRefresh: forceRefresh);
+  }
+
+  // GET KELAS BY JURUSAN - Untuk mendapatkan kelas dalam jurusan tertentu
+  Future<List<Map<String, dynamic>>> getKelasByJurusan(String jurusanId, {bool forceRefresh = false}) async {
+    final cacheKey = 'kelas_by_jurusan_$jurusanId';
+    
+    return await _fetchWithCache(cacheKey, () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
+
+        final response = await http.get(
+          _buildUri('/api/kelas', {'jurusan_id': jurusanId}),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          if (decoded['data'] is List) {
+            data = decoded['data'];
+          } else if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          }
+
+          return data.map<Map<String, dynamic>>((k) {
+            return {
+              'id': (k['id'] ?? '').toString(),
+              'name': (k['nama'] ?? '').toString(),
+              'tingkat': (k['tingkat'] ?? '').toString(),
+              'jumlah_siswa': (k['jumlah_siswa'] ?? 0) as int,
+              'jurusan_id': (k['jurusan_id'] ?? '').toString(),
+            };
+          }).toList();
+        } else {
+          debugPrint('Failed to fetch kelas by jurusan: ${response.statusCode}');
+          return [];
+        }
+      } catch (e) {
+        debugPrint('Error fetching kelas by jurusan: $e');
+        return [];
+      }
+    }, forceRefresh: forceRefresh);
+  }
+
+  // INDUSTRI DATA dengan filter jurusan
+  Future<List<Map<String, dynamic>>> fetchIndustriData({
+    String searchQuery = '',
+    String jurusanId = '',
+    bool forceRefresh = false,
+  }) async {
+    final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
+    final normalizedJurusanId = jurusanId.isEmpty ? 'all' : jurusanId;
+    final cacheKey = 'industri-$normalizedSearchQuery-$normalizedJurusanId';
+    
+    return await _fetchWithCache(cacheKey, () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
+
+        final Map<String, String> queryParams = {
+          'page': '1',
+          'limit': '100',
+        };
+
+        if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+        if (jurusanId.isNotEmpty) queryParams['jurusan_id'] = jurusanId;
 
         final uri = _buildUri('/api/industri', queryParams);
 
@@ -658,21 +791,25 @@ Future<List<Map<String, dynamic>>> fetchJurusanData({
             };
           }).toList();
         } else {
-          throw Exception('Failed to fetch industri data: ${response.statusCode}');
+          debugPrint('Failed to fetch industri data: ${response.statusCode}');
+          return [];
         }
       } catch (e) {
-        throw Exception('Failed to fetch industri data: $e');
+        debugPrint('Error fetching industri data: $e');
+        return [];
       }
     }, forceRefresh: forceRefresh);
   }
 
-  // KELAS DATA
+  // KELAS DATA dengan filter jurusan
   Future<List<Map<String, dynamic>>> fetchKelasData({
     String searchQuery = '',
+    String jurusanId = '',
     bool forceRefresh = false,
   }) async {
     final normalizedSearchQuery = searchQuery.isEmpty ? 'all' : searchQuery;
-    final cacheKey = 'kelas-data-$normalizedSearchQuery';
+    final normalizedJurusanId = jurusanId.isEmpty ? 'all' : jurusanId;
+    final cacheKey = 'kelas-data-$normalizedSearchQuery-$normalizedJurusanId';
     
     return await _fetchWithCache(cacheKey, () async {
       try {
@@ -685,6 +822,7 @@ Future<List<Map<String, dynamic>>> fetchJurusanData({
         };
 
         if (searchQuery.isNotEmpty) queryParams['search'] = searchQuery;
+        if (jurusanId.isNotEmpty) queryParams['jurusan_id'] = jurusanId;
 
         final uri = _buildUri('/api/kelas', queryParams);
 
@@ -713,25 +851,25 @@ Future<List<Map<String, dynamic>>> fetchJurusanData({
           
           for (var k in data) {
             final String kelasId = (k['id'] ?? '').toString();
-            final String jurusanId = (k['jurusan_id'] ?? '').toString();
+            final String kelasJurusanId = (k['jurusan_id'] ?? '').toString();
             final int jumlahMurid = studentCounts[kelasId] ?? 0;
             
             String jurusanNama = 'Tidak ada jurusan';
-            if (jurusanId.isNotEmpty) {
+            if (kelasJurusanId.isNotEmpty) {
               try {
                 final jurusanData = jurusanList.firstWhere(
-                  (j) => j['id'] == jurusanId,
-                  orElse: () => {'name': 'Jurusan $jurusanId'},
+                  (j) => j['id'] == kelasJurusanId,
+                  orElse: () => {'name': 'Jurusan $kelasJurusanId'},
                 );
-                jurusanNama = jurusanData['name'] ?? 'Jurusan $jurusanId';
+                jurusanNama = jurusanData['name'] ?? 'Jurusan $kelasJurusanId';
               } catch (e) {
-                jurusanNama = 'Jurusan $jurusanId';
+                jurusanNama = 'Jurusan $kelasJurusanId';
               }
             }
             
             kelasList.add({
               'name': (k['nama'] ?? 'Unknown').toString(),
-              'jurusan_id': jurusanId,
+              'jurusan_id': kelasJurusanId,
               'jurusan_nama': jurusanNama,
               'role': 'Kelas',
               'id': kelasId,
@@ -742,10 +880,75 @@ Future<List<Map<String, dynamic>>> fetchJurusanData({
           
           return kelasList;
         } else {
-          throw Exception('Failed to fetch kelas data: ${response.statusCode}');
+          debugPrint('Failed to fetch kelas data: ${response.statusCode}');
+          return [];
         }
       } catch (e) {
-        throw Exception('Failed to fetch kelas data: $e');
+        debugPrint('Error fetching kelas data: $e');
+        return [];
+      }
+    }, forceRefresh: forceRefresh);
+  }
+
+  // Method untuk mendapatkan data jurusan (untuk dropdown options)
+  Future<List<Map<String, String>>> getJurusanOptions({bool forceRefresh = false}) async {
+    try {
+      final jurusanData = await fetchJurusanData(forceRefresh: forceRefresh);
+      return jurusanData.map((j) => {
+        'id': j['id'].toString(),
+        'name': j['name'].toString(),
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getting jurusan options: $e');
+      return [];
+    }
+  }
+
+  // Method untuk mendapatkan KAPROG options (guru dengan is_kaprog = true)
+  Future<List<Map<String, dynamic>>> getKaprogOptions({bool forceRefresh = false}) async {
+    return await _fetchWithCache('kaprog_options', () async {
+      try {
+        final token = await _getToken();
+        if (token == null) return [];
+
+        final response = await http.get(
+          _buildUri('/api/guru'),
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final decoded = json.decode(response.body);
+          
+          List data = [];
+          if (decoded['data'] != null && decoded['data']['data'] is List) {
+            data = decoded['data']['data'];
+          } else if (decoded['data'] is List) {
+            data = decoded['data'];
+          }
+
+          // Filter hanya guru yang is_kaprog = true
+          final List<Map<String, dynamic>> kaprogData = [];
+          for (var guru in data) {
+            if (guru['is_kaprog'] == true) {
+              kaprogData.add({
+                'id': guru['id']?.toString(),
+                'name': guru['nama_lengkap'] ?? guru['nama'] ?? 'Unknown',
+                'kode_guru': guru['kode_guru'] ?? '',
+              });
+            }
+          }
+
+          return kaprogData;
+        } else {
+          debugPrint('Failed to fetch kaprog options: ${response.statusCode}');
+          return [];
+        }
+      } catch (e) {
+        debugPrint('Error fetching kaprog options: $e');
+        return [];
       }
     }, forceRefresh: forceRefresh);
   }

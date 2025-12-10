@@ -761,45 +761,91 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF5B1A1A),
-        title: const Text('Dashboard', style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
+      backgroundColor: const Color(0xFF5B1A1A),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refreshData,
           color: const Color(0xFF5B1A1A),
-          child: _isLoading && _dashboardData == null
-              ? _buildLoading()
-              : SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_dashboardData != null) ...[
-                        StatGrid(
-                          data: _dashboardData!,
-                          onAddPressed: _showAddOptions,
-                          onBoxTap: _handleStatBoxTap,
-                        ),
-                        
-                        // CHART SEDERHANA & STATISTIK
-                        _buildSimpleDistributionChart(),
-                        _buildQuickStats(),
-                        
-                        const SizedBox(height: 20),
-                      ]
-                      else
-                        _buildError(),
-                    ],
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // Header dengan warna maroon yang ikut discroll
+              const SliverAppBar(
+                backgroundColor: Color(0xFF5B1A1A),
+                expandedHeight: 63,
+                floating: false,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                  centerTitle: false,
+                  titlePadding: EdgeInsets.only(left: 16, bottom: 16),
+                  expandedTitleScale: 1.0,
+                  title: Text(
+                    'Dashboard',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
+              ),
+              
+              // Konten utama dalam container putih
+              SliverToBoxAdapter(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(40),
+                      topRight: Radius.circular(40),
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFBEBEBE),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: _isLoading && _dashboardData == null
+                      ? _buildLoading()
+                      : Padding(
+                          padding: const EdgeInsets.only(
+                            top: 24,
+                            bottom: 20,
+                            left: 16,
+                            right: 16,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_dashboardData != null) ...[
+                                StatGrid(
+                                  data: _dashboardData!,
+                                  onAddPressed: _showAddOptions,
+                                  onBoxTap: _handleStatBoxTap,
+                                ),
+                                
+                                // CHART SEDERHANA & STATISTIK
+                                _buildSimpleDistributionChart(),
+                                _buildQuickStats(),
+                                
+                                const SizedBox(height: 20),
+                              ]
+                              else
+                                _buildError(),
+                            ],
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

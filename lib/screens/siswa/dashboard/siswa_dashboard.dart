@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'ajukan_pkl_dialog.dart';
 
 class SiswaDashboard extends StatefulWidget {
   const SiswaDashboard({super.key});
@@ -13,16 +14,17 @@ class SiswaDashboard extends StatefulWidget {
 }
 
 class _SiswaDashboardState extends State<SiswaDashboard> {
-  // Data siswa
   String _namaSiswa = 'Loading...';
   String _kelasSiswa = 'Loading...';
+  int? _kelasId;
   bool _isLoading = true;
   bool _hasError = false;
 
-  // Data PKL
   Map<String, dynamic>? _pklData;
   List<dynamic> _pklApplications = [];
   Map<String, dynamic>? _industriData;
+  Map<String, dynamic>? _pembimbingData;
+  Map<String, dynamic>? _processedByData;
 
   @override
   void initState() {
@@ -31,31 +33,71 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   Future<void> _loadAllData() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _hasError = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
 
+    try {
       await _loadProfileData();
       await _loadPklApplications();
     } catch (e) {
-      print('Error loading data: $e');
-      setState(() {
-        _hasError = true;
-      });
+      setState(() => _hasError = true);
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    final userName = prefs.getString('user_name');
+    
+    try {
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/siswa?search=$userName'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['success'] == true && 
+            data['data'] != null && 
+            data['data']['data'] != null && 
+            data['data']['data'].isNotEmpty) {
+          
+          final List<dynamic> siswaList = data['data']['data'];
+          
+          final matchedSiswa = siswaList.firstWhere(
+            (siswa) => siswa['nama_lengkap'] == userName,
+            orElse: () => siswaList.first
+          );
+          
+          final kelasId = matchedSiswa['kelas_id'];
+          
+          await prefs.setInt('user_kelas_id', kelasId);
+          
+          setState(() {
+            _namaSiswa = userName ?? 'Nama Tidak Tersedia';
+            _kelasSiswa = prefs.getString('user_kelas') ?? 'Kelas Tidak Tersedia';
+            _kelasId = kelasId;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      print('Error loading profile from API: $e');
+    }
+    
+    final kelasIdFromPrefs = prefs.getInt('user_kelas_id');
     setState(() {
-      _namaSiswa = prefs.getString('user_name') ?? 'Nama Tidak Tersedia';
+      _namaSiswa = userName ?? 'Nama Tidak Tersedia';
       _kelasSiswa = prefs.getString('user_kelas') ?? 'Kelas Tidak Tersedia';
+      _kelasId = kelasIdFromPrefs;
     });
   }
 
@@ -63,7 +105,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
+
       final response = await http.get(
         Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/applications/me'),
         headers: {
@@ -74,8 +116,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
-        if (data['data'] != null && data['data'] is List && data['data'].isNotEmpty) {
+        if (data['data'] != null && data['data'].isNotEmpty) {
           setState(() {
             _pklApplications = data['data'];
             _pklApplications.sort((a, b) => b['id'].compareTo(a['id']));
@@ -85,11 +126,15 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           if (_pklData?['industri_id'] != null) {
             await _loadIndustriData(_pklData!['industri_id']);
           }
+          if (_pklData?['pembimbing_guru_id'] != null) {
+            await _loadPembimbingData(_pklData!['pembimbing_guru_id']);
+          }
+          if (_pklData?['processed_by'] != null) {
+            await _loadProcessedByData(_pklData!['processed_by']);
+          }
         }
       }
-    } catch (e) {
-      print('Error loading PKL applications: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadIndustriData(int industriId) async {
@@ -106,733 +151,640 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _industriData = data['data'];
-        });
+        final data = jsonDecode(response.body);
+        setState(() => _industriData = data['data']);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadPembimbingData(int? guruId) async {
+    if (guruId == null) return;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru/$guruId'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() => _pembimbingData = data['data']);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadProcessedByData(int? guruId) async {
+    if (guruId == null) return;
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru/$guruId'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() => _processedByData = data['data']);
+      }
+    } catch (_) {}
+  }
+
+  // Fungsi untuk mengajukan PKL
+  Future<void> _ajukanPKL() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      if (_kelasId == null) {
+        await _loadProfileData();
+      }
+
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => AjukanPKLDialog(
+          token: token,
+          kelasId: _kelasId,
+        ),
+      );
+
+      if (result != null) {
+        final response = await http.post(
+          Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/applications'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'catatan': result['catatan'],
+            'industri_id': result['industri_id'],
+          }),
+        );
+
+        if (response.statusCode == 201) {
+          await _loadAllData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Pengajuan PKL berhasil dikirim')),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Gagal mengajukan PKL: ${response.body}')),
+            );
+          }
+        }
       }
     } catch (e) {
-      print('Error fetching industry: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Terjadi kesalahan saat mengajukan PKL')),
+        );
+      }
     }
   }
 
-  String _getIndustriName() {
-    if (_industriData == null) return 'Loading...';
-    return _industriData!['nama'] ?? 'Nama tidak tersedia';
+  // Fungsi untuk membuka halaman riwayat
+  void _bukaRiwayat() {
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(builder: (context) => const RiwayatPKLPage()),
+    // );
   }
 
-  String _getIndustriBidang() {
-    if (_industriData == null) return '';
-    return _industriData!['bidang'] ?? '';
+  // Fungsi untuk membuka halaman industri
+  void _bukaIndustri() {
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(builder: (context) => const ListIndustriPage()),
+    // );
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'disetujui':
+      case 'approved':
+        return Colors.green;
+      case 'ditolak':
+      case 'rejected':
+        return Colors.red;
+      case 'menunggu':
+      case 'pending':
+        return Colors.orange;
+      default:
+        return Colors.orange;
+    }
+  }
+
+  String _formatTanggal(String? dateString) {
+    if (dateString == null || dateString.isEmpty) return '-.-';
+    
+    try {
+      final date = DateTime.parse(dateString);
+      final bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 
+                    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      
+      return '${date.day} ${bulan[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return '-.-';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildLoadingSkeleton();
-    }
-
-    if (_hasError) {
-      return _buildErrorState();
-    }
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: RefreshIndicator(
-        onRefresh: _loadAllData,
-        color: const Color(0xFF641E20),
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // Modern App Bar
-            SliverAppBar(
-              expandedHeight: 180,
-              floating: false,
-              pinned: true,
-              elevation: 0,
-              backgroundColor: const Color(0xFF641E20),
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.pin,
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF641E20),
-                        Color(0xFF8B2A2C),
-                        Color(0xFFA03335),
-                      ],
-                    ),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Column(
+                children: [
+                  Container(
+                    height: 280,
+                    color: Colors.white,
                   ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 60,
-                                height: 60,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.white.withOpacity(0.2),
-                                      Colors.white.withOpacity(0.1),
-                                    ],
-                                  ),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.3),
-                                    width: 2,
-                                  ),
-                                ),
-                                child: const Icon(Icons.person, color: Colors.white, size: 30),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      _namaSiswa,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      _kelasSiswa,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: IconButton(
-                                  onPressed: _loadAllData,
-                                  icon: const Icon(Icons.refresh, color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _pklData != null ? 'PKL Aktif' : 'Belum PKL',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            // Content
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    // Status PKL Card
-                    _buildModernStatusCard(),
-                    const SizedBox(height: 20),
-
-                    // Industri Card jika ada
-                    if (_pklData != null && _industriData != null) 
-                      _buildModernIndustriCard(),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModernStatusCard() {
-    final hasApplication = _pklData != null;
-    final status = _pklData?['status']?.toString() ?? 'Belum Mengajukan';
-    final statusColor = _getStatusColor(status);
-    final statusText = _getStatusText(status);
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white,
-            Colors.white.withOpacity(0.9),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Decorative elements
-          Positioned(
-            right: -20,
-            top: -20,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: statusColor.withOpacity(0.05),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Status PKL',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1F2937),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(15),
-                        border: Border.all(color: statusColor.withOpacity(0.3)),
-                      ),
-                      child: Text(
-                        statusText,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                  Expanded(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFD9D9D9),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(40),
+                          topRight: Radius.circular(40),
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                if (hasApplication) ...[
-                  _buildModernInfoItem(
-                    Icons.calendar_today_rounded,
-                    'Tanggal Pengajuan',
-                    _formatDate(_pklData!['tanggal_permohonan']?.toString()),
-                    Colors.blue,
                   ),
-                  const SizedBox(height: 16),
-                  _buildModernInfoItem(
-                    Icons.business_rounded,
-                    'Tempat PKL',
-                    _getIndustriName(),
-                    Colors.purple,
-                  ),
-                  
-                  if (_pklData!['catatan'] != null && _pklData!['catatan'].toString().isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _buildModernInfoItem(
-                      Icons.note_rounded,
-                      'Catatan',
-                      _pklData!['catatan'].toString(),
-                      Colors.orange,
-                    ),
-                  ],
-
-                  // Status Message
-                  const SizedBox(height: 20),
-                  _buildStatusBanner(status),
-                ] else ...[
-                  const SizedBox(height: 30),
-                  _buildEmptyState(),
                 ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModernIndustriCard() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF641E20),
-            Color(0xFF8B2A2C),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF641E20).withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Background pattern
-          Positioned(
-            right: -30,
-            top: -30,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.1),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.business_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Tempat PKL',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Company Info
-                Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: const Icon(Icons.factory_rounded, color: Colors.white, size: 30),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _getIndustriName(),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (_getIndustriBidang().isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              _getIndustriBidang(),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white70,
-                              ),
+            
+            _isLoading
+                ? _buildSkeletonLoading()
+                : _hasError
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 50, color: Colors.black),
+                            const SizedBox(height: 16),
+                            const Text('Terjadi kesalahan', style: TextStyle(fontSize: 16)),
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: _loadAllData,
+                              child: const Text('Coba Lagi'),
                             ),
                           ],
-                        ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadAllData,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          children: [
+                            const SizedBox(height: 12),
+                            _buildProfileCard(),
+                            const SizedBox(height: 20),
+                            _buildQuickActions(),
+                            const SizedBox(height: 20),
+                            _buildPKLStatusCard(),
+                            const SizedBox(height: 100),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Company Details
-                if (_industriData?['alamat'] != null)
-                  _buildIndustriDetail('Alamat', _industriData!['alamat']),
-                if (_industriData?['pic'] != null)
-                  _buildIndustriDetail('PIC', _industriData!['pic']),
-                if (_industriData?['no_telp'] != null)
-                  _buildIndustriDetail('Telepon', _industriData!['no_telp']),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModernInfoItem(IconData icon, String title, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withOpacity(0.1)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F2937),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildIndustriDetail(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 70,
-            child: Text(
-              '$title:',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusBanner(String status) {
-    final Map<String, Map<String, dynamic>> statusConfig = {
-      'pending': {
-        'icon': Icons.access_time_rounded,
-        'color': Colors.orange,
-        'message': 'Pengajuan sedang dalam proses review oleh sekolah'
-      },
-      'approved': {
-        'icon': Icons.check_circle_rounded,
-        'color': Colors.green,
-        'message': 'Selamat! Pengajuan PKL Anda telah disetujui'
-      },
-      'rejected': {
-        'icon': Icons.cancel_rounded,
-        'color': Colors.red,
-        'message': 'Pengajuan ditolak. Silakan ajukan kembali'
-      },
-    };
-
-    final config = statusConfig[status.toLowerCase()] ?? {
-      'icon': Icons.help_rounded,
-      'color': Colors.grey,
-      'message': 'Status tidak dikenali'
-    };
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            config['color']!.withOpacity(0.1),
-            config['color']!.withOpacity(0.05),
           ],
         ),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: config['color']!.withOpacity(0.3)),
       ),
-      child: Row(
+    );
+  }
+
+  Widget _buildSkeletonLoading() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const SizedBox(height: 12),
+        _buildProfileCardSkeleton(),
+        const SizedBox(height: 20),
+        _buildQuickActionsSkeleton(),
+        const SizedBox(height: 20),
+        _buildPKLStatusCardSkeleton(),
+      ],
+    );
+  }
+
+  Widget _buildProfileCardSkeleton() {
+    return Card(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.grey,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: MediaQuery.of(context).size.width * 0.5,
+                        height: 20,
+                        color: Colors.grey[300],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: MediaQuery.of(context).size.width * 0.3,
+                        height: 16,
+                        color: Colors.grey[300],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 1,
+              color: Colors.grey[300],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(width: 60, height: 14, color: Colors.grey[300]),
+                      const SizedBox(height: 4),
+                      Container(width: 100, height: 16, color: Colors.grey[300]),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(width: 60, height: 14, color: Colors.grey[300]),
+                      const SizedBox(height: 4),
+                      Container(width: 100, height: 16, color: Colors.grey[300]),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickActionsSkeleton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+              color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: config['color']!.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(config['icon'] as IconData, color: config['color'], size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              config['message'] as String,
-              style: TextStyle(
-                color: config['color'],
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+          Container(width: 100, height: 20, color: Colors.grey[300]),
+          const SizedBox(height: 10),
+          GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _menuButtonSkeleton(),
+              _menuButtonSkeleton(),
+              _menuButtonSkeleton(),
+              _menuButtonSkeleton(),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _menuButtonSkeleton() {
     return Column(
       children: [
-        Container(
-          width: 80,
-          height: 80,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.grey[200]!,
-                Colors.grey[100]!,
+        const CircleAvatar(
+          radius: 23,
+          backgroundColor: Colors.grey,
+        ),
+        const SizedBox(height: 6),
+        Container(width: 40, height: 12, color: Colors.grey[300]),
+      ],
+    );
+  }
+
+  Widget _buildPKLStatusCardSkeleton() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: const [
+          BoxShadow(
+              color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(width: 100, height: 20, color: Colors.grey[300]),
+              Container(width: 80, height: 30, color: Colors.grey[300]),
             ],
           ),
-            shape: BoxShape.circle,
+          const SizedBox(height: 16),
+          Container(height: 1, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          _infoRowSkeleton(),
+          _infoRowSkeleton(),
+          _infoRowSkeleton(),
+          _infoRowSkeleton(),
+          _infoRowSkeleton(),
+          _infoRowSkeleton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRowSkeleton() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          const CircleAvatar(radius: 10, backgroundColor: Colors.grey),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(height: 16, color: Colors.grey[300]),
           ),
-          child: Icon(Icons.work_outline_rounded, size: 40, color: Colors.grey[400]),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileCard() {
+    return Card(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.black,
+                  child: Icon(Icons.person, color: Colors.white, size: 30),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_namaSiswa,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text(_kelasSiswa,
+                          style: const TextStyle(
+                              fontSize: 14, color: Colors.black54)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            if (_pklData != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                height: 1,
+                color: Colors.grey[300],
+              ),
+              const SizedBox(height: 12),
+              _buildDateSection(),
+            ],
+          ],
         ),
-        const SizedBox(height: 16),
-        const Text(
-          'Belum Ada Pengajuan PKL',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF6B7280),
+      ),
+    );
+  }
+
+  Widget _buildDateSection() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildDateItem('Mulai', _formatTanggal(_pklData!['tanggal_mulai'])),
+        ),
+        Container(
+          width: 1,
+          height: 40,
+          color: Colors.grey[300],
+        ),
+        Expanded(
+          child: _buildDateItem('Selesai', _formatTanggal(_pklData!['tanggal_selesai'])),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateItem(String label, String date) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.black54,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        const SizedBox(height: 8),
-        const Text(
-          'Ajukan PKL sekarang untuk memulai\nprogram praktik kerja industri',
-          textAlign: TextAlign.center,
+        const SizedBox(height: 4),
+        Text(
+          date,
           style: TextStyle(
-            color: Color(0xFF9CA3AF),
-            fontSize: 13,
+            fontSize: date == '-.-' ? 20 : 18,
+            fontWeight: FontWeight.w600,
+            color: date == '-.-' ? Colors.grey[500] : Colors.black,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLoadingSkeleton() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: CustomScrollView(
-        slivers: [
-          const SliverAppBar(
-            expandedHeight: 180,
-            floating: false,
-            pinned: true,
-            elevation: 0,
-            backgroundColor: Color(0xFF641E20),
-            flexibleSpace: SizedBox(),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Center(child: CircularProgressIndicator(color: Color(0xFF641E20))),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Center(child: CircularProgressIndicator(color: Color(0xFF641E20))),
-                  ),
-                ],
-              ),
-            ),
+  Widget _buildQuickActions() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+              color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Aksi Cepat',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 10),
+          GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            children: [
+              _menuButton(Icons.assignment_outlined, 'Ajukan', _ajukanPKL),
+              _menuButton(Icons.history, 'Riwayat', _bukaRiwayat),
+              _menuButton(Icons.factory_rounded, 'Industri', _bukaIndustri),
+              _menuButton(Icons.help_outline, 'Bantuan', () {}),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState() {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Icon(Icons.error_outline_rounded, size: 50, color: Colors.grey[400]),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Gagal Memuat Data',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Periksa koneksi internet Anda',
-              style: TextStyle(
-                color: Color(0xFF6B7280),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _loadAllData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF641E20),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Coba Lagi'),
-            ),
-          ],
-        ),
+  Widget _menuButton(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          CircleAvatar(
+            backgroundColor: Colors.white,
+            radius: 23,
+            child: Icon(icon, color: Colors.black),
+          ),
+          const SizedBox(height: 6),
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.black)),
+        ],
       ),
     );
   }
 
-  // Utility functions
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending': return Colors.orange;
-      case 'approved': return Colors.green;
-      case 'rejected': return Colors.red;
-      case 'active': return Colors.blue;
-      default: return Colors.grey;
+  Widget _buildPKLStatusCard() {
+    if (_pklData == null) {
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: _cardStyle(),
+        child: Column(
+          children: [
+            const Icon(Icons.info_outline, size: 35, color: Colors.black54),
+            const SizedBox(height: 10),
+            const Text('Belum ada pengajuan PKL'),
+            const SizedBox(height: 10),
+            ElevatedButton(
+                onPressed: _ajukanPKL, 
+                child: const Text('Ajukan PKL Sekarang'),
+            ),
+          ],
+        ),
+      );
     }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _cardStyle(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildStatusHeader(_pklData!['status']),
+          const Divider(height: 22),
+          _infoRow(Icons.factory, 'Nama Industri', _industriData?['nama']),
+          _infoRow(Icons.date_range, 'Tanggal Permohonan',
+              _formatTanggal(_pklData!['tanggal_permohonan'])),
+          _infoRow(Icons.note_alt_outlined, 'Catatan', _pklData!['catatan']),
+          _infoRow(Icons.person_pin_outlined, 'Pembimbing', 
+              _pembimbingData?['nama'] ?? '-'),
+          _infoRow(Icons.verified_user_outlined, 'Diproses Oleh',
+              _processedByData?['nama'] ?? '-'),
+        ],
+      ),
+    );
   }
 
-  String _getStatusText(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending': return 'Menunggu';
-      case 'approved': return 'Disetujui';
-      case 'rejected': return 'Ditolak';
-      case 'active': return 'Aktif';
-      default: return 'Belum';
-    }
+  BoxDecoration _cardStyle() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      boxShadow: const [
+        BoxShadow(
+            color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+      ],
+    );
   }
 
-  String _formatDate(String? dateString) {
-    if (dateString == null) return '-';
-    try {
-      final date = DateTime.parse(dateString);
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-      return '${date.day} ${months[date.month - 1]} ${date.year}';
-    } catch (e) {
-      return dateString;
-    }
+  Widget _buildStatusHeader(String status) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text('Status PKL',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: _statusColor(status).withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            status,
+            style: TextStyle(
+              color: _statusColor(status),
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _infoRow(IconData icon, String title, dynamic value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.black54),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$title : ${value ?? '-'}',
+              style: const TextStyle(fontSize: 14, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

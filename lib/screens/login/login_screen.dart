@@ -19,8 +19,9 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  String selectedRole = 'Admin';
+  String? selectedRole;
   bool isPasswordVisible = false;
+  bool isAdminMode = false;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final TextEditingController nameController = TextEditingController();
@@ -49,8 +50,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       if (selectedRole == 'Siswa') {
         _isNameValid = value.length >= 3;
-      } else {
+      } else if (selectedRole == 'Guru' && isAdminMode) {
         _isNameValid = value.isNotEmpty;
+      } else {
+        _isGuruCodeValid = value.isNotEmpty;
       }
     });
   }
@@ -80,20 +83,14 @@ class _LoginScreenState extends State<LoginScreen> {
     return double.tryParse(value) != null;
   }
 
-  // ✅ PERBAIKAN: Gunakan pengecekan role yang sama dengan SplashScreen
   Future<void> _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     final role = prefs.getString('user_role');
 
-    print('🔑 LoginScreen - Check Login Status:');
-    print('   Token: ${token != null ? "ADA" : "TIDAK ADA"}');
-    print('   Role: $role');
-
     if (token != null && role != null && mounted) {
       Widget targetPage;
-      
-      // 🎯 GUNAKAN LOGIC YANG SAMA PERSIS DENGAN SPLASH SCREEN
+
       switch (role) {
         case 'Siswa':
           targetPage = const SiswaMain();
@@ -114,12 +111,8 @@ class _LoginScreenState extends State<LoginScreen> {
           targetPage = const AdminMain();
           break;
         default:
-          // Jika role tidak dikenali, ke login screen
-          print('❌ Role tidak dikenali: $role');
           return;
       }
-
-      print('🎯 Redirect ke: ${targetPage.runtimeType}');
 
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -168,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.account_circle,
-                    size: 60, color: Color(0xFF5B1A1A)),
+                    size: 60, color: Colors.black87),
                 const SizedBox(height: 12),
                 Text(
                   'Halo, $userName',
@@ -177,28 +170,48 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Silakan masuk sebagai.',
+                  'Silakan masuk sebagai:',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.black54),
                 ),
                 const SizedBox(height: 20),
                 Column(
                   children: rolesAvailable.map((role) {
+                    IconData icon;
+
+                    switch (role) {
+                      case 'Pembimbing':
+                        icon = Icons.supervisor_account;
+                        break;
+                      case 'Wali Kelas':
+                        icon = Icons.class_;
+                        break;
+                      case 'Kaprog':
+                        icon = Icons.engineering;
+                        break;
+                      case 'Admin':
+                        icon = Icons.admin_panel_settings;
+                        break;
+                      default:
+                        icon = Icons.school;
+                    }
+
                     return Container(
                       margin: const EdgeInsets.symmetric(vertical: 6),
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF5B1A1A),
-                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black87,
                           padding: const EdgeInsets.symmetric(
                               vertical: 14, horizontal: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: Colors.black54),
                           ),
                           minimumSize: const Size(double.infinity, 50),
                         ),
-                        label:
-                            Text(role, style: const TextStyle(fontSize: 16)),
+                        icon: Icon(icon, size: 24, color: Colors.black87),
+                        label: Text(role, style: const TextStyle(fontSize: 16)),
                         onPressed: () async {
                           Navigator.pop(context);
                           Widget targetPage;
@@ -212,11 +225,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             case 'Kaprog':
                               targetPage = const KaprogDashboard();
                               break;
+                            case 'Admin':
+                              targetPage = const AdminMain();
+                              break;
                             default:
                               targetPage = const GuruDashboard();
                           }
 
-                          // ✅ SIMPAN ROLE YANG DIPILIH
                           await prefs.setString('user_role', role);
                           if (!mounted) return;
                           Navigator.pushReplacement(
@@ -273,13 +288,12 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (statusCode == 401) {
-        switch (selectedRole) {
-          case 'Siswa':
-            return 'Nama lengkap atau NISN salah';
-          case 'Guru':
-            return 'Kode guru atau password salah';
-          default:
-            return 'Username atau password salah';
+        if (selectedRole == 'Siswa') {
+          return 'Nama lengkap atau NISN salah';
+        } else if (isAdminMode) {
+          return 'Username atau password salah';
+        } else {
+          return 'Kode guru atau password salah';
         }
       } else if (statusCode == 404) {
         return 'Data tidak ditemukan';
@@ -297,19 +311,12 @@ class _LoginScreenState extends State<LoginScreen> {
     final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
     final url = Uri.parse('$baseUrl$endpoint');
 
-    print('🔐 Login Attempt:');
-    print('   URL: $url');
-    print('   Role: $selectedRole');
-    print('   Body: $body');
-
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),
       );
-
-      print('📡 Response Status: ${response.statusCode}');
 
       if (!mounted) return;
 
@@ -323,24 +330,21 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString('access_token', token);
         await prefs.setString('refresh_token', refreshToken);
 
-        // ✅ PERBAIKAN: Pastikan role disimpan dengan benar
         if (selectedRole == 'Siswa') {
           await prefs.setString('user_role', 'Siswa');
           await _saveSiswaData(prefs, user);
-        } else if (selectedRole == 'Guru') {
-          // Untuk guru, role akan disimpan berdasarkan pilihan di dialog
-          await prefs.setString('user_role', 'Guru');
-        } else {
+        } else if (isAdminMode) {
           await prefs.setString('user_role', 'Admin');
+        } else {
+          await prefs.setString('user_role', 'Guru');
         }
 
-        print('💾 Data disimpan - Role: ${prefs.getString('user_role')}');
-
-        if (endpoint == '/auth/guru/login') {
+        if (endpoint == '/auth/guru/login' && !isAdminMode) {
           final List<String> rolesAvailable = ['Guru'];
           if (user['is_pembimbing'] == true) rolesAvailable.add('Pembimbing');
           if (user['is_wali_kelas'] == true) rolesAvailable.add('Wali Kelas');
           if (user['is_kaprog'] == true) rolesAvailable.add('Kaprog');
+          if (user['is_admin'] == true) rolesAvailable.add('Admin');
 
           await _showRoleSelectionDialog(
             context,
@@ -350,13 +354,12 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         } else {
           Widget targetPage;
-          // ✅ PERBAIKAN: Gunakan selectedRole bukan user['role'] dari API
           if (selectedRole == 'Siswa') {
             targetPage = const SiswaMain();
-          } else if (selectedRole == 'Guru') {
-            targetPage = const GuruDashboard();
-          } else {
+          } else if (isAdminMode) {
             targetPage = const AdminMain();
+          } else {
+            targetPage = const GuruDashboard();
           }
 
           if (!mounted) return;
@@ -374,7 +377,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
-            backgroundColor: Colors.red,
+            backgroundColor: Colors.black87,
             duration: const Duration(seconds: 3),
           ),
         );
@@ -384,7 +387,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Terjadi kesalahan: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.black87,
         ),
       );
     }
@@ -412,29 +415,12 @@ class _LoginScreenState extends State<LoginScreen> {
       await prefs.setString('user_nisn', nisn);
       await prefs.setString('user_kelas_id', kelasId);
 
-      print('💾 Data siswa disimpan:');
-      print('   Nama: $nama');
-      print('   NISN: $nisn');
-      print('   Kelas ID: $kelasId');
-
       if (kelasId.isNotEmpty) {
         await _fetchAndSaveKelasDetail(prefs, kelasId);
       } else {
         await prefs.setString('user_kelas', 'Kelas Tidak Diketahui');
       }
-
-      if (user['alamat'] != null) {
-        await prefs.setString('user_alamat', user['alamat'].toString());
-      }
-      if (user['no_telp'] != null) {
-        await prefs.setString('user_no_telp', user['no_telp'].toString());
-      }
-      if (user['tanggal_lahir'] != null) {
-        await prefs.setString(
-            'user_tanggal_lahir', user['tanggal_lahir'].toString());
-      }
     } catch (e) {
-      print('❌ Error menyimpan data siswa: $e');
       await prefs.setString('user_kelas', 'Kelas Tidak Diketahui');
     }
   }
@@ -466,7 +452,6 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         await prefs.setString('user_kelas', kelasName);
-        print('💾 Detail kelas disimpan: $kelasName');
       } else {
         await prefs.setString('user_kelas', 'Kelas $kelasId');
       }
@@ -482,287 +467,633 @@ class _LoginScreenState extends State<LoginScreen> {
           'nama_lengkap': nameController.text.trim(),
           'nisn': nisnController.text.trim(),
         });
-      } else if (selectedRole == 'Guru') {
-        loginToAPI('/auth/guru/login', {
-          'kode_guru': guruController.text.trim(),
+      } else if (isAdminMode) {
+        loginToAPI('/auth/login', {
+          'username': nameController.text.trim(),
           'password': passwordController.text.trim(),
         });
       } else {
-        loginToAPI('/auth/login', {
-          'username': nameController.text.trim(),
+        loginToAPI('/auth/guru/login', {
+          'kode_guru': guruController.text.trim(),
           'password': passwordController.text.trim(),
         });
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isSiswa = selectedRole == 'Siswa';
-    final isGuru = selectedRole == 'Guru';
+  Widget _buildRoleSelectionScreen() {
+    // Ambil ukuran layar
+    final screenSize = MediaQuery.of(context).size;
+    final screenWidth = screenSize.width;
+    final screenHeight = screenSize.height;
 
     return Scaffold(
-      resizeToAvoidBottomInset: true,
-      backgroundColor: const Color(0xFF641E20),
-      body: SafeArea(
-        child: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              left: 24.0,
-              right: 24.0,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      body: Stack(
+        children: [
+          // 1. BACKGROUND PUTIH SELURUH LAYAR (paling bawah)
+          Positioned.fill(
+            child: Container(
+              color: Colors.white,
             ),
-            child: Form(
-              key: _formKey,
+          ),
+
+          // 2. CONTAINER PUTIH BESAR (di atas background putih)
+          Positioned(
+            top: screenHeight * 0.4, // 390dp dari atas
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(40),
+                  topRight: Radius.circular(40),
+                ),
+                border: Border.all(
+                  color: const Color(0xFFBEBEBE),
+                  width: 1,
+                ),
+              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 120),
-                  Center(
-                    child: Image.asset(
-                      'assets/images/ino.webp',
-                      width: 240,
-                    ),
-                  ),
-                  const SizedBox(height: 60),
-                  
-                  // ROLE TAB BAR - Design yang sudah konsisten
-                  RoleTabBar(
-                    selected: selectedRole,
-                    onChanged: (val) {
-                      setState(() {
-                        selectedRole = val;
-                        _validateName();
-                        _validatePassword();
-                        _validateNisn();
-                        _validateGuruCode();
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // NAME FIELD
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4.0),
+                  // TEKS "LOGIN SEBAGAI" - DI DALAM CONTAINER PUTIH
+                  Container(
+                    height: screenHeight * 0.10, // Atur tinggi
+                    alignment: Alignment.center,
                     child: Text(
-                      isSiswa ? 'Nama Lengkap' : (isGuru ? 'Kode Guru' : 'Nama'),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      'LOGIN SEBAGAI',
+                      style: TextStyle(
+                        fontSize: screenWidth * 0.065, // Atur ukuran font
                         fontWeight: FontWeight.bold,
+                        color: const Color(0xFF3B060A),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  
-                  if (isSiswa)
-                    _buildInputField(
-                      hint: 'Masukkan Nama Lengkap',
-                      controller: nameController,
-                      isValid: _isNameValid,
-                    )
-                  else if (isGuru)
-                    _buildInputField(
-                      hint: 'Masukkan Kode Guru',
-                      controller: guruController,
-                      isValid: _isGuruCodeValid,
-                    )
-                  else
-                    _buildInputField(
-                      hint: 'Masukkan Username',
-                      controller: nameController,
-                      isValid: _isNameValid,
-                    ),
-                  const SizedBox(height: 16),
-                  
-                  // PASSWORD or NISN FIELD
-                  if (isSiswa) ...[
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4.0),
-                      child: Text(
-                        'NISN',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _buildInputField(
-                      hint: 'Masukkan NISN (10 digit)',
-                      controller: nisnController,
-                      isValid: _isNisnValid,
-                      isNisn: true,
-                    ),
-                  ] else ...[
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4.0),
-                      child: Text(
-                        'Password',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _buildInputField(
-                      hint: 'Password',
-                      controller: passwordController,
-                      isValid: _isPasswordValid,
-                      isPassword: true,
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  
-                  // LOGIN BUTTON
-                  ElevatedButton(
-                    onPressed: _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      minimumSize: const Size(double.infinity, 30),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Masuk',
-                      style: TextStyle(fontSize: 20, color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
+
+                  // Sisanya kosong, card akan ditempatkan di layer lain
+                  Expanded(child: Container()),
                 ],
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
 
-  // Helper method untuk input field yang konsisten
-  Widget _buildInputField({
-    required String hint,
-    required TextEditingController controller,
-    required bool isValid,
-    bool isPassword = false,
-    bool isNisn = false,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: isNisn ? TextInputType.number : TextInputType.text,
-      style: const TextStyle(color: Colors.black),
-      maxLength: isNisn ? 10 : null,
-      obscureText: isPassword && !isPasswordVisible,
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.black54),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        counterText: isNisn ? '10 digit angka' : null,
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(
-                  isPasswordVisible ? Icons.visibility_off : Icons.visibility,
-                  color: Colors.black,
-                ),
-                onPressed: () {
-                  setState(() {
-                    isPasswordVisible = !isPasswordVisible;
-                  });
-                },
-              )
-            : null,
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Tidak boleh kosong';
-        }
-        if (!isValid) {
-          if (isNisn) return 'NISN harus 10 digit angka';
-          if (isPassword) return 'Password minimal 6 karakter';
-          return 'Input tidak valid';
-        }
-        return null;
-      },
-    );
-  }
-}
-
-class RoleTabBar extends StatelessWidget {
-  final String selected;
-  final ValueChanged<String> onChanged;
-
-  const RoleTabBar({
-    super.key,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final roles = ['Admin', 'Guru', 'Siswa'];
-    final selectedIndex = roles.indexOf(selected);
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final tabWidth = constraints.maxWidth / roles.length;
-
-        return Container(
-          height: 60,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30),
+          // 3. BACKGROUND GAMBAR (di ATAS container putih)
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/login_background.webp',
+              fit: BoxFit.cover,
+            ),
           ),
-          child: Stack(
-            children: [
-              AnimatedAlign(
-                duration: const Duration(milliseconds: 300),
-                alignment: Alignment(
-                  -1 + (2 / (roles.length - 1)) * selectedIndex,
-                  0,
+
+          // 4. LOGO SEKOLAH (di atas background gambar)
+          Positioned(
+            top: screenHeight * 0.15,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: screenWidth * 0.38,
+                height: screenWidth * 0.38,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
                 ),
-                child: Container(
-                  width: tabWidth - 8,
-                  margin:
-                      const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange,
-                    borderRadius: BorderRadius.circular(25),
+                child: ClipRRect(
+                  borderRadius:
+                      BorderRadius.circular(screenWidth * 0.19), // 0.38 / 2
+                  child: Image.asset(
+                    'assets/images/smkn2.webp',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Center(
+                        child: Icon(
+                          Icons.school,
+                          size: screenWidth * 0.3,
+                          color: const Color(0xFF3B060A),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ),
-              Row(
-                children: roles.map((role) {
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => onChanged(role),
-                      child: Center(
-                        child: Text(
-                          role,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: selected == role
-                                ? Colors.white
-                                : Colors.black,
+            ),
+          ),
+
+          // 5. CARD SISWA & GURU (di ATAS background gambar, di luar container)
+          Positioned(
+            top: screenHeight * 0.53, // Atur posisi card
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Card Siswa (kiri) - 152dp x 184dp
+                Container(
+                  width: screenWidth * 0.38,
+                  height: screenHeight * 0.24,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 3,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          selectedRole = 'Siswa';
+                          isAdminMode = false;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(25),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Gambar murid.webp
+                          SizedBox(
+                            width: screenWidth * 0.25,
+                            height: screenWidth * 0.25,
+                            child: Image.asset(
+                              'assets/images/murid.webp',
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.person,
+                                  size: screenWidth * 0.2,
+                                  color: const Color(0xFF3B060A),
+                                );
+                              },
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Siswa',
+                            style: TextStyle(
+                              fontSize: screenWidth * 0.055,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF3B060A),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
-            ],
+                  ),
+                ),
+
+                // Card Guru (kanan) - 152dp x 184dp
+                Container(
+                  width: screenWidth * 0.38,
+                  height: screenHeight * 0.24,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 3,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          selectedRole = 'Guru';
+                          isAdminMode = false;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(25),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Gambar guru.webp
+                          SizedBox(
+                            width: screenWidth * 0.25,
+                            height: screenWidth * 0.25,
+                            child: Image.asset(
+                              'assets/images/guru.webp',
+                              fit: BoxFit.contain,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Icon(
+                                  Icons.school,
+                                  size: screenWidth * 0.2,
+                                  color: const Color(0xFF3B060A),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Guru',
+                            style: TextStyle(
+                              fontSize: screenWidth * 0.055,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF3B060A),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
+  }
+// Widget untuk halaman login (Siswa merah, Guru coklat)
+Widget _buildLoginScreen() {
+  final isSiswa = selectedRole == 'Siswa';
+  final isGuru = selectedRole == 'Guru';
+
+  // Warna yang berbeda untuk Siswa (merah) dan Guru (coklat)
+  final backgroundColor = isSiswa ? const Color(0xFF8A0000) : const Color(0xFF3B060A);
+  final accentColor = isSiswa ? const Color(0xFF8A0000) : const Color(0xFF3B060A);
+  const containerRadius = 40.0;
+
+  return Scaffold(
+    backgroundColor: backgroundColor,
+    body: Stack(
+      children: [
+        // Container putih yang menutupi 90% layar
+        Positioned(
+          top: MediaQuery.of(context).size.height * 0.1,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(containerRadius),
+                topRight: Radius.circular(containerRadius),
+              ),
+            ),
+          ),
+        ),
+
+        SafeArea(
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const SizedBox(height: 40),
+
+                          // Logo sekolah
+                          Container(
+                            width: 140,
+                            height: 140,
+                            margin: const EdgeInsets.only(bottom: 20),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(60),
+                              child: Image.asset(
+                                'assets/images/smkn2.webp',
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    width: 120,
+                                    height: 120,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        isSiswa ? Icons.person : Icons.school,
+                                        size: 50,
+                                        color: accentColor,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // CONTAINER UTAMA UNTUK SEMUA ELEMEN FORM DAN TOMBOL
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.grey[300]!,
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 25,
+                            ),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                children: [
+                                  // FORM SISWA
+                                  if (isSiswa) ...[
+                                    _buildInputField(
+                                      label: 'Nama Lengkap',
+                                      hint: 'Masukkan Nama Lengkap',
+                                      controller: nameController,
+                                      isValid: _isNameValid,
+                                      accentColor: accentColor,
+                                    ),
+                                    const SizedBox(height: 15),
+                                    _buildInputField(
+                                      label: 'NISN',
+                                      hint: 'Masukkan NISN (10 digit)',
+                                      controller: nisnController,
+                                      isValid: _isNisnValid,
+                                      isNisn: true,
+                                      accentColor: accentColor,
+                                    ),
+                                  ]
+
+                                  // FORM GURU
+                                  else if (isGuru && !isAdminMode) ...[
+                                    _buildInputField(
+                                      label: 'Kode Guru',
+                                      hint: 'Masukkan Kode Guru',
+                                      controller: guruController,
+                                      isValid: _isGuruCodeValid,
+                                      accentColor: accentColor,
+                                    ),
+                                    const SizedBox(height: 15),
+                                    _buildInputField(
+                                      label: 'Password',
+                                      hint: 'Masukkan Password',
+                                      controller: passwordController,
+                                      isValid: _isPasswordValid,
+                                      isPassword: true,
+                                      accentColor: accentColor,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          isAdminMode = true;
+                                          guruController.clear();
+                                          nameController.clear();
+                                          passwordController.clear();
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            'Masuk sebagai Admin',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: accentColor,
+                                              fontWeight: FontWeight.bold,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ]
+
+                                  // FORM ADMIN
+                                  else if (isAdminMode) ...[
+                                    _buildInputField(
+                                      label: 'Username',
+                                      hint: 'Masukkan Username',
+                                      controller: nameController,
+                                      isValid: _isNameValid,
+                                      accentColor: accentColor,
+                                    ),
+                                    const SizedBox(height: 15),
+                                    _buildInputField(
+                                      label: 'Password',
+                                      hint: 'Masukkan Password',
+                                      controller: passwordController,
+                                      isValid: _isPasswordValid,
+                                      isPassword: true,
+                                      accentColor: accentColor,
+                                    ),
+                                  ],
+
+                                  const SizedBox(height: 20),
+
+                                  // Tombol Masuk
+                                  Container(
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(15),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.15),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ElevatedButton(
+                                      onPressed: _handleLogin,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: accentColor,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(15),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: Text(
+                                        isAdminMode
+                                            ? 'Masuk sebagai Admin'
+                                            : 'Masuk',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 12),
+
+                                  // Tombol Ganti Role
+                                  Container(
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: accentColor,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          selectedRole = null;
+                                          isAdminMode = false;
+                                          nameController.clear();
+                                          passwordController.clear();
+                                          nisnController.clear();
+                                          guruController.clear();
+                                        });
+                                      },
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Ganti Role?',
+                                        style: TextStyle(
+                                          color: accentColor,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Widget _buildInputField tetap sama seperti sebelumnya
+Widget _buildInputField({
+  required String label,
+  required String hint,
+  required TextEditingController controller,
+  required bool isValid,
+  required Color accentColor,
+  bool isPassword = false,
+  bool isNisn = false,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
+      ),
+      const SizedBox(height: 8),
+      TextFormField(
+        controller: controller,
+        keyboardType: isNisn ? TextInputType.number : TextInputType.text,
+        style: const TextStyle(color: Colors.black),
+        maxLength: isNisn ? 10 : null,
+        obscureText: isPassword && !isPasswordVisible,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.black54),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: accentColor,
+              width: 2,
+            ),
+          ),
+          counterText: isNisn ? '10 digit angka' : null,
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    isPasswordVisible
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: accentColor,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      isPasswordVisible = !isPasswordVisible;
+                    });
+                  },
+                )
+              : null,
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Tidak boleh kosong';
+          }
+          if (!isValid) {
+            if (isNisn) return 'NISN harus 10 digit angka';
+            if (isPassword) return 'Password minimal 6 karakter';
+            return 'Input tidak valid';
+          }
+          return null;
+        },
+      ),
+    ],
+  );
+}
+
+  @override
+  Widget build(BuildContext context) {
+    return selectedRole == null
+        ? _buildRoleSelectionScreen()
+        : _buildLoginScreen();
   }
 }
