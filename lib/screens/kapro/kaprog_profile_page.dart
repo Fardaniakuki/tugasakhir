@@ -16,118 +16,125 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
   Map<String, dynamic>? _currentTeacher;
   bool _isLoading = true;
   String? _errorMessage;
+@override
+void initState() {
+  super.initState();
+  _loadProfileData();
+}
 
-  @override
-  void initState() {
-    super.initState();
-    _loadProfileData();
-  }
+Future<void> _loadProfileData() async {
+  final prefs = await SharedPreferences.getInstance();
+  
+  // AMBIL DATA DARI SHAREDPREFERENCES TERLEBIH DAHULU
+  final userId = prefs.getInt('user_id');
+  final userName = prefs.getString('user_name');
+  final kodeGuru = prefs.getString('kode_guru');
+  final userNip = prefs.getString('user_nip');
+  
+  print('=== DATA DARI SHAREDPREFERENCES ===');
+  print('User ID: $userId');
+  print('User Name: $userName');
+  print('Kode Guru: $kodeGuru');
+  print('NIP: $userNip');
+  
+  // BUAT DATA DARI SHAREDPREFERENCES SEBAGAI FALLBACK
+  final fallbackData = {
+    'nama': userName ?? 'Guru',
+    'kode_guru': kodeGuru ?? '-',
+    'nip': userNip ?? '-',
+    'no_telp': '-',
+    'is_kaprog': true,
+    'is_active': true,
+  };
+  
+  // LANGSUNG SET DATA DARI SHAREDPREFERENCES
+  setState(() {
+    _currentTeacher = fallbackData;
+    _isLoading = false;
+  });
+  
+  // COBA AMBIL DATA LENGKAP DARI API (OPTIONAL)
+  _tryLoadFromAPI();
+}
 
-  Future<void> _loadProfileData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
+Future<void> _tryLoadFromAPI() async {
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('access_token');
+  
+  if (token == null) return;
+  
+  try {
+    print('Trying to load additional data from API...');
     
-    if (token == null) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Token tidak ditemukan';
-      });
-      return;
-    }
-
-    try {
-      print('Loading profile data...');
+    // Coba endpoint yang berbeda
+    final response = await http.get(
+      Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      print('API Response received');
       
-      // Coba ambil dari endpoint guru dengan filter kaprog
-      final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru?search=&limit=100'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      print('Response status: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        print('Data keys: ${data.keys.toList()}');
-        
-        if (data['success'] == true) {
-          // Coba beberapa kemungkinan struktur data
-          List<dynamic>? guruList;
-          
-          if (data['data'] is Map && data['data']['data'] is List) {
-            guruList = data['data']['data'];
-          } else if (data['data'] is List) {
-            guruList = data['data'];
-          } else if (data is List) {
-            guruList = data;
-          }
-          
-          if (guruList != null && guruList.isNotEmpty) {
-            print('Found ${guruList.length} teachers');
-            
-            // Debug: print semua guru
-            for (var i = 0; i < guruList.length; i++) {
-              print('Guru $i: ${guruList[i]}');
-            }
-            
-            // Cari guru yang is_kaprog = true
-            final kaprogList = guruList.where((guru) => 
-                guru['is_kaprog'] == true).toList();
-            
-            if (kaprogList.isNotEmpty) {
-              print('Found ${kaprogList.length} kaprog');
-              setState(() {
-                _currentTeacher = kaprogList.first;
-                _isLoading = false;
-                _errorMessage = null;
-              });
-              print('Loaded kaprog: ${_currentTeacher?['nama']}');
-              print('kode_guru: ${_currentTeacher?['kode_guru']}');
-            } else {
-              // Jika tidak ada kaprog, ambil guru pertama
-              print('No kaprog found, using first teacher');
-              setState(() {
-                _currentTeacher = guruList?.first;
-                _isLoading = false;
-                _errorMessage = null;
-              });
-            }
-          } else {
-            print('Guru list is null or empty');
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'Data guru tidak ditemukan';
-            });
-          }
-        } else {
-          print('API returned success: false');
-          setState(() {
-            _isLoading = false;
-            _errorMessage = data['message'] ?? 'Gagal memuat data';
-          });
+      // Cari data yang sesuai dengan user_id
+      final userId = prefs.getInt('user_id');
+      final kodeGuru = prefs.getString('kode_guru');
+      
+      List<dynamic> guruList = [];
+      
+      // Parse response
+      if (data is Map && data['success'] == true) {
+        if (data['data'] is Map && data['data']['data'] is List) {
+          guruList = data['data']['data'];
+        } else if (data['data'] is List) {
+          guruList = data['data'];
         }
-      } else {
-        print('HTTP Error: ${response.statusCode}');
-        print('Response body: ${response.body}');
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'HTTP Error: ${response.statusCode}';
-        });
       }
-    } catch (e) {
-      print('Error loading profile: $e');
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Error: $e';
-      });
+      
+      if (guruList.isNotEmpty) {
+        // Cari guru yang sesuai
+        Map<String, dynamic>? apiData;
+        
+        if (userId != null) {
+          for (var guru in guruList) {
+            if (guru['user_id'] == userId || guru['id'] == userId) {
+              apiData = guru;
+              break;
+            }
+          }
+        }
+        
+        if (apiData == null && kodeGuru != null) {
+          for (var guru in guruList) {
+            if (guru['kode_guru']?.toString() == kodeGuru) {
+              apiData = guru;
+              break;
+            }
+          }
+        }
+        
+        // Jika ditemukan, update dengan data dari API
+        if (apiData != null && mounted) {
+          setState(() {
+            _currentTeacher = {
+              ..._currentTeacher ?? {}, // Pertahankan data fallback
+              ...apiData!,               // Tambahkan data dari API
+            };
+          });
+          print('Updated with API data');
+        }
+      }
     }
+  } catch (e) {
+    print('Error loading from API: $e');
   }
+}
 
   // Dialog Logout yang lebih bagus
   void _showLogoutDialog() {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (context) => Dialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(
@@ -144,7 +151,8 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                 width: 70,
                 height: 70,
                 decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 190, 28, 16).withOpacity(0.1),
+                  color: const Color.fromARGB(255, 190, 28, 16)
+                      .withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -154,7 +162,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              
+
               // Title
               const Text(
                 'Logout',
@@ -165,7 +173,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                 ),
               ),
               const SizedBox(height: 8),
-              
+
               // Message
               const Text(
                 'Apakah Anda yakin ingin keluar dari aplikasi?',
@@ -176,7 +184,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                 ),
               ),
               const SizedBox(height: 30),
-              
+
               // Buttons
               Row(
                 children: [
@@ -201,7 +209,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  
+
                   // Logout Button
                   Expanded(
                     child: ElevatedButton(
@@ -269,9 +277,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading
-          ? _buildSkeletonLoading()
-          : _buildProfileContent(),
+      body: _isLoading ? _buildSkeletonLoading() : _buildProfileContent(),
     );
   }
 
@@ -325,7 +331,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                   ],
                 ),
               ),
-              
+
               // Konten utama
               Padding(
                 padding: const EdgeInsets.all(20),
@@ -340,7 +346,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -353,10 +359,11 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                             width: 80,
                             height: 80,
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.person, size: 40, color: Colors.black),
+                            child: const Icon(Icons.person,
+                                size: 40, color: Colors.black),
                           ),
                           const SizedBox(height: 16),
                           Text(
@@ -369,8 +376,8 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _currentTeacher?['is_kaprog'] == true 
-                                ? 'Koordinator Program Keahlian' 
+                            _currentTeacher?['is_kaprog'] == true
+                                ? 'Koordinator Program Keahlian'
                                 : 'Guru',
                             style: const TextStyle(
                               color: Colors.grey,
@@ -391,7 +398,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(.05),
+                            color: Colors.black.withValues(alpha: .05),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -410,10 +417,17 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          _buildProfileItem('NIP', _currentTeacher?['nip']?.toString() ?? '-'),
-                          _buildProfileItem('Kode Guru', _currentTeacher?['kode_guru']?.toString() ?? '-'),
-                          _buildProfileItem('No. Telepon', _currentTeacher?['no_telp']?.toString() ?? '-'),
-                          _buildProfileItem('Status', _currentTeacher?['is_active'] == true ? 'Aktif' : 'Tidak Aktif'),
+                          _buildProfileItem('NIP',
+                              _currentTeacher?['nip']?.toString() ?? '-'),
+                          _buildProfileItem('Kode Guru',
+                              _currentTeacher?['kode_guru']?.toString() ?? '-'),
+                          _buildProfileItem('No. Telepon',
+                              _currentTeacher?['no_telp']?.toString() ?? '-'),
+                          _buildProfileItem(
+                              'Status',
+                              _currentTeacher?['is_active'] == true
+                                  ? 'Aktif'
+                                  : 'Tidak Aktif'),
                         ],
                       ),
                     ),
@@ -428,7 +442,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -453,12 +467,16 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                               onPressed: _showLogoutDialog,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
-                                foregroundColor: const Color.fromARGB(255, 190, 28, 16),
+                                foregroundColor:
+                                    const Color.fromARGB(255, 190, 28, 16),
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  side: const BorderSide(color: Color.fromARGB(255, 190, 28, 16), width: 1.5),
+                                  side: const BorderSide(
+                                      color: Color.fromARGB(255, 190, 28, 16),
+                                      width: 1.5),
                                 ),
                               ),
                               icon: const Icon(Icons.logout, size: 20),
@@ -541,7 +559,6 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                   ],
                 ),
               ),
-              
               Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(

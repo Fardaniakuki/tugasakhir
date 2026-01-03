@@ -23,6 +23,39 @@ class _AdminDashboardState extends State<AdminDashboard>
   bool _isLoading = true;
   bool _isAppPaused = false;
 
+  // WARNA BARU SESUAI AdminData
+  final Color _primaryColor = const Color(0xFF3B060A);
+  
+  // Gradasi untuk tombol dan aksen (SAMA PERSIS DENGAN AdminData)
+  static const LinearGradient _primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF3B060A),    // Maroon gelap
+      Color(0xFF5B1A1A),    // Maroon sedang
+    ],
+  );
+  
+  // Gradasi terbalik untuk variasi (SAMA PERSIS DENGAN AdminData)
+
+  // Warna untuk setiap jenis data (konsisten dengan AdminData)
+  final Map<String, Color> _typeColors = {
+    'Murid': const Color(0xFF3B060A),
+    'Guru': const Color(0xFF5B1A1A),
+    'Jurusan': const Color(0xFF8B2A2D),
+    'Industri': const Color(0xFFCD5C5C),
+    'Kelas': const Color(0xFFF08080),
+  };
+
+  // Icon untuk setiap jenis data (SAMA DENGAN AdminData)
+  final Map<String, IconData> _typeIcons = {
+    'Murid': Icons.person,
+    'Guru': Icons.school,
+    'Jurusan': Icons.category,
+    'Industri': Icons.business,
+    'Kelas': Icons.class_,
+  };
+
   @override
   bool get wantKeepAlive => true;
 
@@ -148,20 +181,71 @@ class _AdminDashboardState extends State<AdminDashboard>
             children: [
               Container(
                 padding: const EdgeInsets.all(20),
-                child: const Text(
-                  'Tambah Data Baru',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF5B1A1A),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF3B060A),
+                      Color(0xFF5B1A1A),
+                      Color(0xFF8B2A2D),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
                   ),
                 ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withAlpha(30),
+                            Colors.white.withAlpha(10),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white.withAlpha(20),
+                          width: 1,
+                        ),
+                      ),
+                      child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Tambah Data Baru',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 40,
+                        minHeight: 40,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              _buildAddTile(Icons.school, 'Tambah Murid', 'Siswa'),
-              _buildAddTile(Icons.person, 'Tambah Guru', 'Guru'),
-              _buildAddTile(Icons.category, 'Tambah Jurusan', 'Jurusan'),
-              _buildAddTile(Icons.business, 'Tambah Industri', 'Industri'),
-              _buildAddTile(Icons.class_, 'Tambah Kelas', 'Kelas'),
+              _buildAddTile(Icons.school, 'Tambah Murid', 'Siswa', _typeColors['Murid']!),
+              _buildAddTile(Icons.person, 'Tambah Guru', 'Guru', _typeColors['Guru']!),
+              _buildAddTile(Icons.category, 'Tambah Jurusan', 'Jurusan', _typeColors['Jurusan']!),
+              _buildAddTile(Icons.business, 'Tambah Industri', 'Industri', _typeColors['Industri']!),
+              _buildAddTile(Icons.class_, 'Tambah Kelas', 'Kelas', _typeColors['Kelas']!),
               const SizedBox(height: 20),
             ],
           ),
@@ -170,25 +254,41 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  ListTile _buildAddTile(IconData icon, String title, String type) {
+  ListTile _buildAddTile(IconData icon, String title, String type, Color color) {
     return ListTile(
       leading: Container(
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: const Color(0xFF5B1A1A).withAlpha(13),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [color, color.withAlpha(204)], // 0.8 opacity
+          ),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(icon, color: const Color(0xFF5B1A1A)),
+        child: Icon(icon, color: Colors.white), // ICON PUTIH
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          fontWeight: FontWeight.w500,
-          color: Colors.black87,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: color,
         ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      trailing: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [color, color.withAlpha(204)],
+          ),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Colors.white),
+      ),
       onTap: () {
         Navigator.pop(context);
         _navigateToAddPersonPage(type);
@@ -205,7 +305,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  // SIMPLE SKELETON LOADING - NO COMPLEX LAYOUT
+  // SIMPLE SKELETON LOADING
   Widget _buildLoading() {
     return ListView(
       shrinkWrap: true,
@@ -261,8 +361,15 @@ class _AdminDashboardState extends State<AdminDashboard>
             children: [
               Row(
                 children: [
-                  _buildSkeletonLine(width: 24, height: 24, borderRadius: 12),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: _primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   _buildSkeletonLine(width: 120, height: 20),
                 ],
               ),
@@ -282,12 +389,19 @@ class _AdminDashboardState extends State<AdminDashboard>
             children: [
               Row(
                 children: [
-                  _buildSkeletonLine(width: 24, height: 24, borderRadius: 12),
-                  const SizedBox(width: 8),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: _primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   _buildSkeletonLine(width: 120, height: 20),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(child: _buildStatItemSkeleton()),
@@ -295,12 +409,16 @@ class _AdminDashboardState extends State<AdminDashboard>
                   Expanded(child: _buildStatItemSkeleton()),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
+                  color: _primaryColor.withAlpha(5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _primaryColor.withAlpha(15),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -324,11 +442,15 @@ class _AdminDashboardState extends State<AdminDashboard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Colors.grey.withValues(alpha:.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: Colors.grey.withValues(alpha:.1),
+          width: 1,
+        ),
       ),
       child: child,
     );
@@ -344,7 +466,14 @@ class _AdminDashboardState extends State<AdminDashboard>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSkeletonLine(width: 40, height: 40, borderRadius: 20),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: _primaryGradient,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
           const SizedBox(height: 12),
           _buildSkeletonLine(width: 80, height: 16),
           const SizedBox(height: 8),
@@ -360,15 +489,26 @@ class _AdminDashboardState extends State<AdminDashboard>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: _primaryColor.withAlpha(5),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _primaryColor.withAlpha(10),
+          width: 1,
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSkeletonLine(width: 24, height: 24, borderRadius: 12),
-          const SizedBox(height: 8),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: _primaryGradient,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(height: 12),
           _buildSkeletonLine(width: 60, height: 20),
           const SizedBox(height: 4),
           _buildSkeletonLine(width: 80, height: 14),
@@ -381,8 +521,15 @@ class _AdminDashboardState extends State<AdminDashboard>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildSkeletonLine(width: 20, height: 20, borderRadius: 10),
-        const SizedBox(height: 4),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: const BoxDecoration(
+            gradient: _primaryGradient,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(height: 8),
         _buildSkeletonLine(width: 30, height: 16),
         const SizedBox(height: 2),
         _buildSkeletonLine(width: 40, height: 12),
@@ -399,13 +546,20 @@ class _AdminDashboardState extends State<AdminDashboard>
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: Colors.grey[300],
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey[300]!,
+            Colors.grey[200]!,
+          ],
+        ),
         borderRadius: BorderRadius.circular(borderRadius),
       ),
     );
   }
 
-  // CHART SEDERHANA - Distribusi Data
+  // CHART SEDERHANA - Distribusi Data DENGAN WARNA BARU DAN ICON KONSISTEN
   Widget _buildSimpleDistributionChart() {
     if (_dashboardData == null) return const SizedBox();
 
@@ -419,39 +573,98 @@ class _AdminDashboardState extends State<AdminDashboard>
         .reduce((a, b) => a > b ? a : b)
         .toDouble();
 
+    // Data untuk bar chart dengan warna dan icon yang sesuai
+    final List<ChartData> chartData = [
+      ChartData(
+        'Murid', 
+        siswaCount.toDouble(), 
+        _typeIcons['Murid']!,
+        _typeColors['Murid']!,
+      ),
+      ChartData(
+        'Guru', 
+        guruCount.toDouble(), 
+        _typeIcons['Guru']!,
+        _typeColors['Guru']!,
+      ),
+      ChartData(
+        'Kelas', 
+        kelasCount.toDouble(), 
+        _typeIcons['Kelas']!,
+        _typeColors['Kelas']!,
+      ),
+      ChartData(
+        'Jurusan', 
+        jurusanCount.toDouble(), 
+        _typeIcons['Jurusan']!,
+        _typeColors['Jurusan']!,
+      ),
+      ChartData(
+        'Industri', 
+        industriCount.toDouble(), 
+        _typeIcons['Industri']!,
+        _typeColors['Industri']!,
+      ),
+    ];
+
     return Container(
-      margin: const EdgeInsets.only(top: 24, bottom: 16),
+      margin: const EdgeInsets.only(top: 16, bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Colors.grey.withValues(alpha:.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: Colors.grey.withValues(alpha:.1),
+          width: 1,
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.analytics, color: Color(0xFF5B1A1A)),
-              SizedBox(width: 8),
-              Text(
-                'Distribusi Data',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF5B1A1A),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: _primaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.analytics_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Distribusi Data',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          
+          // Legend dengan Icon
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              children: chartData.map((data) => _buildChartLegend(data)).toList(),
+            ),
+          ),
+          
           SizedBox(
             height: 200,
             child: BarChart(
@@ -461,11 +674,11 @@ class _AdminDashboardState extends State<AdminDashboard>
                 barTouchData: BarTouchData(
                   enabled: true,
                   touchTooltipData: BarTouchTooltipData(
-                    tooltipBgColor: const Color(0xFF5B1A1A),
+                    tooltipBgColor: _primaryColor,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      final titles = ['Murid', 'Guru', 'Kelas', 'Jurusan', 'Industri'];
+                      final data = chartData[groupIndex];
                       return BarTooltipItem(
-                        '${titles[groupIndex]}\n${rod.toY.toInt()}',
+                        '${data.label}\n${rod.toY.toInt()}',
                         const TextStyle(color: Colors.white),
                       );
                     },
@@ -477,14 +690,14 @@ class _AdminDashboardState extends State<AdminDashboard>
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        final titles = ['Murid', 'Guru', 'Kelas', 'Jurusan', 'Industri'];
                         return Padding(
                           padding: const EdgeInsets.only(top: 8.0),
                           child: Text(
-                            titles[value.toInt()],
-                            style: const TextStyle(
+                            chartData[value.toInt()].label,
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         );
@@ -497,9 +710,10 @@ class _AdminDashboardState extends State<AdminDashboard>
                       getTitlesWidget: (value, meta) {
                         return Text(
                           value.toInt().toString(),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
                           ),
                         );
                       },
@@ -515,63 +729,28 @@ class _AdminDashboardState extends State<AdminDashboard>
                 ),
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
-                barGroups: [
-                  BarChartGroupData(
-                    x: 0,
+                barGroups: chartData.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final data = entry.value;
+                  return BarChartGroupData(
+                    x: index,
                     barRods: [
                       BarChartRodData(
-                        toY: siswaCount.toDouble(),
-                        color: const Color(0xFF8B0000),
+                        toY: data.value,
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [
+                            data.color,
+                            data.color.withAlpha(178), // 0.7 opacity
+                          ],
+                        ),
                         width: 20,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ],
-                  ),
-                  BarChartGroupData(
-                    x: 1,
-                    barRods: [
-                      BarChartRodData(
-                        toY: guruCount.toDouble(),
-                        color: const Color(0xFFB22222),
-                        width: 20,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  ),
-                  BarChartGroupData(
-                    x: 2,
-                    barRods: [
-                      BarChartRodData(
-                        toY: kelasCount.toDouble(),
-                        color: const Color(0xFFDC143C),
-                        width: 20,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  ),
-                  BarChartGroupData(
-                    x: 3,
-                    barRods: [
-                      BarChartRodData(
-                        toY: jurusanCount.toDouble(),
-                        color: const Color(0xFFCD5C5C),
-                        width: 20,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  ),
-                  BarChartGroupData(
-                    x: 4,
-                    barRods: [
-                      BarChartRodData(
-                        toY: industriCount.toDouble(),
-                        color: const Color(0xFFF08080),
-                        width: 20,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ],
-                  ),
-                ],
+                  );
+                }).toList(),
               ),
             ),
           ),
@@ -580,7 +759,48 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  // STATISTIK RINGKAS
+  Widget _buildChartLegend(ChartData data) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: data.color.withAlpha(10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: data.color.withAlpha(20),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [data.color, data.color.withAlpha(204)],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(data.icon, size: 12, color: Colors.white),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            data.label,
+            style: TextStyle(
+              fontSize: 12,
+              color: data.color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // STATISTIK RINGKAS DENGAN DESIGN BARU DAN ICON KONSISTEN
   Widget _buildQuickStats() {
     if (_dashboardData == null) return const SizedBox();
 
@@ -596,51 +816,86 @@ class _AdminDashboardState extends State<AdminDashboard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.1),
+            color: Colors.grey.withValues(alpha:.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(
+          color: Colors.grey.withValues(alpha:.1),
+          width: 1,
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.trending_up, color: Color(0xFF5B1A1A)),
-              SizedBox(width: 8),
-              Text(
-                'Statistik Ringkas',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF5B1A1A),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: _primaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.trending_up_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Statistik Ringkas',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: _buildStatItem('Rata Murid/Kelas', _calculateAverageStudentsPerClass(), Icons.people)),
+              Expanded(child: _buildStatItem(
+                'Rata Murid/Kelas', 
+                _calculateAverageStudentsPerClass(), 
+                Icons.people_rounded,
+                _typeColors['Murid']!,
+              )),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatItem('Rasio Guru:Murid', _calculateTeacherStudentRatio(), Icons.balance)),
+              Expanded(child: _buildStatItem(
+                'Rasio Guru:Murid', 
+                _calculateTeacherStudentRatio(), 
+                Icons.balance_rounded,
+                _typeColors['Guru']!,
+              )),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF5B1A1A).withAlpha(10),
-              borderRadius: BorderRadius.circular(8),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _primaryColor.withAlpha(10),
+                  _primaryColor.withAlpha(5),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _primaryColor.withAlpha(15),
+                width: 1,
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildMiniStat('Murid', siswaCount, Icons.school),
-                _buildMiniStat('Guru', guruCount, Icons.person),
-                _buildMiniStat('Kelas', kelasCount, Icons.class_),
+                _buildMiniStat('Murid', siswaCount, Icons.school_rounded, _typeColors['Murid']!),
+                _buildMiniStat('Guru', guruCount, Icons.person_rounded, _typeColors['Guru']!),
+                _buildMiniStat('Kelas', kelasCount, Icons.class_rounded, _typeColors['Kelas']!),
               ],
             ),
           ),
@@ -649,33 +904,57 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  Widget _buildStatItem(String title, String value, IconData icon) {
+  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF5B1A1A).withAlpha(10),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withAlpha(10),
+            color.withAlpha(5),
+          ],
+        ),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: color.withAlpha(15),
+          width: 1,
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF5B1A1A), size: 24),
-          const SizedBox(height: 8),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color, color.withAlpha(204)],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: Colors.white, size: 18),
+          ),
+          const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 16,
+            style: TextStyle(
+              fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF5B1A1A),
+              color: color,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.grey,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -683,25 +962,45 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  Widget _buildMiniStat(String title, int value, IconData icon) {
+  Widget _buildMiniStat(String title, int value, IconData icon, Color color) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: const Color(0xFF5B1A1A), size: 20),
-        const SizedBox(height: 4),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [color, color.withAlpha(204)],
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: color.withAlpha(76), // 0.3 opacity
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
+        ),
+        const SizedBox(height: 8),
         Text(
           value.toString(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF5B1A1A),
+            color: color,
           ),
         ),
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 10,
-            color: Colors.grey,
+          style: TextStyle(
+            fontSize: 11,
+            color: color.withAlpha(204), // 0.8 opacity
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -729,26 +1028,75 @@ class _AdminDashboardState extends State<AdminDashboard>
   }
 
   Widget _buildError() {
-    return Padding(
-      padding: const EdgeInsets.all(40.0),
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha:.1),
+          width: 1,
+        ),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.grey[400],
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _primaryColor.withAlpha(10),
+                  _primaryColor.withAlpha(5),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.error_outline_rounded,
+              size: 40,
+              color: Colors.grey[400],
+            ),
           ),
           const SizedBox(height: 16),
           const Text(
             'Gagal memuat dashboard',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 8),
+          Text(
+            'Silakan coba lagi beberapa saat',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
+          const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _refreshData,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF5B1A1A),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              elevation: 2,
+            ).copyWith(
+              backgroundColor: WidgetStateProperty.resolveWith<Color>(
+                (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.pressed)) {
+                    return const Color(0xFF5B1A1A);
+                  }
+                  return _primaryColor;
+                },
+              ),
             ),
             child: const Text('Coba Lagi'),
           ),
@@ -761,21 +1109,21 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF5B1A1A),
+      backgroundColor: _primaryColor,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _refreshData,
-          color: const Color(0xFF5B1A1A),
+          color: _primaryColor,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               // Header dengan warna maroon yang ikut discroll
-              const SliverAppBar(
-                backgroundColor: Color(0xFF5B1A1A),
+              SliverAppBar(
+                backgroundColor: _primaryColor,
                 expandedHeight: 63,
                 floating: false,
                 pinned: true,
-                flexibleSpace: FlexibleSpaceBar(
+                flexibleSpace: const FlexibleSpaceBar(
                   centerTitle: false,
                   titlePadding: EdgeInsets.only(left: 16, bottom: 16),
                   expandedTitleScale: 1.0,
@@ -788,6 +1136,26 @@ class _AdminDashboardState extends State<AdminDashboard>
                     ),
                   ),
                 ),
+                actions: [
+                  Container(
+                    margin: const EdgeInsets.only(right: 16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withAlpha(51), // 0.2 opacity
+                          Colors.white.withAlpha(25), // 0.1 opacity
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                      onPressed: _refreshData,
+                    ),
+                  ),
+                ],
               ),
               
               // Konten utama dalam container putih
@@ -796,18 +1164,14 @@ class _AdminDashboardState extends State<AdminDashboard>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(40),
-                      topRight: Radius.circular(40),
-                    ),
-                    border: Border.all(
-                      color: const Color(0xFFBEBEBE),
-                      width: 1,
+                      topLeft: Radius.circular(32),
+                      topRight: Radius.circular(32),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, -5),
+                        color: Colors.black.withAlpha(13), // 0.05 opacity
+                        blurRadius: 20,
+                        offset: const Offset(0, -10),
                       ),
                     ],
                   ),
@@ -825,10 +1189,11 @@ class _AdminDashboardState extends State<AdminDashboard>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (_dashboardData != null) ...[
+                                // StatGrid dengan warna yang konsisten
                                 StatGrid(
                                   data: _dashboardData!,
                                   onAddPressed: _showAddOptions,
-                                  onBoxTap: _handleStatBoxTap,
+                                  onBoxTap: _handleStatBoxTap, typeColors: const {},
                                 ),
                                 
                                 // CHART SEDERHANA & STATISTIK
@@ -850,4 +1215,14 @@ class _AdminDashboardState extends State<AdminDashboard>
       ),
     );
   }
+}
+
+// Class helper untuk data chart
+class ChartData {
+  final String label;
+  final double value;
+  final IconData icon;
+  final Color color;
+
+  ChartData(this.label, this.value, this.icon, this.color);
 }

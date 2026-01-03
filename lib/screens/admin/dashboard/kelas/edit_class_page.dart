@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:dropdown_search/dropdown_search.dart';
-import '../../popup_helper.dart';
 
 class EditClassPage extends StatefulWidget {
   final Map<String, dynamic> classData;
@@ -17,103 +15,157 @@ class EditClassPage extends StatefulWidget {
 
 class _EditClassPageState extends State<EditClassPage> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _namaController;
+  late FocusNode _namaFocusNode;
+  late FocusNode _jurusanFocusNode;
   
-  // PERBAIKAN: Gunakan Map untuk selected jurusan seperti di industry
+  late TextEditingController _namaController;
+  late TextEditingController _jurusanController;
+  
   Map<String, dynamic>? _selectedJurusan;
-  bool _isLoadingJurusan = true;
-  bool _hasJurusanError = false;
-
-  final Color brown = const Color(0xFF5B1A1A);
-  List<Map<String, dynamic>> _jurusanList = []; // PERBAIKAN: Tambah underscore untuk konsistensi
+  List<Map<String, dynamic>> _jurusanList = [];
+  List<Map<String, dynamic>> _filteredJurusanList = [];
+  
+  final Color _primaryColor = const Color(0xFF3B060A);
+  final Color _accentColor = const Color(0xFF5B1A1A);
+  bool _isLoading = true;
+  bool _isSubmitting = false;
+  bool _showJurusanPopup = false;
+  
+  // Keys untuk mendapatkan posisi
+  final GlobalKey _jurusanFieldKey = GlobalKey();
+  OverlayEntry? _jurusanOverlayEntry;
+  final TextEditingController _jurusanSearchController = TextEditingController();
+  final FocusNode _jurusanSearchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _namaController = TextEditingController(text: widget.classData['nama']);
+    _jurusanController = TextEditingController();
     
-    // PERBAIKAN: Load data jurusan dulu, baru set selected jurusan
+    _namaFocusNode = FocusNode();
+    _jurusanFocusNode = FocusNode();
+    
+    _jurusanSearchController.addListener(_filterJurusanList);
+    
     _fetchJurusan();
   }
 
-  Future<void> _fetchJurusan() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token') ?? '';
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
+  @override
+  void dispose() {
+    _namaFocusNode.dispose();
+    _jurusanFocusNode.dispose();
+    _jurusanSearchController.dispose();
+    _jurusanSearchFocusNode.dispose();
+    _removeJurusanOverlay();
+    super.dispose();
+  }
 
+  void _filterJurusanList() {
+    final query = _jurusanSearchController.text.toLowerCase();
+    setState(() {
+      _filteredJurusanList = _jurusanList.where((jurusan) {
+        return (jurusan['nama']?.toString().toLowerCase() ?? '').contains(query) ||
+               (jurusan['kode']?.toString().toLowerCase() ?? '').contains(query);
+      }).toList();
+    });
+    
+    // Update overlay jika sedang terbuka
+    if (_jurusanOverlayEntry != null && _jurusanOverlayEntry!.mounted) {
+      _jurusanOverlayEntry!.markNeedsBuild();
+    }
+  }
+
+  Future<void> _fetchJurusan() async {
     try {
-      final res = await http.get(
-        Uri.parse('$baseUrl/api/jurusan?limit=1000'),
-        headers: {'Authorization': 'Bearer $token'},
+      setState(() => _isLoading = true);
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/jurusan?limit=1000'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
 
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        setState(() {
-          if (data['data'] is List) {
-            _jurusanList = List<Map<String, dynamic>>.from(data['data']);
-          } else if (data['data']['data'] is List) {
-            _jurusanList = List<Map<String, dynamic>>.from(data['data']['data']);
-          }
-          _isLoadingJurusan = false;
-        });
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
 
-        // PERBAIKAN: Set selected jurusan setelah data loaded
-        _setSelectedJurusan();
-      } else {
-        print('Gagal fetch jurusan: ${res.statusCode}');
+        List data = [];
+        if (decoded['data'] != null && decoded['data']['data'] is List) {
+          data = decoded['data']['data'];
+        } else if (decoded['data'] is List) {
+          data = decoded['data'];
+        }
+
+        final List<Map<String, dynamic>> jurusanData = [];
+        for (var jurusan in data) {
+          jurusanData.add({
+            'id': jurusan['id']?.toString(),
+            'nama': jurusan['nama'] ?? 'Unknown',
+            'kode': jurusan['kode'] ?? '',
+          });
+        }
+
         setState(() {
-          _isLoadingJurusan = false;
-          _hasJurusanError = true;
+          _jurusanList = jurusanData;
+          _filteredJurusanList = List.from(jurusanData);
+          
+          // Set nama jurusan yang terpilih ke controller
+          final currentJurusanId = widget.classData['jurusan']?['id'] ?? widget.classData['jurusan_id'];
+          if (currentJurusanId != null) {
+            try {
+              final selectedJurusan = jurusanData.firstWhere(
+                (j) => j['id'] == currentJurusanId.toString(),
+              );
+              _selectedJurusan = selectedJurusan;
+              _jurusanController.text = selectedJurusan['nama'];
+            } catch (e) {
+              _jurusanController.clear();
+            }
+          }
+          
+          _isLoading = false;
         });
+      } else {
+        throw Exception('Failed to load jurusan data: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetch jurusan: $e');
+      print('Error loading jurusan data: $e');
       setState(() {
-        _isLoadingJurusan = false;
-        _hasJurusanError = true;
+        _isLoading = false;
       });
     }
   }
 
-  void _setSelectedJurusan() {
-    final currentJurusanId = widget.classData['jurusan']?['id'] ?? widget.classData['jurusan_id'];
-    if (currentJurusanId != null) {
-      final foundJurusan = _jurusanList.firstWhere(
-        (jurusan) => jurusan['id'] == currentJurusanId,
-        orElse: () => <String, dynamic>{},
-      );
-      
-      if (foundJurusan.isNotEmpty) {
-        setState(() {
-          _selectedJurusan = foundJurusan;
-        });
-      }
-    }
-  }
-
   Future<void> _updateClass() async {
+    // Dismiss keyboard before validating
+    FocusScope.of(context).unfocus();
+    
     if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
-    // PERBAIKAN: Struktur data yang benar
     final Map<String, dynamic> updateData = {
       'nama': _namaController.text.trim(),
     };
 
-    // PERBAIKAN: Tambahkan jurusan_id jika dipilih
     if (_selectedJurusan != null) {
-      updateData['jurusan_id'] = _selectedJurusan!['id'];
+      final jurusanId = int.tryParse(_selectedJurusan!['id']!);
+      if (jurusanId != null) {
+        updateData['jurusan_id'] = jurusanId;
+      } else {
+        updateData['jurusan_id'] = null;
+      }
     } else {
-      // Jika tidak ada jurusan yang dipilih, set ke null
       updateData['jurusan_id'] = null;
     }
-
-    print('=== START UPDATE CLASS ===');
-    print('Update URL: ${dotenv.env['API_BASE_URL']}/api/kelas/${widget.classData['id']}');
-    print('Update Data: $updateData');
 
     try {
       final response = await http.put(
@@ -126,113 +178,629 @@ class _EditClassPageState extends State<EditClassPage> {
         body: json.encode(updateData),
       );
 
-      print('Update Response Status: ${response.statusCode}');
-      print('Update Response Body: ${response.body}');
+      if (!mounted) {
+        setState(() => _isSubmitting = false);
+        return;
+      }
 
-      if (!mounted) return;
+      setState(() => _isSubmitting = false);
 
       if (response.statusCode == 200) {
         _showSuccessDialog();
       } else {
-        // PERBAIKAN: Handle error response dengan lebih baik
-        String errorMessage = 'Gagal memperbarui kelas.';
-        try {
-          final errorData = json.decode(response.body);
-          if (errorData['message'] != null) {
-            errorMessage = errorData['message'];
-          } else if (errorData['errors'] != null) {
-            errorMessage = errorData['errors'].values.first[0];
-          }
-        } catch (e) {
-          errorMessage = 'Error: ${response.statusCode}';
-        }
+        final error = json.decode(response.body);
+        final String errorMessage = error['message'] ?? 'Gagal memperbarui kelas';
         _showErrorDialog(errorMessage);
       }
     } catch (e) {
-      print('Error during update: $e');
-      _showErrorDialog('Terjadi kesalahan jaringan: $e');
+      setState(() => _isSubmitting = false);
+      _showErrorDialog('Terjadi kesalahan jaringan');
     }
-    print('=== END UPDATE CLASS ===');
   }
 
   void _showSuccessDialog() {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.all(24),
-        titlePadding: const EdgeInsets.only(top: 24),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_circle_outline, color: Colors.green, size: 48),
-            SizedBox(height: 16),
-            Text(
-              'Berhasil!',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 12),
-            Text('Data kelas berhasil diperbarui.',
-                textAlign: TextAlign.center),
-          ],
-        ),
-        actions: [
-          Center(
-            child: TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pop(context, true); // kembali ke detail page dengan refresh
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: brown,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Kembali'),
-            ),
+      barrierColor: Colors.black.withValues(alpha:0.5),
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.5,
+            maxWidth: 400,
           ),
-          const SizedBox(height: 12),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header dengan gradient
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF2E7D32),
+                      Color(0xFF4CAF50),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha:0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.check_circle_rounded,
+                              color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Berhasil!',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20, color: Colors.white),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        Navigator.pop(context, true);
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Konten utama
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 60,
+                      color: Color(0xFF4CAF50),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Data berhasil diperbarui',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Data kelas "${_namaController.text}" berhasil diperbarui',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Tombol OK
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.grey[200]!,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.pop(context, true);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4CAF50),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text('OK'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   void _showErrorDialog(String message) {
-    PopupHelper.showErrorDialog(context, message);
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha:0.5),
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: Colors.white,
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.5,
+            maxWidth: 400,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header dengan gradient merah
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFC62828),
+                      Color(0xFFEF5350),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha:0.2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.error_outline_rounded,
+                              color: Colors.white, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Terjadi Kesalahan',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Konten utama
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      size: 60,
+                      color: Color(0xFFEF5350),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Silakan coba lagi',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Tombol Tutup
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.grey[200]!,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF5350),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text('Tutup'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  Widget _buildTextField() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // ========== JURUSAN OVERLAY POPUP ==========
+
+  void _showJurusanPopupOverlay(BuildContext context) {
+    if (_jurusanOverlayEntry != null) {
+      _removeJurusanOverlay();
+      return;
+    }
+
+    final RenderBox renderBox = _jurusanFieldKey.currentContext!.findRenderObject() as RenderBox;
+    final fieldOffset = renderBox.localToGlobal(Offset.zero);
+    final fieldSize = renderBox.size;
+    final screenSize = MediaQuery.of(context).size;
+
+    double top = fieldOffset.dy + fieldSize.height;
+    double left = fieldOffset.dx;
+    final double width = fieldSize.width;
+    final double maxHeight = screenSize.height * 0.3;
+
+    // Pastikan popup tidak keluar dari layar
+    if (top + maxHeight > screenSize.height) {
+      top = fieldOffset.dy - maxHeight;
+    }
+    if (left + width > screenSize.width) {
+      left = screenSize.width - width;
+    }
+    if (left < 0) left = 0;
+
+    _jurusanOverlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        left: left,
+        top: top,
+        width: width,
+        child: Material(
+          elevation: 4,
+          borderRadius: BorderRadius.circular(8),
+          child: Container(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Column(
+              children: [
+                // Search Bar
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.search, color: Colors.grey, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _jurusanSearchController,
+                                  focusNode: _jurusanSearchFocusNode,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Cari jurusan...',
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                    isDense: true,
+                                  ),
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                              if (_jurusanSearchController.text.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () => _jurusanSearchController.clear(),
+                                  child: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () {
+                          _removeJurusanOverlay();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.close, size: 18),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // List Jurusan
+                Expanded(
+                  child: _buildJurusanList(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    Overlay.of(context).insert(_jurusanOverlayEntry!);
+    setState(() {
+      _showJurusanPopup = true;
+    });
+  }
+
+  Widget _buildJurusanList() {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_filteredJurusanList.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.school_outlined, size: 40, color: Colors.grey),
+              SizedBox(height: 8),
+              Text(
+                'Tidak ada jurusan tersedia',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Tambahkan opsi "Tidak ada jurusan"
+    final List<Map<String, dynamic>> options = [
+      {'id': null, 'nama': 'Tidak ada jurusan', 'kode': ''},
+      ..._filteredJurusanList,
+    ];
+
+    return ListView.builder(
+      padding: EdgeInsets.zero,
+      itemCount: options.length,
+      itemBuilder: (context, index) {
+        final jurusan = options[index];
+        final isSelected = _selectedJurusan != null && 
+                          _selectedJurusan!['id'] == jurusan['id'];
+        
+        return InkWell(
+          onTap: () {
+            setState(() {
+              if (jurusan['id'] == null) {
+                _selectedJurusan = null;
+                _jurusanController.clear();
+              } else {
+                _selectedJurusan = jurusan;
+                _jurusanController.text = jurusan['nama'] ?? '';
+              }
+            });
+            _removeJurusanOverlay();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            decoration: BoxDecoration(
+              border: index == 0
+                  ? null
+                  : Border(
+                      top: BorderSide(color: Colors.grey[100]!),
+                    ),
+              color: isSelected ? _primaryColor.withValues(alpha:0.1) : Colors.transparent,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: isSelected ? _primaryColor : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.school,
+                    color: isSelected ? Colors.white : Colors.grey[600],
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        jurusan['nama'] ?? '-',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                          color: isSelected ? _primaryColor : Colors.black87,
+                        ),
+                      ),
+                      if (jurusan['kode'] != null && jurusan['kode'].toString().isNotEmpty)
+                        Text(
+                          jurusan['kode'].toString(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isSelected ? _primaryColor.withValues(alpha:0.8) : Colors.grey,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check,
+                    color: _primaryColor,
+                    size: 20,
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _removeJurusanOverlay() {
+    if (_jurusanOverlayEntry != null) {
+      _jurusanOverlayEntry!.remove();
+      _jurusanOverlayEntry = null;
+    }
+    setState(() {
+      _showJurusanPopup = false;
+    });
+    _jurusanSearchController.clear();
+    _jurusanSearchFocusNode.unfocus();
+  }
+
+  // ========== FORM FIELDS ==========
+
+  Widget _buildFormField(
+      IconData icon, String label, TextEditingController controller, FocusNode focusNode) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
         children: [
-          const Text('Nama Kelas', style: TextStyle(fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _namaController,
-            validator: (value) => value == null || value.isEmpty
-                ? 'Nama kelas wajib diisi'
-                : null,
-            decoration: InputDecoration(
-              prefixIcon: Icon(Icons.class_, color: brown),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.grey),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.grey),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: brown, width: 1.5),
-              ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _primaryColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Container(
+            width: 1,
+            height: 40,
+            color: Colors.grey[300],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextFormField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  validator: (value) =>
+                      value == null || value.isEmpty ? 'Wajib diisi' : null,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                    isDense: true,
+                    errorStyle: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -240,173 +808,291 @@ class _EditClassPageState extends State<EditClassPage> {
     );
   }
 
-  Widget _buildJurusanDropdown() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Jurusan', style: TextStyle(fontWeight: FontWeight.w500)),
-          const SizedBox(height: 8),
-          _isLoadingJurusan
-              ? Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.school, color: brown),
-                      const SizedBox(width: 12),
-                      const Text('Loading jurusan...'),
-                    ],
-                  ),
-                )
-              : _hasJurusanError
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.error_outline, color: Colors.red),
-                          SizedBox(width: 12),
-                          Text('Error loading jurusan'),
-                        ],
-                      ),
-                    )
-                  : DropdownSearch<Map<String, dynamic>>(
-                      popupProps: PopupProps.menu(
-                        showSearchBox: true,
-                        searchFieldProps: const TextFieldProps(
-                          decoration: InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            hintText: 'Cari jurusan...',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        menuProps: MenuProps(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      items: _jurusanList,
-                      itemAsString: (item) => item['nama']?.toString() ?? '-',
-                      dropdownDecoratorProps: DropDownDecoratorProps(
-                        dropdownSearchDecoration: InputDecoration(
-                          hintText: 'Pilih Jurusan (Opsional)',
-                          prefixIcon: Icon(Icons.school, color: brown),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Colors.grey),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: brown, width: 1.5),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                        ),
-                      ),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedJurusan = val;
-                        });
-                      },
-                      selectedItem: _selectedJurusan,
-                    ),
+  Widget _buildJurusanField() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      key: _jurusanFieldKey,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
         ],
+      ),
+      child: InkWell(
+        onTap: () => _showJurusanPopupOverlay(context),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _primaryColor,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.school_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 16),
+            Container(
+              width: 1,
+              height: 40,
+              color: Colors.grey[300],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Jurusan',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _jurusanController.text.isEmpty ? 'Pilih Jurusan' : _jurusanController.text,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _jurusanController.text.isNotEmpty ? Colors.black87 : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              _showJurusanPopup ? Icons.expand_less : Icons.expand_more,
+              color: Colors.grey[600],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Header
-            Stack(
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.only(top: 60, bottom: 20),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF8B0000), Color(0xFFB22222)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
-                  ),
-                  child: const Column(
-                    children: [
-                      Text(
-                        'Ubah Kelas',
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(height: 16),
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.class_, size: 50, color: Color(0xFF5B1A1A)),
-                      ),
-                    ],
-                  ),
-                ),
-                Positioned(
-                  top: 50,
-                  left: 16,
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-              ],
-            ),
-            // Form
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Form(
-                key: _formKey,
-                child: Column(
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping outside
+        FocusScope.of(context).unfocus();
+        // Tutup overlay jurusan jika terbuka
+        if (_jurusanOverlayEntry != null) {
+          _removeJurusanOverlay();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: _primaryColor,
+        body: SafeArea(
+          child: Column(
+            children: [
+              // APPBAR CUSTOM
+              Container(
+                height: 60,
+                color: _primaryColor,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
                   children: [
-                    _buildTextField(),
-                    _buildJurusanDropdown(),
-                    const SizedBox(height: 30),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _updateClass,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: brown,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Simpan Perubahan'),
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Edit Kelas',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
+                    const Spacer(),
                   ],
                 ),
               ),
-            ),
-          ],
+              
+              // SATU CONTAINER PUTIH UTUH DENGAN BORDER RADIUS
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(40),
+                      topRight: Radius.circular(40),
+                    ),
+                    border: Border.all(
+                      color: const Color(0xFFBEBEBE),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha:0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -5),
+                      ),
+                    ],
+                  ),
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF3B060A),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // ICON KELAS DI TENGAH
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 30),
+                                  child: Container(
+                                    width: 110,
+                                    height: 110,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha:0.1),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            _primaryColor,
+                                            _accentColor,
+                                          ],
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.class_rounded,
+                                        size: 60,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                
+                                // JUDUL FORM DI TENGAH
+                                const Text(
+                                  'Edit Data Kelas',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 30),
+                                
+                                // FORM FIELDS
+                                _buildFormField(
+                                  Icons.class_rounded,
+                                  'Nama Kelas',
+                                  _namaController,
+                                  _namaFocusNode,
+                                ),
+                                _buildJurusanField(),
+                                
+                                const SizedBox(height: 40),
+                                
+                                // TOMBOL SIMPAN
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 30),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(12),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: _primaryColor.withValues(alpha:0.2),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ],
+                                          ),
+                                          child: ElevatedButton(
+                                            onPressed: _isSubmitting ? null : _updateClass,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: _primaryColor,
+                                              foregroundColor: Colors.white,
+                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              elevation: 0,
+                                            ),
+                                            child: _isSubmitting
+                                                ? const Row(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    children: [
+                                                      SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2.5,
+                                                          color: Colors.white,
+                                                        ),
+                                                      ),
+                                                      SizedBox(width: 12),
+                                                      Text(
+                                                        'Menyimpan...',
+                                                        style: TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  )
+                                                : const Row(
+                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    children: [
+                                                      Icon(Icons.save_rounded, size: 20),
+                                                      SizedBox(width: 10),
+                                                      Text(
+                                                        'Simpan Perubahan',
+                                                        style: TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _namaController.dispose();
-    super.dispose();
   }
 }

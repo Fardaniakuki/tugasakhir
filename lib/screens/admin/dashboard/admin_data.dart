@@ -26,46 +26,67 @@ class AdminDataState extends State<AdminData> {
   bool _isLoading = true;
 
   // Warna konsisten untuk semua tab
-  final Color _primaryColor = const Color(0xFF641E20);
-// Data untuk tab selector - HAPUS hasFilter dari Jurusan
-final List<Map<String, dynamic>> _tabData = [
-  {
-    'type': 'Murid',
-    'icon': Icons.person,
-    'stats': {'total': 0, 'active': 0, 'baru': 0},
-    'hasFilter': true,
-    'filterType': 'kelas',
-    'filterLabel': 'Filter Kelas',
-  },
-  {
-    'type': 'Guru',
-    'icon': Icons.school,
-    'stats': {'total': 0, 'active': 0, 'baru': 0},
-    'hasFilter': false,
-  },
-  {
-    'type': 'Jurusan',
-    'icon': Icons.category,
-    'stats': {'total': 0, 'active': 0, 'baru': 0},
-    'hasFilter': false, // DIUBAH: dari true menjadi false
-  },
-  {
-    'type': 'Industri',
-    'icon': Icons.business,
-    'stats': {'total': 0, 'active': 0, 'baru': 0},
-    'hasFilter': true,
-    'filterType': 'jurusan',
-    'filterLabel': 'Filter Jurusan',
-  },
-  {
-    'type': 'Kelas',
-    'icon': Icons.class_,
-    'stats': {'total': 0, 'active': 0, 'baru': 0},
-    'hasFilter': true,
-    'filterType': 'jurusan',
-    'filterLabel': 'Filter Jurusan',
-  },
-];
+  final Color _primaryColor = const Color(0xFF3B060A);
+  
+  // Gradasi untuk tombol dan aksen
+  static const LinearGradient _primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF3B060A),    // Maroon gelap
+      Color(0xFF5B1A1A),    // Maroon sedang
+    ],
+  );
+  
+  // Gradasi terbalik untuk variasi
+  static const LinearGradient _reverseGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF5B1A1A),    // Maroon sedang
+      Color(0xFF3B060A),    // Maroon gelap
+    ],
+  );
+
+  // Data untuk tab selector - HAPUS hasFilter dari Jurusan
+  final List<Map<String, dynamic>> _tabData = [
+    {
+      'type': 'Murid',
+      'icon': Icons.person,
+      'stats': {'total': 0, 'active': 0, 'baru': 0},
+      'hasFilter': true,
+      'filterType': 'kelas',
+      'filterLabel': 'Filter Kelas',
+    },
+    {
+      'type': 'Guru',
+      'icon': Icons.school,
+      'stats': {'total': 0, 'active': 0, 'baru': 0},
+      'hasFilter': false,
+    },
+    {
+      'type': 'Jurusan',
+      'icon': Icons.category,
+      'stats': {'total': 0, 'active': 0, 'baru': 0},
+      'hasFilter': false, // DIUBAH: dari true menjadi false
+    },
+    {
+      'type': 'Industri',
+      'icon': Icons.business,
+      'stats': {'total': 0, 'active': 0, 'baru': 0},
+      'hasFilter': true,
+      'filterType': 'jurusan',
+      'filterLabel': 'Filter Jurusan',
+    },
+    {
+      'type': 'Kelas',
+      'icon': Icons.class_,
+      'stats': {'total': 0, 'active': 0, 'baru': 0},
+      'hasFilter': true,
+      'filterType': 'jurusan',
+      'filterLabel': 'Filter Jurusan',
+    },
+  ];
 
   int _currentTab = 0;
   String _selectedFilterDisplay = 'Semua';
@@ -219,84 +240,85 @@ final List<Map<String, dynamic>> _tabData = [
       _dataCache.remove(currentTypeKeys.first);
     }
   }
-Future<void> _fetchDataWithCache(String query,
-    {bool forceRefresh = false}) async {
-  final cacheKey = _getCacheKey(query);
 
-  _cleanCacheIfNeeded();
+  Future<void> _fetchDataWithCache(String query,
+      {bool forceRefresh = false}) async {
+    final cacheKey = _getCacheKey(query);
 
-  if (!forceRefresh && _dataCache.containsKey(cacheKey)) {
-    final cachedData = _dataCache[cacheKey]!;
-    _setupPaginationData(cachedData);
+    _cleanCacheIfNeeded();
 
-    // ✅ PERBAIKAN: Update statistik juga ketika menggunakan cache
-    _updateStats(cachedData);
+    if (!forceRefresh && _dataCache.containsKey(cacheKey)) {
+      final cachedData = _dataCache[cacheKey]!;
+      _setupPaginationData(cachedData);
+
+      // ✅ PERBAIKAN: Update statistik juga ketika menggunakan cache
+      _updateStats(cachedData);
+
+      setState(() {
+        _searchQuery = query;
+        _isLoading = false;
+      });
+      return;
+    }
 
     setState(() {
       _searchQuery = query;
-      _isLoading = false;
+      _isLoading = true;
     });
-    return;
-  }
 
-  setState(() {
-    _searchQuery = query;
-    _isLoading = true;
-  });
+    try {
+      List<Map<String, dynamic>> data;
+      final currentType = _tabData[_currentTab]['type'];
 
-  try {
-    List<Map<String, dynamic>> data;
-    final currentType = _tabData[_currentTab]['type'];
+      switch (currentType) {
+        case 'Murid':
+          data = await _service.fetchSiswaData(
+            searchQuery: query,
+            kelasId: _selectedFilterId,
+            jurusanId: '',
+          );
+          break;
+        case 'Guru':
+          data = await _service.fetchGuruData(searchQuery: query);
+          break;
+        case 'Jurusan':
+          // DIUBAH: Hapus parameter kelasId karena jurusan tidak perlu filter kelas
+          data = await _service.fetchJurusanData(searchQuery: query);
+          break;
+        case 'Industri':
+          data = await _service.fetchIndustriData(
+            searchQuery: query,
+            jurusanId: _selectedFilterId,
+          );
+          break;
+        case 'Kelas':
+          data = await _service.fetchKelasData(
+            searchQuery: query,
+            jurusanId: _selectedFilterId,
+          );
+          break;
+        default:
+          data = [];
+      }
 
-    switch (currentType) {
-      case 'Murid':
-        data = await _service.fetchSiswaData(
-          searchQuery: query,
-          kelasId: _selectedFilterId,
-          jurusanId: '',
-        );
-        break;
-      case 'Guru':
-        data = await _service.fetchGuruData(searchQuery: query);
-        break;
-      case 'Jurusan':
-        // DIUBAH: Hapus parameter kelasId karena jurusan tidak perlu filter kelas
-        data = await _service.fetchJurusanData(searchQuery: query);
-        break;
-      case 'Industri':
-        data = await _service.fetchIndustriData(
-          searchQuery: query,
-          jurusanId: _selectedFilterId,
-        );
-        break;
-      case 'Kelas':
-        data = await _service.fetchKelasData(
-          searchQuery: query,
-          jurusanId: _selectedFilterId,
-        );
-        break;
-      default:
-        data = [];
+      // Cache the data
+      _dataCache[cacheKey] = data;
+
+      // Update stats
+      _updateStats(data);
+
+      _setupPaginationData(data);
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Exception fetching ${_tabData[_currentTab]['type']}: $e');
+      setState(() {
+        _isLoading = false;
+      });
     }
-
-    // Cache the data
-    _dataCache[cacheKey] = data;
-
-    // Update stats
-    _updateStats(data);
-
-    _setupPaginationData(data);
-
-    setState(() {
-      _isLoading = false;
-    });
-  } catch (e) {
-    debugPrint('Exception fetching ${_tabData[_currentTab]['type']}: $e');
-    setState(() {
-      _isLoading = false;
-    });
   }
-}
 
   void _updateStats(List<Map<String, dynamic>> data) {
     final currentStats = _tabData[_currentTab]['stats'] as Map<String, dynamic>;
@@ -401,61 +423,62 @@ Future<void> _fetchDataWithCache(String query,
       }
     }
   }
-void _handleTabChange(int newIndex) {
-  if (newIndex == _currentTab) return;
 
-  setState(() {
-    _currentTab = newIndex;
-    _searchQuery = '';
-    _searchController.text = '';
-    
-    // PERBAIKAN: Reset filter hanya untuk tab yang memiliki filter
-    final newTabData = _tabData[newIndex];
-    if (newTabData['hasFilter'] == true) {
-      // Tab baru memiliki filter, biarkan filter tetap
-      // Tapi cek apakah filter yang ada cocok dengan tipe filter tab baru
+  void _handleTabChange(int newIndex) {
+    if (newIndex == _currentTab) return;
+
+    setState(() {
+      _currentTab = newIndex;
+      _searchQuery = '';
+      _searchController.text = '';
       
-      // Jika filter aktif tapi tidak cocok dengan tab baru, reset
-      if (_selectedFilterId.isNotEmpty) {
-        // Misal: filter aktif adalah kelas, tapi tab baru menggunakan filter jurusan
-        // Untuk sederhana, kita reset dulu
-        // (Bisa juga di-advanced dengan konversi, tapi untuk sekarang reset saja)
+      // PERBAIKAN: Reset filter hanya untuk tab yang memiliki filter
+      final newTabData = _tabData[newIndex];
+      if (newTabData['hasFilter'] == true) {
+        // Tab baru memiliki filter, biarkan filter tetap
+        // Tapi cek apakah filter yang ada cocok dengan tipe filter tab baru
+        
+        // Jika filter aktif tapi tidak cocok dengan tab baru, reset
+        if (_selectedFilterId.isNotEmpty) {
+          // Misal: filter aktif adalah kelas, tapi tab baru menggunakan filter jurusan
+          // Untuk sederhana, kita reset dulu
+          // (Bisa juga di-advanced dengan konversi, tapi untuk sekarang reset saja)
+          _selectedFilterDisplay = 'Semua';
+          _selectedFilterId = '';
+        }
+      } else {
+        // Tab baru tidak memiliki filter, HARUS reset filter
         _selectedFilterDisplay = 'Semua';
         _selectedFilterId = '';
       }
+      
+      // Reset statistik untuk tab baru
+      _resetStatsForTab(newIndex);
+    });
+
+    // Reset pagination
+    _resetPagination();
+
+    // Cek dulu apakah data sudah ada di cache
+    final cacheKey = _getCacheKey('');
+    if (_dataCache.containsKey(cacheKey)) {
+      // Data ada di cache, langsung pakai tanpa loading
+      final cachedData = _dataCache[cacheKey]!;
+      _setupPaginationData(cachedData);
+      _updateStats(cachedData);
+      
+      // PERBAIKAN: Jangan set isLoading ke false di sini karena akan bertentangan
+      if (_isLoading) {
+        setState(() => _isLoading = false);
+      }
     } else {
-      // Tab baru tidak memiliki filter, HARUS reset filter
-      _selectedFilterDisplay = 'Semua';
-      _selectedFilterId = '';
+      // Data belum di cache, fetch dengan loading
+      if (!_isLoading) {
+        setState(() => _isLoading = true);
+      }
+      _fetchDataWithCache('');
     }
-    
-    // Reset statistik untuk tab baru
-    _resetStatsForTab(newIndex);
-  });
-
-  // Reset pagination
-  _resetPagination();
-
-  // Cek dulu apakah data sudah ada di cache
-  final cacheKey = _getCacheKey('');
-  if (_dataCache.containsKey(cacheKey)) {
-    // Data ada di cache, langsung pakai tanpa loading
-    final cachedData = _dataCache[cacheKey]!;
-    _setupPaginationData(cachedData);
-    _updateStats(cachedData);
-    
-    // PERBAIKAN: Jangan set isLoading ke false di sini karena akan bertentangan
-    if (_isLoading) {
-      setState(() => _isLoading = false);
-    }
-  } else {
-    // Data belum di cache, fetch dengan loading
-    if (!_isLoading) {
-      setState(() => _isLoading = true);
-    }
-    _fetchDataWithCache('');
   }
-}
 
   // HEADER STATS - Menampilkan jumlah data untuk setiap role
   Widget _buildHeaderStats() {
@@ -468,8 +491,8 @@ void _handleTabChange(int newIndex) {
       decoration: BoxDecoration(
         color: _primaryColor,
         borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(20),
-          bottomRight: Radius.circular(20),
+          bottomLeft: Radius.circular(0),
+          bottomRight: Radius.circular(0),
         ),
       ),
       child: SingleChildScrollView(
@@ -504,10 +527,33 @@ void _handleTabChange(int newIndex) {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: isPrimary
-                  ? _withOpacity(Colors.white, 0.3)
-                  : _withOpacity(Colors.white, 0.2),
+              gradient: isPrimary
+                  ? LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.4),
+                        Colors.white.withValues(alpha: 0.2),
+                      ],
+                    )
+                  : LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.3),
+                        Colors.white.withValues(alpha: 0.1),
+                      ],
+                    ),
               borderRadius: BorderRadius.circular(12),
+              boxShadow: isPrimary
+                  ? [
+                      BoxShadow(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
             child: Icon(icon, color: Colors.white, size: 24),
           ),
@@ -525,7 +571,7 @@ void _handleTabChange(int newIndex) {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: _withOpacity(Colors.white, 0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
@@ -589,10 +635,20 @@ void _handleTabChange(int newIndex) {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected ? _primaryColor : Colors.grey,
+              Container(
+                width: 30,
+                height: 30,
+                decoration: isSelected
+                    ? const BoxDecoration(
+                        gradient: _primaryGradient,
+                        shape: BoxShape.circle,
+                      )
+                    : null,
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: isSelected ? Colors.white : Colors.grey,
+                ),
               ),
               const SizedBox(width: 6),
               Text(
@@ -610,78 +666,32 @@ void _handleTabChange(int newIndex) {
     );
   }
 
-Widget _buildSearchSection() {
-  final currentTabData = _tabData[_currentTab];
-  final bool hasFilter = currentTabData['hasFilter'] as bool;
-  
-  // PERBAIKAN: Pastikan filter tidak ditampilkan jika tab tidak memiliki filter
-  if (!hasFilter && _selectedFilterDisplay != 'Semua') {
-    // Reset filter jika tab tidak memiliki filter tapi filter aktif
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _selectFilter('Semua', '');
-    });
-  }
-  
-  final String filterType = hasFilter ? currentTabData['filterType'] as String : '';
-  final String filterLabel = hasFilter ? currentTabData['filterLabel'] as String : '';
+  Widget _buildSearchSection() {
+    final currentTabData = _tabData[_currentTab];
+    final bool hasFilter = currentTabData['hasFilter'] as bool;
+    
+    // PERBAIKAN: Pastikan filter tidak ditampilkan jika tab tidak memiliki filter
+    if (!hasFilter && _selectedFilterDisplay != 'Semua') {
+      // Reset filter jika tab tidak memiliki filter tapi filter aktif
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _selectFilter('Semua', '');
+      });
+    }
+    
+    final String filterType = hasFilter ? currentTabData['filterType'] as String : '';
+    final String filterLabel = hasFilter ? currentTabData['filterLabel'] as String : '';
 
-  return Padding(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: _withOpacity(Colors.grey, 0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText:
-                        'Cari ${currentTabData['type'].toString().toLowerCase()}...',
-                    prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 12, horizontal: 16),
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // PERBAIKAN: Filter button hanya ditampilkan jika tab memiliki filter
-            if (hasFilter)
-              GestureDetector(
-                onTap: () => _showFilterDialog(filterType, filterLabel),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
                 child: Container(
-                  width: 48,
-                  height: 48,
-                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    gradient: _selectedFilterDisplay != 'Semua'
-                        ? LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              _primaryColor,
-                              const Color(0xFF8B2A2D),
-                            ],
-                          )
-                        : null,
-                    color: _selectedFilterDisplay == 'Semua'
-                        ? Colors.white
-                        : null,
                     borderRadius: BorderRadius.circular(12),
+                    color: Colors.white,
                     boxShadow: [
                       BoxShadow(
                         color: _withOpacity(Colors.grey, 0.1),
@@ -690,90 +700,151 @@ Widget _buildSearchSection() {
                       ),
                     ],
                   ),
-                  child: Stack(
-                    children: [
-                      Icon(
-                        Icons.tune,
-                        color: _selectedFilterDisplay != 'Semua'
-                            ? Colors.white
-                            : _primaryColor,
-                        size: 20,
-                      ),
-                      if (_selectedFilterDisplay != 'Semua')
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.orange,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Cari ${currentTabData['type'].toString().toLowerCase()}...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 16),
+                      isDense: true,
+                    ),
                   ),
                 ),
               ),
-          ],
-        ),
-
-        // PERBAIKAN: Tampilkan filter aktif hanya jika tab memiliki filter
-        if (hasFilter && _selectedFilterDisplay != 'Semua')
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: _primaryColor.withOpacity(0.3),
-                      width: 1,
+              const SizedBox(width: 12),
+              // PERBAIKAN: Filter button hanya ditampilkan jika tab memiliki filter
+              if (hasFilter)
+                GestureDetector(
+                  onTap: () => _showFilterDialog(filterType, filterLabel),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: _selectedFilterDisplay != 'Semua'
+                          ? _primaryGradient
+                          : null,
+                      color: _selectedFilterDisplay == 'Semua'
+                          ? Colors.white
+                          : null,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: _selectedFilterDisplay != 'Semua'
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF3B060A).withValues(alpha: 0.3),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : [
+                              BoxShadow(
+                                color: _withOpacity(Colors.grey, 0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                    ),
+                    child: Stack(
+                      children: [
+                        Icon(
+                          Icons.tune,
+                          color: _selectedFilterDisplay != 'Semua'
+                              ? Colors.white
+                              : _primaryColor,
+                          size: 20,
+                        ),
+                        if (_selectedFilterDisplay != 'Semua')
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.orange.withValues(alpha: 0.5),
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _getFilterIcon(filterType),
-                        size: 14,
-                        color: _primaryColor,
+                ),
+            ],
+          ),
+
+          // PERBAIKAN: Tampilkan filter aktif hanya jika tab memiliki filter
+          if (hasFilter && _selectedFilterDisplay != 'Semua')
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          _primaryColor.withValues(alpha: 0.1),
+                          _primaryColor.withValues(alpha: 0.05),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _selectedFilterDisplay,
-                        style: TextStyle(
-                          color: _primaryColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _primaryColor.withValues(alpha: 0.3),
+                        width: 1,
                       ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () {
-                          _selectFilter('Semua', '');
-                        },
-                        child: Icon(
-                          Icons.close_rounded,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getFilterIcon(filterType),
                           size: 14,
                           color: _primaryColor,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedFilterDisplay,
+                          style: TextStyle(
+                            color: _primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
+                            _selectFilter('Semua', '');
+                          },
+                          child: Icon(
+                            Icons.close_rounded,
+                            size: 14,
+                            color: _primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 
   IconData _getFilterIcon(String filterType) {
     switch (filterType) {
@@ -800,7 +871,7 @@ Widget _buildSearchSection() {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -812,16 +883,17 @@ Widget _buildSearchSection() {
               // Header yang lebih stylish
               Container(
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      _primaryColor,
-                      const Color(0xFF8B2A2D),
+                      Color(0xFF3B060A),
+                      Color(0xFF5B1A1A),
+                      Color(0xFF8B2A2D),
                     ],
                   ),
-                  borderRadius: const BorderRadius.only(
+                  borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(20),
                     topRight: Radius.circular(20),
                   ),
@@ -832,8 +904,19 @@ Widget _buildSearchSection() {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withValues(alpha: 0.3),
+                            Colors.white.withValues(alpha: 0.1),
+                          ],
+                        ),
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          width: 1,
+                        ),
                       ),
                       child: const Icon(Icons.filter_list_rounded,
                           color: Colors.white, size: 20),
@@ -855,7 +938,7 @@ Widget _buildSearchSection() {
                           Text(
                             'Pilih $filterType untuk memfilter data',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                               fontSize: 12,
                             ),
                           ),
@@ -947,14 +1030,22 @@ Widget _buildSearchSection() {
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(context),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryColor,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
                           elevation: 2,
-                          shadowColor: _primaryColor.withOpacity(0.3),
+                          shadowColor: const Color(0xFF3B060A).withValues(alpha: 0.3),
+                        ).copyWith(
+                          backgroundColor: WidgetStateProperty.resolveWith<Color>(
+                            (Set<WidgetState> states) {
+                              if (states.contains(WidgetState.pressed)) {
+                                return const Color(0xFF5B1A1A);
+                              }
+                              return const Color(0xFF3B060A);
+                            },
+                          ),
                         ),
                         child: const Text('Selesai'),
                       ),
@@ -1083,7 +1174,7 @@ Widget _buildSearchSection() {
   }) {
     return Material(
       color: isSelected
-          ? _primaryColor.withOpacity(0.08)
+          ? _primaryColor.withValues(alpha: 0.08)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
@@ -1098,9 +1189,16 @@ Widget _buildSearchSection() {
               width: 1.5,
             ),
             borderRadius: BorderRadius.circular(12),
-            color: isSelected
-                ? _primaryColor.withOpacity(0.05)
-                : Colors.transparent,
+            gradient: isSelected
+                ? LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      _primaryColor.withValues(alpha: 0.05),
+                      _primaryColor.withValues(alpha: 0.02),
+                    ],
+                  )
+                : null,
           ),
           child: Row(
             children: [
@@ -1109,10 +1207,26 @@ Widget _buildSearchSection() {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? _primaryColor
-                      : iconColor.withOpacity(0.1),
+                  gradient: isSelected
+                      ? _primaryGradient
+                      : LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            iconColor.withValues(alpha: 0.15),
+                            iconColor.withValues(alpha: 0.05),
+                          ],
+                        ),
                   borderRadius: BorderRadius.circular(10),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: _primaryColor.withValues(alpha: 0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Icon(
                   icon,
@@ -1141,7 +1255,7 @@ Widget _buildSearchSection() {
                       subtitle,
                       style: TextStyle(
                         color: isSelected
-                            ? _primaryColor.withOpacity(0.8)
+                            ? _primaryColor.withValues(alpha: 0.8)
                             : Colors.grey[600],
                         fontSize: 12,
                       ),
@@ -1156,8 +1270,15 @@ Widget _buildSearchSection() {
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    color: _primaryColor,
+                    gradient: _primaryGradient,
                     shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _primaryColor.withValues(alpha: 0.3),
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
                   child: const Icon(
                     Icons.check_rounded,
@@ -1184,24 +1305,24 @@ Widget _buildSearchSection() {
     );
   }
 
-void _selectFilter(String displayName, String filterId) {
-  // PERBAIKAN: Cek apakah tab saat ini memiliki filter
-  final currentTabData = _tabData[_currentTab];
-  if (currentTabData['hasFilter'] != true) {
-    // Tab saat ini tidak memiliki filter, tidak boleh set filter
-    debugPrint('⚠️ Tab ${currentTabData['type']} tidak mendukung filter');
-    return;
+  void _selectFilter(String displayName, String filterId) {
+    // PERBAIKAN: Cek apakah tab saat ini memiliki filter
+    final currentTabData = _tabData[_currentTab];
+    if (currentTabData['hasFilter'] != true) {
+      // Tab saat ini tidak memiliki filter, tidak boleh set filter
+      debugPrint('⚠️ Tab ${currentTabData['type']} tidak mendukung filter');
+      return;
+    }
+
+    setState(() {
+      _selectedFilterDisplay = displayName;
+      _selectedFilterId = filterId;
+      _isLoading = true;
+    });
+
+    _resetPagination();
+    _fetchDataWithCache(_searchQuery, forceRefresh: true);
   }
-
-  setState(() {
-    _selectedFilterDisplay = displayName;
-    _selectedFilterId = filterId;
-    _isLoading = true;
-  });
-
-  _resetPagination();
-  _fetchDataWithCache(_searchQuery, forceRefresh: true);
-}
 
   // CONTENT SECTION - Pagination ikut scroll
   Widget _buildContent() {
@@ -1294,7 +1415,7 @@ void _selectFilter(String displayName, String filterId) {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1314,20 +1435,13 @@ void _selectFilter(String displayName, String filterId) {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        _primaryColor.withOpacity(0.8),
-                        _primaryColor,
-                      ],
-                    ),
+                    gradient: _reverseGradient,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: _primaryColor.withOpacity(0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+                        color: const Color(0xFF3B060A).withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -1485,7 +1599,14 @@ void _selectFilter(String displayName, String filterId) {
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: _primaryColor.withOpacity(0.1),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _primaryColor.withValues(alpha: 0.15),
+                  _primaryColor.withValues(alpha: 0.05),
+                ],
+              ),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
@@ -1517,6 +1638,17 @@ void _selectFilter(String displayName, String filterId) {
 
     return Container(
       padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Text(
@@ -1611,12 +1743,15 @@ void _selectFilter(String displayName, String filterId) {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: isEnabled ? _primaryColor : Colors.grey[300],
+          gradient: isEnabled
+              ? _primaryGradient
+              : null,
+          color: !isEnabled ? Colors.grey[300] : null,
           borderRadius: BorderRadius.circular(8),
           boxShadow: isEnabled
               ? [
                   BoxShadow(
-                    color: _primaryColor.withOpacity(0.3),
+                    color: const Color(0xFF3B060A).withValues(alpha: 0.3),
                     blurRadius: 6,
                     offset: const Offset(0, 3),
                   )
@@ -1642,16 +1777,19 @@ void _selectFilter(String displayName, String filterId) {
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: isActive ? _primaryColor : Colors.transparent,
+          gradient: isActive
+              ? _primaryGradient
+              : null,
+          color: !isActive ? Colors.transparent : null,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: isActive ? _primaryColor : Colors.grey[300]!,
+            color: isActive ? Colors.transparent : Colors.grey[300]!,
             width: isActive ? 0 : 1,
           ),
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: _primaryColor.withOpacity(0.3),
+                    color: const Color(0xFF3B060A).withValues(alpha: 0.3),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   )
@@ -1698,9 +1836,19 @@ void _selectFilter(String displayName, String filterId) {
         elevation: 0,
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: refreshData,
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              gradient: _primaryGradient,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF3B060A).withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -9,7 +9,7 @@ class StatGrid extends StatelessWidget {
     super.key,
     required this.onAddPressed,
     this.data,
-    this.onBoxTap,
+    this.onBoxTap, required Map<String, Color> typeColors,
   });
 
   @override

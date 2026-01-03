@@ -47,6 +47,38 @@ class Industri {
   String toString() => nama;
 }
 
+// Cache untuk menyimpan data industri
+class IndustriCache {
+  static final Map<int, List<Industri>> _cacheByJurusan = {};
+  static List<Industri>? _allIndustriCache;
+  static DateTime? _lastFetchTime;
+  
+  static bool isCacheValid() {
+    if (_lastFetchTime == null) return false;
+    return DateTime.now().difference(_lastFetchTime!).inMinutes < 5; // Cache 5 menit
+  }
+  
+  static List<Industri>? getCachedIndustriByJurusan(int? jurusanId) {
+    if (jurusanId == null) return _allIndustriCache;
+    return _cacheByJurusan[jurusanId];
+  }
+  
+  static void cacheIndustriByJurusan(int? jurusanId, List<Industri> industriList) {
+    if (jurusanId == null) {
+      _allIndustriCache = industriList;
+    } else {
+      _cacheByJurusan[jurusanId] = industriList;
+    }
+    _lastFetchTime = DateTime.now();
+  }
+  
+  static void clearCache() {
+    _cacheByJurusan.clear();
+    _allIndustriCache = null;
+    _lastFetchTime = null;
+  }
+}
+
 // Enum untuk posisi popup
 enum PopupPosition {
   below,      // Di bawah field (default)
@@ -62,19 +94,19 @@ class AjukanPKLDialog extends StatefulWidget {
   final Offset? customPosition;
   final double? popupWidth;
   final double? popupMaxHeight;
-  final double horizontalOffset; // TAMBAHAN: offset horizontal
-  final double verticalOffset;   // TAMBAHAN: offset vertikal
+  final double horizontalOffset;
+  final double verticalOffset;
 
   const AjukanPKLDialog({
     super.key, 
-    this.token, 
-    this.kelasId,
+    required this.token, // Wajib ada token
+    required this.kelasId, // Wajib ada kelasId
     this.popupPosition = PopupPosition.below,
     this.customPosition,
     this.popupWidth,
     this.popupMaxHeight,
-    this.horizontalOffset = 40.0, // TAMBAHAN: default 40
-    this.verticalOffset = 0.0,   // TAMBAHAN: default 0
+    this.horizontalOffset = 40.0,
+    this.verticalOffset = 0.0,
   });
 
   @override
@@ -82,16 +114,43 @@ class AjukanPKLDialog extends StatefulWidget {
 }
 
 class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
+  // Neo Brutalism Colors
+  final Color _primaryColor = const Color(0xFFE63946); // Merah cerah
+  final Color _secondaryColor = const Color(0xFFF1FAEE); // Putih krem
+  final Color _accentColor = const Color(0xFFA8DADC); // Biru muda
+  final Color _darkColor = const Color(0xFF1D3557); // Biru tua
+  final Color _yellowColor = const Color(0xFFFFB703); // Kuning cerah
+  final Color _blackColor = Colors.black;
+
+  // Neo Brutalism Shadows
+  static const BoxShadow _heavyShadow = BoxShadow(
+    color: Colors.black,
+    offset: Offset(6, 6),
+    blurRadius: 0,
+  );
+
+  final BoxShadow _lightShadow = BoxShadow(
+    color: Colors.black.withValues(alpha: 0.2),
+    offset: const Offset(4, 4),
+    blurRadius: 0,
+  );
+
   final _catatanController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _catatanFocusNode = FocusNode();
   
   List<Industri> _industriList = [];
   List<Industri> _filteredIndustriList = [];
   Industri? _selectedIndustri;
   bool _isLoading = true;
   bool _showIndustriPopup = false;
+  bool _isSearching = false;
   int? _jurusanId;
+  
+  // Tambahkan flag untuk tracking loading state
+  bool _hasLoadedData = false;
+  bool _isLoadingIndustri = false;
   
   // Keys untuk mendapatkan posisi
   final GlobalKey _industriFieldKey = GlobalKey();
@@ -102,11 +161,21 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
     super.initState();
     _loadData();
     _searchController.addListener(_filterIndustriList);
+    
+    // Listen untuk focus catatan
+    _catatanFocusNode.addListener(() {
+      if (_showIndustriPopup) {
+        _removeOverlay();
+      }
+    });
   }
 
   void _filterIndustriList() {
     final query = _searchController.text.toLowerCase();
+    if (!mounted) return;
+    
     setState(() {
+      _isSearching = query.isNotEmpty;
       _filteredIndustriList = _industriList.where((industri) {
         return industri.nama.toLowerCase().contains(query) ||
                industri.bidang.toLowerCase().contains(query) ||
@@ -121,19 +190,51 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
   }
 
   Future<void> _loadData() async {
-    if (widget.token == null) {
-      setState(() {
-        _isLoading = false;
-      });
+    // Cek jika sudah pernah load data sebelumnya
+    if (_hasLoadedData) {
       return;
     }
 
+    setState(() {
+      _isLoading = true;
+      _isLoadingIndustri = true;
+    });
+
     try {
-      if (widget.kelasId == null) {
-        await _loadAllIndustri();
+      // Cek cache terlebih dahulu
+      final cachedData = IndustriCache.getCachedIndustriByJurusan(_jurusanId);
+      if (cachedData != null && IndustriCache.isCacheValid()) {
+        if (mounted) {
+          setState(() {
+            _industriList = cachedData;
+            _filteredIndustriList = List.from(cachedData);
+            _isLoading = false;
+            _isLoadingIndustri = false;
+            _hasLoadedData = true;
+          });
+        }
         return;
       }
 
+      // Load jurusanId dari kelasId
+      await _loadJurusanId();
+      
+      // Load data industri dari API
+      await _loadIndustriFromAPI();
+      
+    } catch (e) {
+      print('Error loading data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isLoadingIndustri = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadJurusanId() async {
+    try {
       final kelasResponse = await http.get(
         Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/${widget.kelasId}'),
         headers: {
@@ -144,22 +245,29 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
 
       if (kelasResponse.statusCode == 200) {
         final kelasData = jsonDecode(kelasResponse.body);
-        _jurusanId = kelasData['data']['jurusan_id'];
-        await _loadIndustriByJurusan(_jurusanId!);
+        setState(() {
+          _jurusanId = kelasData['data']['jurusan_id'];
+        });
       } else {
-        throw Exception('Gagal memuat data kelas');
+        setState(() {
+          _jurusanId = null; // Jika gagal, load semua industri
+        });
       }
     } catch (e) {
       setState(() {
-        _isLoading = false;
+        _jurusanId = null; // Jika error, load semua industri
       });
     }
   }
 
-  Future<void> _loadIndustriByJurusan(int jurusanId) async {
+  Future<void> _loadIndustriFromAPI() async {
     try {
+      final url = _jurusanId != null
+          ? '${dotenv.env['API_BASE_URL']}/api/industri?jurusan_id=$_jurusanId&limit=100'
+          : '${dotenv.env['API_BASE_URL']}/api/industri?limit=100';
+
       final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/industri?jurusan_id=$jurusanId&limit=100'),
+        Uri.parse(url),
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer ${widget.token}',
@@ -173,11 +281,12 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
         throw Exception('Gagal memuat data industri');
       }
     } catch (e) {
-      await _loadAllIndustri();
+      // Jika gagal, coba load semua industri
+      await _loadAllIndustriAsFallback();
     }
   }
 
-  Future<void> _loadAllIndustri() async {
+  Future<void> _loadAllIndustriAsFallback() async {
     try {
       final response = await http.get(
         Uri.parse('${dotenv.env['API_BASE_URL']}/api/industri?limit=100'),
@@ -202,20 +311,29 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
     if (data['success'] == true && data['data'] != null) {
       final List<dynamic> industriListData = data['data']['data'] ?? [];
       
-      setState(() {
-        _industriList = industriListData
-            .map((item) => Industri.fromJson(item))
-            .where((industri) => industri.isActive)
-            .toList();
-        _filteredIndustriList = List.from(_industriList);
-        _isLoading = false;
-      });
+      final industriList = industriListData
+          .map((item) => Industri.fromJson(item))
+          .where((industri) => industri.isActive)
+          .toList();
+      
+      // Cache data
+      IndustriCache.cacheIndustriByJurusan(_jurusanId, industriList);
+      
+      if (mounted) {
+        setState(() {
+          _industriList = industriList;
+          _filteredIndustriList = List.from(industriList);
+          _isLoading = false;
+          _isLoadingIndustri = false;
+          _hasLoadedData = true;
+        });
+      }
     } else {
       throw Exception('Format data tidak sesuai');
     }
   }
 
-  // Fungsi untuk menghitung posisi popup - DIMODIFIKASI
+  // Fungsi untuk menghitung posisi popup
   Offset _calculatePopupPosition(BuildContext context, Size fieldSize, Offset fieldOffset) {
     final screenSize = MediaQuery.of(context).size;
     final popupWidth = widget.popupWidth ?? fieldSize.width;
@@ -225,27 +343,27 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
     switch (widget.popupPosition) {
       case PopupPosition.below:
         top = fieldOffset.dy + fieldSize.height + widget.verticalOffset;
-        left += widget.horizontalOffset; // TAMBAHAN
+        left += widget.horizontalOffset;
         break;
         
       case PopupPosition.above:
-        final maxHeight = widget.popupMaxHeight ?? screenSize.height * 0.4;
+        final maxHeight = widget.popupMaxHeight ?? screenSize.height * 0.35;
         top = fieldOffset.dy - maxHeight - widget.verticalOffset;
-        left += widget.horizontalOffset; // TAMBAHAN
+        left += widget.horizontalOffset;
         break;
         
       case PopupPosition.center:
-        left = (screenSize.width - popupWidth) / 2 + widget.horizontalOffset; // TAMBAHAN
-        top = (screenSize.height - (widget.popupMaxHeight ?? screenSize.height * 0.4)) / 2 + widget.verticalOffset; // TAMBAHAN
+        left = (screenSize.width - popupWidth) / 2 + widget.horizontalOffset;
+        top = (screenSize.height - (widget.popupMaxHeight ?? screenSize.height * 0.35)) / 2 + widget.verticalOffset;
         break;
         
       case PopupPosition.custom:
         if (widget.customPosition != null) {
-          left = widget.customPosition!.dx + widget.horizontalOffset; // TAMBAHAN
-          top = widget.customPosition!.dy + widget.verticalOffset; // TAMBAHAN
+          left = widget.customPosition!.dx + widget.horizontalOffset;
+          top = widget.customPosition!.dy + widget.verticalOffset;
         } else {
           top = fieldOffset.dy + fieldSize.height + widget.verticalOffset;
-          left += widget.horizontalOffset; // TAMBAHAN
+          left += widget.horizontalOffset;
         }
         break;
     }
@@ -271,93 +389,133 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
     final fieldOffset = renderBox.localToGlobal(Offset.zero);
     final fieldSize = renderBox.size;
     final popupWidth = widget.popupWidth ?? fieldSize.width;
-    final maxHeight = widget.popupMaxHeight ?? MediaQuery.of(context).size.height * 0.4;
+    final maxHeight = widget.popupMaxHeight ?? MediaQuery.of(context).size.height * 0.35;
     
     final popupPosition = _calculatePopupPosition(context, fieldSize, fieldOffset);
 
     _overlayEntry = OverlayEntry(
       builder: (context) {
-        return Positioned(
-          left: popupPosition.dx,
-          top: popupPosition.dy,
-          width: popupWidth,
+        return GestureDetector(
+          onTap: () {
+            // Tutup popup saat klik di luar
+            _removeOverlay();
+          },
           child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              constraints: BoxConstraints(
-                maxHeight: maxHeight,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(
-                children: [
-                  // Search Bar
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: Colors.transparent,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Container(color: Colors.transparent),
+                ),
+                Positioned(
+                  left: popupPosition.dx,
+                  top: popupPosition.dy,
+                  width: popupWidth,
+                  child: GestureDetector(
+                    onTap: () {}, // Mencegah event bubble
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxHeight: maxHeight,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _secondaryColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _blackColor, width: 3),
+                        boxShadow: const [_heavyShadow],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Search Bar
+                          Container(
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
+                              color: _primaryColor,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(8),
+                                topRight: Radius.circular(8),
+                              ),
+                              border: Border(
+                                bottom: BorderSide(color: _blackColor, width: 3),
+                              ),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.search, color: Colors.grey, size: 20),
-                                const SizedBox(width: 8),
                                 Expanded(
-                                  child: TextField(
-                                    controller: _searchController,
-                                    focusNode: _searchFocusNode,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Cari industri...',
-                                      border: InputBorder.none,
-                                      contentPadding: EdgeInsets.zero,
-                                      isDense: true,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: _secondaryColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: _blackColor, width: 2),
                                     ),
-                                    style: const TextStyle(fontSize: 14),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.search, color: _darkColor, size: 20),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: TextField(
+                                            controller: _searchController,
+                                            focusNode: _searchFocusNode,
+                                            decoration: InputDecoration(
+                                              hintText: 'CARI INDUSTRI...',
+                                              hintStyle: TextStyle(
+                                                color: _darkColor.withValues(alpha: 0.7),
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12,
+                                                letterSpacing: -0.3,
+                                              ),
+                                              border: InputBorder.none,
+                                              contentPadding: EdgeInsets.zero,
+                                              isDense: true,
+                                            ),
+                                            style: TextStyle(
+                                              fontSize: 14, 
+                                              color: _blackColor,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: -0.3,
+                                            ),
+                                            cursorColor: _primaryColor,
+                                          ),
+                                        ),
+                                        if (_searchController.text.isNotEmpty)
+                                          GestureDetector(
+                                            onTap: () => _searchController.clear(),
+                                            child: Icon(Icons.clear, size: 18, color: _darkColor),
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                                if (_searchController.text.isNotEmpty)
-                                  GestureDetector(
-                                    onTap: () => _searchController.clear(),
-                                    child: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: () {
+                                    _removeOverlay();
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: _secondaryColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: _blackColor, width: 2),
+                                    ),
+                                    child: Icon(Icons.close, size: 20, color: _darkColor),
                                   ),
+                                ),
                               ],
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () {
-                            _removeOverlay();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.close, size: 18),
+                          
+                          // List Industri
+                          Expanded(
+                            child: _buildIndustriList(),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                  
-                  // List Industri
-                  Expanded(
-                    child: _buildIndustriList(),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -371,27 +529,100 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
   }
 
   Widget _buildIndustriList() {
-    if (_isLoading) {
-      return const Center(
+    // Gunakan _isLoadingIndustri untuk overlay, bukan _isLoading
+    if (_isLoadingIndustri) {
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(20),
-          child: CircularProgressIndicator(),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _yellowColor,
+                  border: Border.all(color: _blackColor, width: 3),
+                  shape: BoxShape.circle,
+                ),
+                child: const CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  border: Border.all(color: _blackColor, width: 2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'MEMUAT INDUSTRI...',
+                  style: TextStyle(
+                    color: _secondaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
-    if (_filteredIndustriList.isEmpty) {
-      return const Center(
+    final displayList = _isSearching ? _filteredIndustriList : _industriList;
+    
+    if (displayList.isEmpty) {
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.business_outlined, size: 40, color: Colors.grey),
-              SizedBox(height: 8),
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: _accentColor,
+                  border: Border.all(color: _blackColor, width: 3),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.business_outlined, 
+                  size: 32,
+                  color: _darkColor,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  border: Border.all(color: _blackColor, width: 2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'TIDAK ADA INDUSTRI',
+                  style: TextStyle(
+                    color: _secondaryColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
-                'Tidak ada industri tersedia',
-                style: TextStyle(color: Colors.grey),
+                'Coba kata kunci lain',
+                style: TextStyle(
+                  color: _darkColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -401,86 +632,117 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
 
     return ListView.builder(
       padding: EdgeInsets.zero,
-      itemCount: _filteredIndustriList.length,
+      shrinkWrap: true,
+      itemCount: displayList.length,
       itemBuilder: (context, index) {
-        final industri = _filteredIndustriList[index];
+        final industri = displayList[index];
         final isSelected = _selectedIndustri?.id == industri.id;
         
-        return InkWell(
-          onTap: () {
-            setState(() {
-              _selectedIndustri = industri;
-            });
-            _removeOverlay();
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-            decoration: BoxDecoration(
-              border: index == 0
-                  ? null
-                  : Border(
-                      top: BorderSide(color: Colors.grey[100]!),
+        return Material(
+          color: isSelected ? _primaryColor.withValues(alpha: 0.2) : Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _selectedIndustri = industri;
+              });
+              _removeOverlay();
+            },
+            splashColor: _primaryColor.withValues(alpha: 0.3),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                border: index == 0
+                    ? null
+                    : Border(
+                        top: BorderSide(color: _blackColor, width: 2),
+                      ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: _accentColor,
+                      border: Border.all(color: _blackColor, width: 3),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-              color: isSelected ? Colors.blue[50] : Colors.transparent,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.blue[100],
-                    borderRadius: BorderRadius.circular(8),
+                    child: Icon(
+                      Icons.business,
+                      color: _darkColor,
+                      size: 22,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.business,
-                    color: Colors.blue,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        industri.nama,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          industri.nama.toUpperCase(),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                            color: _blackColor,
+                            letterSpacing: -0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        industri.bidang,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+                        const SizedBox(height: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _yellowColor,
+                            border: Border.all(color: _blackColor, width: 1.5),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            industri.bidang,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: _blackColor,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        industri.alamat,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey,
+                        const SizedBox(height: 4),
+                        Text(
+                          industri.alamat,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: _darkColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _primaryColor,
+                        border: Border.all(color: _blackColor, width: 2),
+                        shape: BoxShape.circle,
                       ),
-                    ],
-                  ),
-                ),
-                if (isSelected)
-                  const Icon(
-                    Icons.check,
-                    color: Colors.blue,
-                    size: 20,
-                  ),
-              ],
+                      child: Icon(
+                        Icons.check,
+                        size: 16,
+                        color: _secondaryColor,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );
@@ -493,9 +755,12 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
       _overlayEntry!.remove();
       _overlayEntry = null;
     }
-    setState(() {
-      _showIndustriPopup = false;
-    });
+    if (mounted) {
+      setState(() {
+        _showIndustriPopup = false;
+        _isSearching = false;
+      });
+    }
     _searchController.clear();
     _searchFocusNode.unfocus();
   }
@@ -505,70 +770,141 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       key: _industriFieldKey,
       children: [
-        // Label "Industri"
-        const Padding(
-          padding: EdgeInsets.only(bottom: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _yellowColor,
+            border: Border.all(color: _blackColor, width: 2),
+            borderRadius: BorderRadius.circular(6),
+          ),
           child: Text(
-            'Industri',
+            'INDUSTRI',
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+              color: _blackColor,
+              letterSpacing: -0.2,
             ),
           ),
         ),
         
-        // Field untuk pilih industri
+        const SizedBox(height: 8),
+        
         GestureDetector(
-          onTap: () => _showIndustriPopupOverlay(context),
+          onTap: () {
+            if (!_hasLoadedData && !_isLoadingIndustri) {
+              // Reload data hanya jika belum pernah load sebelumnya
+              _loadData();
+            }
+            _showIndustriPopupOverlay(context);
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.white, // Warna putih
+              color: _secondaryColor,
+              border: Border.all(color: _blackColor, width: 3),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [_lightShadow],
             ),
             child: Row(
               children: [
+                if (_isLoading && !_hasLoadedData)
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: _primaryColor,
+                      border: Border.all(color: _blackColor, width: 2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                else
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: _accentColor,
+                      border: Border.all(color: _blackColor, width: 3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.business_outlined,
+                      color: _darkColor,
+                      size: 18,
+                    ),
+                  ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: _selectedIndustri == null
                       ? Text(
-                          'Pilih industri',
+                          _isLoading && !_hasLoadedData 
+                            ? 'MEMUAT DATA INDUSTRI...' 
+                            : 'PILIH INDUSTRI',
                           style: TextStyle(
-                            color: Colors.black.withOpacity(0.6), // Warna hitam dengan opacity
+                            color: _darkColor.withValues(alpha: 0.7),
                             fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
                           ),
                         )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _selectedIndustri!.nama,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.black, // Warna hitam
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              _selectedIndustri!.bidang,
+                              _selectedIndustri!.nama.toUpperCase(),
                               style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600], // Warna abu-abu lebih gelap
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: _blackColor,
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _yellowColor,
+                                border: Border.all(color: _blackColor, width: 1.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _selectedIndustri!.bidang,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: _blackColor,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
                 ),
-                Icon(
-                  _showIndustriPopup ? Icons.expand_less : Icons.expand_more,
-                  color: Colors.black.withOpacity(0.6), // Warna icon
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: _secondaryColor,
+                    border: Border.all(color: _blackColor, width: 3),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _showIndustriPopup ? Icons.expand_less : Icons.expand_more,
+                    color: _darkColor,
+                  ),
                 ),
               ],
             ),
           ),
         ),
+        
       ],
     );
   }
@@ -576,187 +912,310 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: GestureDetector(
-        onTap: () {
-          // Tutup overlay jika klik di luar popup
-          if (_overlayEntry != null) {
-            _removeOverlay();
-          }
-        },
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white, // Warna putih untuk form
-            borderRadius: BorderRadius.circular(12),
-          ),
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
-          ),
-          child: SingleChildScrollView(
-            child: Padding(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Container(
+        width: double.infinity,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.65,
+          maxWidth: 500,
+        ),
+        decoration: BoxDecoration(
+          color: _secondaryColor,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _blackColor, width: 4),
+          boxShadow: const [_heavyShadow],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header dengan warna tema
+            Container(
               padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+              decoration: BoxDecoration(
+                color: _primaryColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+                border: Border(
+                  bottom: BorderSide(color: _blackColor, width: 4),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Header "Ajukan PKL" dengan garis bawah transparan
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Ajukan PKL',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 20),
-                            onPressed: () {
-                              _removeOverlay();
-                              Navigator.of(context).pop();
-                            },
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        height: 1,
-                        color: Colors.grey.withOpacity(0.3), // Garis abu-abu transparan
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Industri Field
-                  _buildIndustriField(context),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Catatan Field dengan label di atas border
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Label Catatan (di atas border)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8, left: 4),
-                        child: Text(
-                          'Catatan',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black87,
-                          ),
+                      Text(
+                        'AJUKAN PKL',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: _secondaryColor,
+                          letterSpacing: -0.5,
                         ),
                       ),
-                      
-                      // TextField dengan ukuran yang lebih kecil - DIUBAH
                       Container(
-                        height: 100, // DIUBAH: Tinggi tetap 100px
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.grey[300]!),
+                          color: _yellowColor,
+                          border: Border.all(color: _blackColor, width: 2),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: TextFormField(
-                          controller: _catatanController,
-                          decoration: const InputDecoration(
-                            hintText: 'Catatan untuk pengajuan PKL',
-                            border: InputBorder.none, // Hapus border default
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 12, 
-                              vertical: 8, // DIUBAH: padding vertikal lebih kecil
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            hintStyle: TextStyle(fontSize: 14), // DIUBAH: ukuran hint lebih kecil
+                        child: Text(
+                          'PILIH INDUSTRI & CATATAN',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: _blackColor,
+                            letterSpacing: -0.2,
                           ),
-                          style: const TextStyle(fontSize: 14), // DIUBAH: ukuran teks lebih kecil
-                          maxLines: null, // Biarkan otomatis wrap
-                          expands: false, // Tidak mengisi seluruh container
-                          textInputAction: TextInputAction.newline,
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Catatan harus diisi';
-                            }
-                            return null;
-                          },
                         ),
                       ),
                     ],
                   ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Actions
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            _removeOverlay();
-                            Navigator.of(context).pop();
-                          },
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            side: const BorderSide(color: Colors.black),
-                            backgroundColor: Colors.white, // Warna putih
-                          ),
-                          child: const Text('Batal', style: TextStyle(color: Colors.black)),
-                        ),
+                  GestureDetector(
+                    onTap: () {
+                      _removeOverlay();
+                      Navigator.of(context).pop();
+                    },
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: _secondaryColor,
+                        border: Border.all(color: _blackColor, width: 3),
+                        shape: BoxShape.circle,
+                        boxShadow: [_lightShadow],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (_selectedIndustri == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Silakan pilih industri terlebih dahulu'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-                            
-                            if (_catatanController.text.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Silakan isi catatan'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-                            
-                            _removeOverlay();
-                            Navigator.of(context).pop({
-                              'catatan': _catatanController.text,
-                              'industri_id': _selectedIndustri!.id,
-                            });
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          child: const Text(
-                            'Ajukan',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
+                      child: Icon(
+                        Icons.close,
+                        size: 22,
+                        color: _primaryColor,
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
+            
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                
+                    
+                    _buildIndustriField(context),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Catatan Field
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _primaryColor,
+                            border: Border.all(color: _blackColor, width: 2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: _secondaryColor,
+                                  border: Border.all(color: _blackColor, width: 2),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.edit,
+                                  size: 10,
+                                  color: _primaryColor,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'CATATAN',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: _secondaryColor,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 8),
+                        
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _blackColor, width: 3),
+                            color: Colors.white,
+                            boxShadow: [_lightShadow],
+                          ),
+                          child: TextFormField(
+                            controller: _catatanController,
+                            focusNode: _catatanFocusNode,
+                            decoration: InputDecoration(
+                              hintText: 'TULIS CATATAN PENGAJUAN PKL...',
+                              hintStyle: TextStyle(
+                                color: _darkColor.withValues(alpha: 0.6),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              isDense: true,
+                            ),
+                            style: TextStyle(
+                              fontSize: 14, 
+                              color: _blackColor,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 3,
+                            minLines: 3,
+                            keyboardType: TextInputType.multiline,
+                            textInputAction: TextInputAction.newline,
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 32),
+                    
+                    // Tombol aksi
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              _removeOverlay();
+                              Navigator.of(context).pop();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              decoration: BoxDecoration(
+                                color: _accentColor,
+                                border: Border.all(color: _blackColor, width: 3),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [_lightShadow],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'BATAL',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: _blackColor,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              // Validasi harus memilih industri dan catatan harus diisi
+                              if (_selectedIndustri == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                      'SILAKAN PILIH INDUSTRI TERLEBIH DAHULU',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                    backgroundColor: _primaryColor,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: _blackColor, width: 2),
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              if (_catatanController.text.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                      'CATATAN HARUS DIISI',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                    backgroundColor: _primaryColor,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: _blackColor, width: 2),
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                              
+                              _removeOverlay();
+                              Navigator.of(context).pop({
+                                'catatan': _catatanController.text,
+                                'industri_id': _selectedIndustri!.id,
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              decoration: BoxDecoration(
+                                color: _primaryColor,
+                                border: Border.all(color: _blackColor, width: 3),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: const [_heavyShadow],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'AJUKAN PKL',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: _secondaryColor,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -768,6 +1227,7 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
     _catatanController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _catatanFocusNode.dispose();
     super.dispose();
   }
 }

@@ -4,8 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'edit_class_page.dart';
-import '../../popup_helper.dart';
-import '../murid/student_detail_page.dart'; // Import halaman detail siswa
+import '../murid/student_detail_page.dart';
 
 class ClassDetailPage extends StatefulWidget {
   final String classId;
@@ -22,8 +21,9 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
   bool isLoading = true;
   bool isLoadingStudents = true;
 
-  final Color brown = const Color(0xFF5B1A1A);
-  final Color danger = const Color(0xFF8B0000);
+  final Color _primaryColor = const Color(0xFF3B060A);
+  final Color _accentColor = const Color(0xFF5B1A1A);
+  final Color _dangerColor = const Color(0xFF8B0000);
 
   @override
   void initState() {
@@ -32,69 +32,75 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
     fetchStudents();
   }
 
-  // Ambil nama jurusan
   Future<String> getJurusanName(int jurusanId, String token) async {
-    final response = await http.get(
-      Uri.parse('${dotenv.env['API_BASE_URL']}/api/jurusan/$jurusanId'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/jurusan/$jurusanId'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      return data['data']?['nama'] ?? '-';
-    } else {
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['data']?['nama'] ?? '-';
+      } else {
+        return '-';
+      }
+    } catch (_) {
       return '-';
     }
   }
 
   Future<void> fetchClassDetail() async {
-    setState(() => isLoading = true);
+    try {
+      setState(() => isLoading = true);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
 
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token') ?? '';
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/${widget.classId}'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
 
-    final response = await http.get(
-      Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/${widget.classId}'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+      if (!mounted) return;
 
-    if (!mounted) return;
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        final kelas = decoded['data'];
 
-    if (response.statusCode == 200) {
-      final decoded = json.decode(response.body);
-      final kelas = decoded['data'];
+        String jurusanNama = '-';
+        if (kelas['jurusan_id'] != null) {
+          jurusanNama = await getJurusanName(kelas['jurusan_id'], token);
+        }
 
-      // Ambil nama jurusan
-      String jurusanNama = '-';
-      if (kelas['jurusan_id'] != null) {
-        jurusanNama = await getJurusanName(kelas['jurusan_id'], token);
+        setState(() {
+          classData = {...kelas, 'jurusan_nama': jurusanNama};
+          isLoading = false;
+        });
+      } else {
+        setState(() => isLoading = false);
+        _showErrorDialog('Gagal mengambil data kelas');
       }
-
-      setState(() {
-        classData = {...kelas, 'jurusan_nama': jurusanNama};
-        isLoading = false;
-      });
-    } else {
+    } catch (_) {
       setState(() => isLoading = false);
-      PopupHelper.showErrorDialog(context, 'Gagal mengambil data kelas');
+      _showErrorDialog('Terjadi kesalahan saat mengambil data');
     }
   }
 
   Future<void> fetchStudents() async {
-    setState(() => isLoadingStudents = true);
-
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token') ?? '';
-
     try {
+      setState(() => isLoadingStudents = true);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
+
       final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/siswa?kelas_id=${widget.classId}'),
+        Uri.parse(
+            '${dotenv.env['API_BASE_URL']}/api/siswa?kelas_id=${widget.classId}'),
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
@@ -106,7 +112,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
         List<dynamic> fetchedStudents = [];
-        
+
         if (decoded['data'] != null && decoded['data']['data'] is List) {
           fetchedStudents = decoded['data']['data'];
         } else if (decoded['data'] is List) {
@@ -115,15 +121,13 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
           fetchedStudents = [];
         }
 
-        // Urutkan siswa berdasarkan nama depan
         fetchedStudents.sort((a, b) {
-          final String nameA = (a['nama_lengkap'] ?? a['nama'] ?? '').toString().toLowerCase();
-          final String nameB = (b['nama_lengkap'] ?? b['nama'] ?? '').toString().toLowerCase();
-          
-          // Ambil kata pertama (nama depan)
+          final String nameA =
+              (a['nama_lengkap'] ?? a['nama'] ?? '').toString().toLowerCase();
+          final String nameB =
+              (b['nama_lengkap'] ?? b['nama'] ?? '').toString().toLowerCase();
           final String firstNameA = nameA.split(' ').first;
           final String firstNameB = nameB.split(' ').first;
-          
           return firstNameA.compareTo(firstNameB);
         });
 
@@ -133,114 +137,480 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
         });
       } else {
         setState(() => isLoadingStudents = false);
-        PopupHelper.showErrorDialog(context, 'Gagal mengambil data siswa');
+        _showErrorDialog('Gagal mengambil data siswa');
       }
     } catch (e) {
       setState(() => isLoadingStudents = false);
       if (!mounted) return;
-      PopupHelper.showErrorDialog(context, 'Error: $e');
+      _showErrorDialog('Error: $e');
     }
   }
 
   Future<void> deleteClass() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      final role = prefs.getString('user_role');
 
-    final response = await http.delete(
-      Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/${widget.classId}'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+      if (role?.toLowerCase() != 'admin') {
+        _showErrorDialog('Kamu tidak memiliki izin untuk menghapus data');
+        return;
+      }
 
-    if (!mounted) return;
+      final int? classId = classData?['id'];
+      if (classId == null) {
+        _showErrorDialog('ID kelas tidak ditemukan');
+        return;
+      }
 
-    if (response.statusCode == 200) {
-      PopupHelper.showSuccessDialog(context, 'Kelas berhasil dihapus',
-          onOk: () {
-        Navigator.pop(context, {'deleted': true});
-      });
-    } else {
-      PopupHelper.showErrorDialog(
-        context,
-        'Gagal menghapus kelas: ${response.statusCode}\n${response.body}',
+      final response = await http.delete(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/$classId'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
       );
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+        _showSuccessDialog(
+          'Data kelas berhasil dihapus',
+          onOk: () {
+            Navigator.pop(context, {'deleted': true});
+          },
+        );
+      } else {
+        if (!mounted) return;
+        _showErrorDialog('Gagal menghapus data: ${response.statusCode}');
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _showErrorDialog('Terjadi kesalahan jaringan');
     }
   }
 
-  void _confirmDelete() {
+  void _confirmDelete(BuildContext context) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Hapus Kelas'),
-        content: const Text('Yakin ingin menghapus kelas ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
+      barrierColor: Colors.black.withValues(alpha:0.5),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha:0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: danger,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              deleteClass();
-            },
-            child: const Text('Hapus'),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      _primaryColor,
+                      _accentColor,
+                    ],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha:0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded,
+                          color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Konfirmasi Hapus',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            classData?['nama'] ?? 'Kelas',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha:0.9),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.delete_outline_rounded,
+                      size: 60,
+                      color: Color(0xFF8B0000),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Yakin ingin menghapus data ini?',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tindakan ini tidak dapat dibatalkan',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.grey[200]!,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _primaryColor,
+                          side: BorderSide(color: _primaryColor),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Batal'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          deleteClass();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _dangerColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                          shadowColor: _dangerColor.withValues(alpha:0.3),
+                        ),
+                        child: const Text('Hapus'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildProfileItem(IconData icon, String title, String? value) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+  void _showSuccessDialog(String message, {VoidCallback? onOk}) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha:0.5),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha:0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color.fromRGBO(46, 125, 50, 1),
+                      Color(0xFF4CAF50),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha:0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.check_circle_rounded,
+                          color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Berhasil!',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 60,
+                      color: Color(0xFF4CAF50),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.grey[200]!,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      onOk?.call();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4CAF50),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                      shadowColor: const Color(0xFF4CAF50).withValues(alpha:0.3),
+                    ),
+                    child: const Text('OK'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: brown,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 20),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha:0.5),
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha:0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-                const SizedBox(height: 4),
-                Text(value ?? '-', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          )
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFC62828),
+                      Color(0xFFEF5350),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha:0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.error_outline_rounded,
+                          color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Terjadi Kesalahan',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    const Icon(
+                      Icons.error_outline_rounded,
+                      size: 60,
+                      color: Color(0xFFEF5350),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Silakan coba lagi',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.grey[200]!,
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFEF5350),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                      shadowColor: const Color(0xFFEF5350).withValues(alpha:0.3),
+                    ),
+                    child: const Text('Tutup'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildStudentsSection() {
     return Container(
-      margin: const EdgeInsets.only(top: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: const Color(0xFFF9F9F9),
         borderRadius: BorderRadius.circular(12),
@@ -258,28 +628,37 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: brown,
+                  color: _primaryColor,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.people, color: Colors.white, size: 18),
+                child: const Icon(Icons.people_rounded,
+                    color: Colors.white, size: 20),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
               const Text(
                 'Daftar Murid',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: brown.withValues(alpha: 0.1),
+                  color: _primaryColor.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${students.length} siswa',
-                  style: TextStyle(fontSize: 12, color: brown, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _primaryColor,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
@@ -302,7 +681,6 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
               children: students.map((student) {
                 return InkWell(
                   onTap: () {
-                    // Navigasi ke halaman detail siswa ketika diklik
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -314,7 +692,8 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                   },
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 16),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
@@ -324,10 +703,10 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                       children: [
                         CircleAvatar(
                           radius: 20,
-                          backgroundColor: brown.withValues(alpha: 0.1),
+                          backgroundColor: _primaryColor.withValues(alpha:0.1),
                           child: Icon(
-                            Icons.person,
-                            color: brown,
+                            Icons.person_rounded,
+                            color: _primaryColor,
                             size: 20,
                           ),
                         ),
@@ -337,23 +716,20 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                student['nama_lengkap'] ?? student['nama'] ?? '-',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                                student['nama_lengkap'] ??
+                                    student['nama'] ??
+                                    '-',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                              if (student['nisn'] != null)
-                                Text(
-                                  'NISN: ${student['nisn']}',
-                                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                ),
-                              if (student['email'] != null)
-                                Text(
-                                  student['email'],
-                                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                                ),
+                              
                             ],
                           ),
                         ),
-                        const Icon(Icons.chevron_right, color: Colors.grey),
+                        const Icon(Icons.chevron_right_rounded,
+                            color: Colors.grey),
                       ],
                     ),
                   ),
@@ -368,102 +744,402 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Detail Kelas'),
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF8B0000), Color(0xFFB22222)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      backgroundColor: _primaryColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // APPBAR CUSTOM
+            Container(
+              height: 60,
+              color: _primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Profil Kelas',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                ],
+              ),
             ),
-          ),
-        ),
-        foregroundColor: Colors.white,
-        centerTitle: true,
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : classData == null
-              ? const Center(child: Text('Data tidak ditemukan'))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundColor: brown,
-                              child: const Icon(Icons.class_, size: 50, color: Colors.white),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              classData!['nama'] ?? '-',
-                              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text('Kelas', style: TextStyle(fontSize: 16, color: Colors.grey)),
-                          ],
+
+            // SATU CONTAINER PUTIH UTUH
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(40),
+                    topRight: Radius.circular(40),
+                  ),
+                  border: Border.all(
+                    color: const Color(0xFFBEBEBE),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha:0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, -5),
+                    ),
+                  ],
+                ),
+                child: isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF3B060A),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      _buildProfileItem(Icons.class_, 'Nama Kelas', classData!['nama']),
-                      _buildProfileItem(Icons.school, 'Jurusan', classData!['jurusan_nama'] ?? '-'),
-
-                      // Tambahkan section daftar murid di sini
-                      _buildStudentsSection(),
-
-                      const SizedBox(height: 30),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _confirmDelete,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: danger,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('Hapus'),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () async {
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => EditClassPage(classData: classData!),
+                      )
+                    : classData == null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.class_rounded,
+                                  size: 80,
+                                  color: Colors.grey[300],
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Data tidak ditemukan',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                );
-
-                                // **Refresh data dari server setelah edit**
-                                if (result == true && mounted) {
-                                  fetchClassDetail();
-                                  fetchStudents(); // Refresh data siswa setelah edit
-                                }
-                              },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: brown,
-                                side: BorderSide(color: brown),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                              child: const Text('Edit'),
+                                ),
+                                const SizedBox(height: 8),
+                                ElevatedButton(
+                                  onPressed: fetchClassDetail,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _primaryColor,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  child: const Text('Coba Lagi'),
+                                ),
+                              ],
                             ),
+                          )
+                        : LayoutBuilder(
+                            builder: (context, constraints) {
+                              return SingleChildScrollView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minHeight: constraints.maxHeight,
+                                  ),
+                                  child: IntrinsicHeight(
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 20),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          // ICON PROFILE UKURAN 110 (TETAP)
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                                top: 30, bottom: 30),
+                                            child: Container(
+                                              width: 110,
+                                              height: 110,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.white,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black
+                                                        .withValues(alpha:0.1),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 3),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  gradient: LinearGradient(
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                    colors: [
+                                                      _primaryColor,
+                                                      _accentColor,
+                                                    ],
+                                                  ),
+                                                ),
+                                                child: const Icon(
+                                                  Icons.class_rounded,
+                                                  size: 60,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+
+                                          // DATA KELAS
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10),
+                                            child: Column(
+                                              children: [
+                                                _buildProfileItem(
+                                                  icon: Icons.class_rounded,
+                                                  title: 'Nama Kelas',
+                                                  value:
+                                                      classData!['nama'] ?? '-',
+                                                ),
+                                                const SizedBox(height: 16),
+
+                                                _buildProfileItem(
+                                                  icon: Icons.school_rounded,
+                                                  title: 'Jurusan',
+                                                  value: classData![
+                                                          'jurusan_nama'] ??
+                                                      '-',
+                                                ),
+                                                const SizedBox(height: 24),
+
+                                                // SECTION DAFTAR MURID
+                                                _buildStudentsSection(),
+                                                const SizedBox(height: 40),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // TOMBOL DI BAWAH
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 30,
+                                                left: 10,
+                                                right: 10),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              12),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: _dangerColor
+                                                              .withValues(alpha:0.2),
+                                                          blurRadius: 4,
+                                                          offset: const Offset(
+                                                              0, 2),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: ElevatedButton(
+                                                      onPressed: () =>
+                                                          _confirmDelete(
+                                                              context),
+                                                      style: ElevatedButton
+                                                          .styleFrom(
+                                                        backgroundColor:
+                                                            _dangerColor,
+                                                        foregroundColor:
+                                                            Colors.white,
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                vertical: 14),
+                                                        shape:
+                                                            RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(12),
+                                                        ),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                              Icons
+                                                                  .delete_rounded,
+                                                              size: 18),
+                                                          SizedBox(width: 6),
+                                                          Text(
+                                                            'Hapus',
+                                                            style: TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 16),
+                                                Expanded(
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              12),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: _primaryColor
+                                                              .withValues(alpha:0.2),
+                                                          blurRadius: 4,
+                                                          offset: const Offset(
+                                                              0, 2),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: ElevatedButton(
+                                                      onPressed: () async {
+                                                        final result =
+                                                            await Navigator
+                                                                .push(
+                                                          context,
+                                                          MaterialPageRoute(
+                                                            builder: (_) =>
+                                                                EditClassPage(
+                                                                    classData:
+                                                                        classData!),
+                                                          ),
+                                                        );
+                                                        if (result == true &&
+                                                            mounted) {
+                                                          fetchClassDetail();
+                                                          fetchStudents();
+                                                        }
+                                                      },
+                                                      style: ElevatedButton
+                                                          .styleFrom(
+                                                        backgroundColor:
+                                                            _primaryColor,
+                                                        foregroundColor:
+                                                            Colors.white,
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                vertical: 14),
+                                                        shape:
+                                                            RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(12),
+                                                        ),
+                                                      ),
+                                                      child: const Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                              Icons
+                                                                  .edit_rounded,
+                                                              size: 18),
+                                                          SizedBox(width: 6),
+                                                          Text(
+                                                            'Edit',
+                                                            style: TextStyle(
+                                                              fontSize: 14,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        ],
-                      ),
-                    ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Widget untuk item profil yang konsisten dengan halaman detail lainnya
+  Widget _buildProfileItem({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _primaryColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -18,6 +18,7 @@ class _AdminMainState extends State<AdminMain> {
   final PageController _pageController = PageController();
   bool _isBottomBarVisible = true;
   Timer? _scrollTimer;
+  bool _isKeyboardVisible = false;
 
   final GlobalKey<AdminDataState> _adminDataKey = GlobalKey<AdminDataState>();
 
@@ -32,12 +33,42 @@ class _AdminMainState extends State<AdminMain> {
       const ManajemenPklPage(),
       const AdminSetting(),
     ];
-    
+
     _showBottomBar();
+
+    // Setup keyboard listener
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupKeyboardListener();
+    });
+  }
+
+  void _setupKeyboardListener() {
+    // Menggunakan MediaQuery untuk mendeteksi keyboard
+    WidgetsBinding.instance.addObserver(
+      LifecycleEventHandler(
+        onMetricsChanged: () {
+          final newKeyboardVisible =
+              MediaQuery.of(context).viewInsets.bottom > 0;
+          if (newKeyboardVisible != _isKeyboardVisible) {
+            setState(() {
+              _isKeyboardVisible = newKeyboardVisible;
+            });
+
+            if (_isKeyboardVisible) {
+              // Keyboard muncul - sembunyikan bottom bar
+              _hideBottomBar();
+            } else {
+              // Keyboard hilang - tampilkan bottom bar
+              _showBottomBar();
+            }
+          }
+        },
+      ),
+    );
   }
 
   void _showBottomBar() {
-    if (!_isBottomBarVisible) {
+    if (!_isBottomBarVisible && !_isKeyboardVisible) {
       setState(() {
         _isBottomBarVisible = true;
       });
@@ -45,7 +76,7 @@ class _AdminMainState extends State<AdminMain> {
   }
 
   void _hideBottomBar() {
-    if (_isBottomBarVisible) {
+    if (_isKeyboardVisible || _isBottomBarVisible) {
       setState(() {
         _isBottomBarVisible = false;
       });
@@ -57,7 +88,7 @@ class _AdminMainState extends State<AdminMain> {
       _showAddDataDialog();
       return;
     }
-    
+
     int pageIndex = index;
     if (index > 2) {
       pageIndex = index - 1;
@@ -67,7 +98,7 @@ class _AdminMainState extends State<AdminMain> {
       _selectedIndex = pageIndex;
     });
     _pageController.jumpToPage(pageIndex);
-    
+
     _showBottomBar();
   }
 
@@ -82,9 +113,9 @@ class _AdminMainState extends State<AdminMain> {
       _selectedIndex = 1;
     });
     _pageController.jumpToPage(1);
-    
+
     _showBottomBar();
-    
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _adminDataKey.currentState?.updateFilter(filter);
     });
@@ -94,6 +125,8 @@ class _AdminMainState extends State<AdminMain> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled:
+          true, // Penting agar dialog bisa naik saat keyboard muncul
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(20),
@@ -147,7 +180,8 @@ class _AdminMainState extends State<AdminMain> {
           color: Colors.black87,
         ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      trailing:
+          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: () {
         Navigator.pop(context);
         _navigateToAddPage(jenis);
@@ -175,7 +209,7 @@ class _AdminMainState extends State<AdminMain> {
     bool isAddButton = false,
   }) {
     final isSelected = _getCurrentNavIndex() == index;
-    
+
     if (isAddButton) {
       return GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -188,7 +222,7 @@ class _AdminMainState extends State<AdminMain> {
             color: const Color(0xFF641E20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 8,
                 spreadRadius: 1,
                 offset: const Offset(0, 3),
@@ -203,7 +237,7 @@ class _AdminMainState extends State<AdminMain> {
         ),
       );
     }
-    
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => _onItemTapped(index),
@@ -211,7 +245,7 @@ class _AdminMainState extends State<AdminMain> {
         padding: const EdgeInsets.all(12),
         decoration: isSelected
             ? BoxDecoration(
-                color: const Color(0xFF641E20).withOpacity(0.1),
+                color: const Color(0xFF641E20).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               )
             : null,
@@ -227,47 +261,52 @@ class _AdminMainState extends State<AdminMain> {
   void _handleScroll(ScrollNotification notification) {
     if (notification is ScrollUpdateNotification) {
       final metrics = notification.metrics;
-      
+
       // Check jika sudah mencapai paling bawah
-      final isAtBottom = metrics.pixels >= metrics.maxScrollExtent;
-      
+      final isAtBottom =
+          metrics.pixels >= metrics.maxScrollExtent - 10; // Buffer 10 pixel
+
       // Cancel timer sebelumnya
       _scrollTimer?.cancel();
-      
-      // Hide navbar saat scroll
-      _hideBottomBar();
-      
-      // Hanya set timer untuk show jika TIDAK di paling bawah
-      if (!isAtBottom) {
+
+      // Jangan hide navbar jika keyboard sedang terbuka
+      if (!_isKeyboardVisible) {
+        _hideBottomBar();
+      }
+
+      // Set timer untuk show setelah 2.5 detik - berlaku untuk semua kasus
+      _scrollTimer = Timer(const Duration(milliseconds: 3000), () {
+        // Jangan show jika keyboard masih terbuka
+        if (!_isKeyboardVisible) {
+          _showBottomBar();
+        }
+      });
+
+      // Jika tidak di bottom, set timer yang lebih pendek (500ms) untuk show
+      if (!isAtBottom && !_isKeyboardVisible) {
+        _scrollTimer?.cancel(); // Cancel timer 2.5 detik
         _scrollTimer = Timer(const Duration(milliseconds: 500), () {
-          // Munculkan navbar setelah 0.5 detik (hanya jika tidak di bottom)
-          final currentMetrics = metrics;
-          if (currentMetrics.pixels < currentMetrics.maxScrollExtent) {
+          if (!_isKeyboardVisible) {
             _showBottomBar();
           }
-          // Jika di bottom, biarkan tetap hidden
         });
       }
-      // Jika di bottom, tidak set timer, jadi tetap hidden
+      // Jika di bottom, timer 2.5 detik tetap berjalan
     }
   }
 
   // Handler untuk gesture/swipe di halaman yang tidak bisa discroll
   void _handleVerticalDrag(DragUpdateDetails details) {
-    // Deteksi swipe (baik ke atas maupun ke bawah)
-    // primaryDelta > 0 = swipe ke bawah
-    // primaryDelta < 0 = swipe ke atas
+    // Jangan handle swipe jika keyboard terbuka
+    if (_isKeyboardVisible) return;
+
     final deltaY = details.primaryDelta ?? 0;
-    
-    // Threshold untuk menentukan apakah ini benar-benar swipe (bukan tremor tangan)
     const swipeThreshold = 5.0;
-    
+
     if (deltaY.abs() > swipeThreshold) {
-      // Hide bottom bar untuk swipe ke atas maupun ke bawah
       _hideBottomBar();
       _scrollTimer?.cancel();
-      
-      // Auto show setelah 2 detik (untuk semua arah swipe)
+
       _scrollTimer = Timer(const Duration(seconds: 2), () {
         _showBottomBar();
       });
@@ -299,7 +338,9 @@ class _AdminMainState extends State<AdminMain> {
             controller: _pageController,
             physics: const NeverScrollableScrollPhysics(),
             onPageChanged: (index) {
-              _showBottomBar();
+              if (!_isKeyboardVisible) {
+                _showBottomBar();
+              }
             },
             children: _pages.asMap().entries.map((entry) {
               final index = entry.key;
@@ -307,7 +348,7 @@ class _AdminMainState extends State<AdminMain> {
               return _buildPageWithGestureDetector(index, page);
             }).toList(),
           ),
-          
+
           // Floating Bottom Navigation Bar
           Positioned(
             left: 20,
@@ -315,20 +356,22 @@ class _AdminMainState extends State<AdminMain> {
             bottom: 20,
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 300),
-              opacity: _isBottomBarVisible ? 1.0 : 0.0,
+              opacity: _isBottomBarVisible && !_isKeyboardVisible ? 1.0 : 0.0,
               curve: Curves.easeInOut,
               child: AnimatedSlide(
                 duration: const Duration(milliseconds: 300),
-                offset: Offset(0, _isBottomBarVisible ? 0.0 : 1.0),
+                offset: Offset(
+                    0, _isBottomBarVisible && !_isKeyboardVisible ? 0.0 : 1.0),
                 curve: Curves.easeInOut,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(30),
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                         spreadRadius: 0,
                         offset: const Offset(0, 2),
@@ -384,5 +427,18 @@ class _AdminMainState extends State<AdminMain> {
     _pageController.dispose();
     _scrollTimer?.cancel();
     super.dispose();
+  }
+}
+
+// Helper class untuk mendeteksi perubahan keyboard
+class LifecycleEventHandler extends WidgetsBindingObserver {
+  final VoidCallback? onMetricsChanged;
+
+  LifecycleEventHandler({this.onMetricsChanged});
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    onMetricsChanged?.call();
   }
 }
