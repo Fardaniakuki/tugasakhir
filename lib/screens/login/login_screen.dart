@@ -6,10 +6,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Import screens
 import 'package:tes_flutter/screens/kapro/kaprog_dashboard.dart';
+import 'package:tes_flutter/screens/koordinator/koordinator_main.dart';
 import '../admin/admin_main.dart';
 import '../guru/guru_dashboard.dart';
 import '../pembimbing/pembimbing_dashboard.dart';
-import '../walikelas/wali_kelas_dashboard.dart';
+import '../walikelas/wali_kelas_main.dart';
 import '../siswa/siswa_main.dart';
 
 // Import dialog
@@ -42,31 +43,12 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _checkLoginStatus();
-   // _clearPreviousSession(); // Clear session sebelumnya
 
     nameController.addListener(_validateName);
     passwordController.addListener(_validatePassword);
     nisnController.addListener(_validateNisn);
     guruController.addListener(_validateGuruCode);
   }
-
-  // // Fungsi untuk clear session sebelumnya
-  // Future<void> _clearPreviousSession() async {
-  //   final prefs = await SharedPreferences.getInstance();
-  //   // Hapus semua data terkait user
-  //   await prefs.remove('access_token');
-  //   await prefs.remove('refresh_token');
-  //   await prefs.remove('user_role');
-  //   await prefs.remove('user_id');
-  //   await prefs.remove('username');
-  //   await prefs.remove('user_name');
-  //   await prefs.remove('user_nisn');
-  //   await prefs.remove('user_kelas_id');
-  //   await prefs.remove('user_kelas');
-  //   await prefs.remove('user_nip');
-
-  //   print('=== SESSION CLEARED ===');
-  // }
 
   void _validateName() {
     final value = nameController.text.trim();
@@ -125,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> {
           targetPage = const PembimbingDashboard();
           break;
         case 'Wali Kelas':
-          targetPage = const WaliKelasDashboard();
+          targetPage = const WaliKelasMain();
           break;
         case 'Kaprog':
           targetPage = const KaprogDashboard();
@@ -134,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
           targetPage = const AdminMain();
           break;
         case 'Koordinator':
-          targetPage = const GuruDashboard();
+          targetPage = const KoordinatorMain();
           break;
         default:
           return;
@@ -188,18 +170,24 @@ class _LoginScreenState extends State<LoginScreen> {
             if (role == 'Kaprog' ||
                 role == 'Wali Kelas' ||
                 role == 'Pembimbing' ||
-                role == 'Guru') {
+                role == 'Koordinator') {
               await prefs.setInt('user_id', userData['id'] ?? 0);
               await prefs.setString('username', userData['username'] ?? '');
               await prefs.setString('user_name', userData['nama'] ?? userName);
               if (userData['nip'] != null) {
                 await prefs.setString('user_nip', userData['nip'].toString());
               }
+              
+              // SIMPAN KODE GURU untuk role guru
+              if (userData['kode_guru'] != null) {
+                await prefs.setString('kode_guru', userData['kode_guru'].toString());
+              }
 
               print('=== DATA DISIMPAN UNTUK ROLE: $role ===');
               print('User ID: ${userData['id']}');
               print('Username: ${userData['username']}');
               print('Nama: ${userData['nama']}');
+              print('Kode Guru: ${userData['kode_guru']}');
             }
 
             if (!mounted) return;
@@ -210,7 +198,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 targetPage = const PembimbingDashboard();
                 break;
               case 'Wali Kelas':
-                targetPage = const WaliKelasDashboard();
+                targetPage = const WaliKelasMain();
                 break;
               case 'Kaprog':
                 targetPage = const KaprogDashboard();
@@ -219,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 targetPage = const AdminMain();
                 break;
               case 'Koordinator':
-                targetPage = const GuruDashboard();
+                targetPage = const KoordinatorMain();
                 break;
               default:
                 targetPage = const GuruDashboard();
@@ -291,141 +279,143 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-Future<void> loginToAPI(String endpoint, Map<String, dynamic> body) async {
-  final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
-  final url = Uri.parse('$baseUrl$endpoint');
+  Future<void> loginToAPI(String endpoint, Map<String, dynamic> body) async {
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
+    final url = Uri.parse('$baseUrl$endpoint');
 
-  print('=== LOGIN REQUEST ===');
-  print('Endpoint: $endpoint');
-  print('Body: $body');
+    print('=== LOGIN REQUEST ===');
+    print('Endpoint: $endpoint');
+    print('Body: $body');
 
-  try {
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
 
-    if (!mounted) return;
-
-    print('=== LOGIN RESPONSE ===');
-    print('Status: ${response.statusCode}');
-    print('Response: ${response.body}');
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final token = data['access_token'];
-      final refreshToken = data['refresh_token'];
-      final user = data['user'];
-
-      // DEBUG: Lihat struktur user dari API
-      print('=== USER DATA FROM API ===');
-      print('Full user object: $user');
-      print('User keys: ${user.keys.toList()}');
-      print('User id: ${user['id']}');
-      print('User nama: ${user['nama']}');
-      print('User kode_guru: ${user['kode_guru']}');
-      print('User role: ${user['role']}');
-
-      final prefs = await SharedPreferences.getInstance();
-      
-      // SIMPAN SEMUA DATA TERLEBIH DAHULU
-      await prefs.setString('access_token', token);
-      await prefs.setString('refresh_token', refreshToken);
-      await prefs.setInt('user_id', user['id'] ?? 0);
-      await prefs.setString('user_name', user['nama'] ?? 'Guru');
-      
-      // SIMPAN KODE_GURU DENGAN CARA YANG BERBEDA
-      String kodeGuru = '';
-      
-      if (user['kode_guru'] != null) {
-        kodeGuru = user['kode_guru'].toString();
-        await prefs.setString('kode_guru', kodeGuru);
-      } else if (user['username'] != null) {
-        kodeGuru = user['username'].toString();
-        await prefs.setString('kode_guru', kodeGuru);
-      } else {
-        // Jika tidak ada kode_guru, gunakan kode dari form login
-        if (selectedRole == 'Guru' && !isAdminMode) {
-          kodeGuru = guruController.text.trim();
-          await prefs.setString('kode_guru', kodeGuru);
-        }
-      }
-      
-      // SIMPAN NIP jika ada
-      if (user['nip'] != null) {
-        await prefs.setString('user_nip', user['nip'].toString());
-      }
-
-      // DEBUG: Verifikasi data yang tersimpan
-      print('=== VERIFIKASI DATA TERSIMPAN ===');
-      final savedId = prefs.getInt('user_id');
-      final savedName = prefs.getString('user_name');
-      final savedKode = prefs.getString('kode_guru');
-      final savedNip = prefs.getString('user_nip');
-      
-      print('Saved User ID: $savedId');
-      print('Saved User Name: $savedName');
-      print('Saved Kode Guru: $savedKode');
-      print('Saved NIP: $savedNip');
-
-      // Set role
-      if (selectedRole == 'Siswa') {
-        await prefs.setString('user_role', 'Siswa');
-        await _saveSiswaData(prefs, user);
-      } else if (isAdminMode) {
-        await prefs.setString('user_role', 'Admin');
-      } else {
-        await prefs.setString('user_role', 'Guru');
-      }
-
-      if (endpoint == '/auth/guru/login' && !isAdminMode) {
-        await _showRoleSelectionDialog(
-          context,
-          user,
-          prefs,
-          capitalize(user['nama']),
-        );
-      } else {
-        Widget targetPage;
-        if (selectedRole == 'Siswa') {
-          targetPage = const SiswaMain();
-        } else if (isAdminMode) {
-          targetPage = const AdminMain();
-        } else {
-          targetPage = const GuruDashboard();
-        }
-
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => targetPage),
-        );
-      }
-    } else {
       if (!mounted) return;
 
-      final errorMessage =
-          _getUserFriendlyError(endpoint, response.statusCode, response.body);
+      print('=== LOGIN RESPONSE ===');
+      print('Status: ${response.statusCode}');
+      print('Response: ${response.body}');
 
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final token = data['access_token'];
+        final refreshToken = data['refresh_token'];
+        final user = data['user'];
+
+        print('=== USER DATA FROM API ===');
+        print('Full user object: $user');
+        print('User keys: ${user.keys.toList()}');
+        print('User id: ${user['id']}');
+        print('User nama: ${user['nama']}');
+        print('User kode_guru: ${user['kode_guru']}');
+        print('User role: ${user['role']}');
+
+        final prefs = await SharedPreferences.getInstance();
+
+        // SIMPAN SEMUA DATA TERLEBIH DAHULU
+        await prefs.setString('access_token', token);
+        await prefs.setString('refresh_token', refreshToken);
+        await prefs.setInt('user_id', user['id'] ?? 0);
+        await prefs.setString('user_name', user['nama'] ?? 'Guru');
+
+        // SIMPAN KODE_GURU
+        String kodeGuru = '';
+
+        if (user['kode_guru'] != null) {
+          kodeGuru = user['kode_guru'].toString();
+          await prefs.setString('kode_guru', kodeGuru);
+        } else if (user['username'] != null) {
+          kodeGuru = user['username'].toString();
+          await prefs.setString('kode_guru', kodeGuru);
+        } else {
+          // Jika tidak ada kode_guru, gunakan kode dari form login
+          if (selectedRole == 'Guru' && !isAdminMode) {
+            kodeGuru = guruController.text.trim();
+            await prefs.setString('kode_guru', kodeGuru);
+          }
+        }
+
+        // SIMPAN NIP jika ada
+        if (user['nip'] != null) {
+          await prefs.setString('user_nip', user['nip'].toString());
+        }
+
+        // DEBUG: Verifikasi data yang tersimpan
+        print('=== VERIFIKASI DATA TERSIMPAN ===');
+        final savedId = prefs.getInt('user_id');
+        final savedName = prefs.getString('user_name');
+        final savedKode = prefs.getString('kode_guru');
+        final savedNip = prefs.getString('user_nip');
+
+        print('Saved User ID: $savedId');
+        print('Saved User Name: $savedName');
+        print('Saved Kode Guru: $savedKode');
+        print('Saved NIP: $savedNip');
+
+        // Set role
+        if (selectedRole == 'Siswa') {
+          await prefs.setString('user_role', 'Siswa');
+          await _saveSiswaData(prefs, user);
+        } else if (isAdminMode) {
+          await prefs.setString('user_role', 'Admin');
+        } else {
+          await prefs.setString('user_role', 'Guru');
+        }
+
+        if (endpoint == '/auth/guru/login' && !isAdminMode) {
+          // Tampilkan dialog pemilihan role untuk guru
+          await _showRoleSelectionDialog(
+            context,
+            user,
+            prefs,
+            capitalize(user['nama']),
+          );
+        } else {
+          Widget targetPage;
+          if (selectedRole == 'Siswa') {
+            targetPage = const SiswaMain();
+          } else if (isAdminMode) {
+            targetPage = const AdminMain();
+          } else {
+            // Jika tidak memilih role khusus, default ke GuruDashboard
+            targetPage = const GuruDashboard();
+          }
+
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => targetPage),
+          );
+        }
+      } else {
+        if (!mounted) return;
+
+        final errorMessage =
+            _getUserFriendlyError(endpoint, response.statusCode, response.body);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.black87,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(errorMessage),
+          content: Text('Terjadi kesalahan: $e'),
           backgroundColor: Colors.black87,
-          duration: const Duration(seconds: 3),
         ),
       );
     }
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Terjadi kesalahan: $e'),
-        backgroundColor: Colors.black87,
-      ),
-    );
   }
-}
+
   Future<void> _saveSiswaData(
       SharedPreferences prefs, Map<String, dynamic> user) async {
     try {

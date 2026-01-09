@@ -2,14 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tes_flutter/screens/koordinator/koordinator_main.dart';
 
 import 'package:tes_flutter/screens/login/login_screen.dart';
 import 'package:tes_flutter/screens/admin/admin_main.dart';
 import 'package:tes_flutter/screens/guru/guru_dashboard.dart';
 import 'package:tes_flutter/screens/siswa/siswa_main.dart';
-import 'package:tes_flutter/screens/koordinator/koordinator_dashboard.dart';
 import 'package:tes_flutter/screens/pembimbing/pembimbing_dashboard.dart';
-import 'package:tes_flutter/screens/walikelas/wali_kelas_dashboard.dart';
+import 'package:tes_flutter/screens/walikelas/wali_kelas_main.dart';
 import 'package:tes_flutter/screens/kapro/kaprog_dashboard.dart';
 
 class SplashScreen1 extends StatefulWidget {
@@ -58,13 +58,13 @@ class _SplashScreen1State extends State<SplashScreen1>
           nextPage = const PembimbingDashboard();
           break;
         case 'Wali Kelas':
-          nextPage = const WaliKelasDashboard();
+          nextPage = const WaliKelasMain();
           break;
         case 'Kaprog':
           nextPage = const KaprogDashboard();
           break;
         case 'Koordinator':
-          nextPage = const KoordinatorDashboard();
+          nextPage = const KoordinatorMain();
           break;
         case 'Admin':
           nextPage = const AdminMain();

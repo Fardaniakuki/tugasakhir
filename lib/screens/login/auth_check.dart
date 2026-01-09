@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../admin/admin_main.dart';
 import '../guru/guru_dashboard.dart';
 import '../siswa/dashboard/siswa_dashboard.dart';
-import '../koordinator/koordinator_dashboard.dart';
+import '../koordinator/koordinator_main.dart';
 import 'login_screen.dart';
 
 class AuthCheck extends StatefulWidget {
@@ -56,7 +56,7 @@ class _AuthCheckState extends State<AuthCheck> {
           targetPage = const GuruDashboard();
           break;
         case 'Koordinator':
-          targetPage = const KoordinatorDashboard();
+          targetPage = const KoordinatorMain();
           break;
         case 'Pembimbing':
         case 'Wali Kelas':

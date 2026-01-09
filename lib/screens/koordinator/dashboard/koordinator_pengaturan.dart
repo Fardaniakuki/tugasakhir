@@ -2,26 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../login/login_screen.dart';
 
-class SiswaPengaturan extends StatefulWidget {
-  const SiswaPengaturan({super.key});
+class KoordinatorPengaturan extends StatefulWidget {
+  const KoordinatorPengaturan({super.key});
 
   @override
-  State<SiswaPengaturan> createState() => _SiswaPengaturanState();
+  State<KoordinatorPengaturan> createState() => _KoordinatorPengaturanState();
 }
 
-class _SiswaPengaturanState extends State<SiswaPengaturan> {
-  String _namaSiswa = 'Nama Siswa';
+class _KoordinatorPengaturanState extends State<KoordinatorPengaturan> {
+  String _namaKoordinator = 'Nama Koordinator';
   bool _isLoading = true;
 
   // Warna tema Neo Brutalism
-  final Color _primaryColor = const Color(0xFF8B0000);
+  final Color _primaryColor = const Color(0xFF1D3557);
   final Color _borderColor = const Color(0xFF000000);
   
   // Atur ketebalan border di sini
-  final double _borderThickness = 2.0;
+  final double _borderThickness = 3.0;
   
   // 👇 KHUSUS UNTUK SHADOW LINGKARAN (profile, loading, dialog)
-  final double _circleShadowOffset = 1.0;
+  final double _circleShadowOffset = 4.0;
 
   @override
   void initState() {
@@ -33,7 +33,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
     final prefs = await SharedPreferences.getInstance();
     
     setState(() {
-      _namaSiswa = prefs.getString('user_name') ?? 'Nama Siswa';
+      _namaKoordinator = prefs.getString('user_name') ?? 'Koordinator PKL';
       _isLoading = false;
     });
   }
@@ -45,7 +45,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
     // 1. Tampilkan dialog konfirmasi
     final shouldLogout = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withValues(alpha:0.3),
+      barrierColor: Colors.black.withValues(alpha: 0.3),
       builder: (context) => _buildLogoutConfirmationDialog(),
     );
 
@@ -118,8 +118,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                           border: Border.all(color: _borderColor, width: _borderThickness),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black,
-                              offset: Offset(_circleShadowOffset, _circleShadowOffset),
+                              color: _borderColor,
+                              offset: Offset(_circleShadowOffset / 2, _circleShadowOffset / 2),
                             ),
                           ],
                         ),
@@ -142,7 +142,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _namaSiswa,
+                              _namaKoordinator,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
@@ -171,8 +171,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                           border: Border.all(color: _borderColor, width: _borderThickness),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black,
-                              offset: Offset(_circleShadowOffset, _circleShadowOffset),
+                              color: _borderColor,
+                              offset: Offset(_circleShadowOffset / 2, _circleShadowOffset / 2),
                             ),
                           ],
                         ),
@@ -265,7 +265,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
   void _showLogoutLoadingDialog(BuildContext context) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withValues(alpha:0.3),
+      barrierColor: Colors.black.withValues(alpha: 0.3),
       barrierDismissible: false,
       builder: (context) => Center(
         child: Container(
@@ -277,7 +277,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
             boxShadow: [
               BoxShadow(
                 color: _borderColor,
-                offset: Offset(_circleShadowOffset, _circleShadowOffset),
+                offset: Offset(_circleShadowOffset / 2, _circleShadowOffset / 2),
               ),
             ],
           ),
@@ -294,7 +294,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                   boxShadow: [
                     BoxShadow(
                       color: _borderColor,
-                      offset: Offset(_circleShadowOffset, _circleShadowOffset),
+                      offset: Offset(_circleShadowOffset / 2, _circleShadowOffset / 2),
                     ),
                   ],
                 ),
@@ -383,13 +383,18 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
       body: SafeArea(
         child: Column(
           children: [
+            // Header
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: const Row(
-                children: [              
-                  SizedBox(width: 8),
-                  Text(
-                    'PENGATURAN',
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'PENGATURAN KOORDINATOR',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -401,6 +406,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
               ),
             ),
 
+            // Konten Utama
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -419,6 +425,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                   child: Column(
                     children: [
+                      // Profile Section
                       Container(
                         margin: const EdgeInsets.only(top: 20, bottom: 30),
                         child: Column(
@@ -450,7 +457,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                                 : Column(
                                     children: [
                                       Text(
-                                        _namaSiswa.toUpperCase(),
+                                        _namaKoordinator.toUpperCase(),
                                         style: const TextStyle(
                                           fontSize: 24,
                                           fontWeight: FontWeight.w900,
@@ -459,12 +466,30 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: _primaryColor,
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: _borderColor, width: _borderThickness),
+                                        ),
+                                        child: const Text(
+                                          'KOORDINATOR PKL',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
                           ],
                         ),
                       ),
 
+                      // Menu Section
                       _buildMenuSection(
                         title: '',
                         items: [
@@ -487,6 +512,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
 
                       const SizedBox(height: 32),
 
+                      // Logout Button
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
@@ -509,7 +535,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _primaryColor,
+                            backgroundColor: const Color(0xFFE63946), // Warna merah untuk logout
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                             shape: RoundedRectangleBorder(
@@ -667,7 +693,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
           width: 120,
           height: 24,
           decoration: BoxDecoration(
-            color: _borderColor.withValues(alpha:0.1),
+            color: _borderColor.withValues(alpha: 0.1),
             border: Border.all(color: _borderColor, width: _borderThickness),
           ),
         ),
@@ -676,7 +702,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
           width: 80,
           height: 18,
           decoration: BoxDecoration(
-            color: _borderColor.withValues(alpha:0.1),
+            color: _borderColor.withValues(alpha: 0.1),
             border: Border.all(color: _borderColor, width: _borderThickness),
           ),
         ),

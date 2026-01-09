@@ -308,7 +308,7 @@ class SiswaRekap extends StatelessWidget {
                     'Selasa, 24 Des 2024',
                     'Debugging API integration. Meeting dengan tim developer untuk review code.',
                     '08:30 - 15:30',
-                    'IZIN SETENGAH HARI',
+                    'IZIN SETENGAH',
                   ),
                   const SizedBox(height: 12),
                   _buildDailyNote(
@@ -557,7 +557,7 @@ class SiswaRekap extends StatelessWidget {
       case 'HADIR':
         statusColor = const Color(0xFF06D6A0);
         break;
-      case 'IZIN SETENGAH HARI':
+      case 'IZIN SETENGAH':
         statusColor = const Color(0xFFFFB703);
         break;
       default:

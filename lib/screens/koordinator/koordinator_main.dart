@@ -1,40 +1,41 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dashboard/siswa_dashboard.dart';
-import 'dashboard/siswa_kalender.dart';
-import 'dashboard/siswa_rekap.dart';
-import 'dashboard/siswa_pengaturan.dart';
+import 'dashboard/koordinator_dashboard.dart';
+import 'dashboard/koordinator_jadwal.dart';
+import 'dashboard/koordinator_data.dart';
+import 'dashboard/koordinator_pengaturan.dart';
 
-class SiswaMain extends StatefulWidget {
-  const SiswaMain({super.key});
+class KoordinatorMain extends StatefulWidget {
+  const KoordinatorMain({super.key});
 
   @override
-  State<SiswaMain> createState() => _SiswaMainState();
+  State<KoordinatorMain> createState() => _KoordinatorMainState();
 }
 
-class _SiswaMainState extends State<SiswaMain> {
+class _KoordinatorMainState extends State<KoordinatorMain> {
   int _selectedIndex = 0;
   bool _isBottomBarVisible = true;
   Timer? _scrollTimer;
   bool _isKeyboardVisible = false;
 
-  // Warna tema Neo Brutalism
-  final Color _primaryColor = const Color.fromARGB(255, 206, 16, 57);
+  // Warna tema Neo Brutalism KOORDINATOR
+  final Color _primaryColor = const Color(0xFF1D3557); // Merah khas koordinator
   final Color _backgroundColor = Colors.white;
   final Color _borderColor = const Color(0xFF000000);
-  final double _borderThickness = 2.0; // Untuk border kotak
-  final double _circleBorderThickness = 0.7; // 👈 INI KHUSUS UNTUK LINGKARAN (tombol +, icon lingkaran)
+  final double _borderThickness = 2.0;
+  final double _circleBorderThickness = 0.7;
 
   late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
+    
     _pages = [
-      const SiswaDashboard(), // INDEX 0 - BERANDA (tanpa const)
-      const SiswaKalender(),  // INDEX 1 - KALENDER (tanpa const)
-      const SiswaRekap(),     // INDEX 2 - REKAP (tanpa const)
-      const SiswaPengaturan(), // INDEX 3 - PENGATURAN (tanpa const)
+      const KoordinatorDashboard(),    // INDEX 0 - BERANDA
+      const KoordinatorJadwal(),       // INDEX 1 - JADWAL
+      const KoordinatorData(),         // INDEX 2 - DATA
+      const KoordinatorPengaturan(),   // INDEX 3 - PENGATURAN
     ];
 
     _showBottomBar();
@@ -108,9 +109,9 @@ class _SiswaMainState extends State<SiswaMain> {
 
   // Method untuk mapping _selectedIndex ke BottomNavigationBar index
   int _getCurrentNavIndex() {
-    if (_selectedIndex == 2) return 3; // Rekap di nav index 3
+    if (_selectedIndex == 2) return 3; // Data di nav index 3
     if (_selectedIndex == 3) return 4; // Pengaturan di nav index 4
-    return _selectedIndex; // Beranda (0), Kalender (1)
+    return _selectedIndex; // Beranda (0), Jadwal (1)
   }
 
   void _showQuickActionsDialog() {
@@ -123,12 +124,12 @@ class _SiswaMainState extends State<SiswaMain> {
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20)
         ),
-        side: BorderSide(color: _borderColor, width: _borderThickness), // Border kotak
+        side: BorderSide(color: _borderColor, width: _borderThickness),
       ),
       builder: (BuildContext context) {
         return Container(
           decoration: BoxDecoration(
-            border: Border.all(color: _borderColor, width: _borderThickness), // Border kotak
+            border: Border.all(color: _borderColor, width: _borderThickness),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
@@ -142,7 +143,7 @@ class _SiswaMainState extends State<SiswaMain> {
                 decoration: BoxDecoration(
                   color: _primaryColor,
                   border: Border(
-                    bottom: BorderSide(color: _borderColor, width: _borderThickness), // Border kotak
+                    bottom: BorderSide(color: _borderColor, width: _borderThickness),
                   ),
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(18),
@@ -151,7 +152,7 @@ class _SiswaMainState extends State<SiswaMain> {
                 ),
                 child: const Center(
                   child: Text(
-                    'AKSI CEPAT',
+                    'AKSI CEPAT KOORDINATOR',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -161,15 +162,15 @@ class _SiswaMainState extends State<SiswaMain> {
                   ),
                 ),
               ),
-              _buildActionTile(Icons.assignment, 'AJUKAN PKL', 'pengajuan'),
+              _buildActionTile(Icons.schedule, 'BUAT JADWAL PEMBEKALAN', 'jadwal'),
               Divider(height: 1, color: _borderColor, thickness: 1),
-              _buildActionTile(Icons.calendar_today, 'LIHAT JADWAL', 'jadwal'),
+              _buildActionTile(Icons.business, 'TAMBAH INDUSTRI BARU', 'industri'),
               Divider(height: 1, color: _borderColor, thickness: 1),
-              _buildActionTile(Icons.assessment, 'LIHAT NILAI', 'nilai'),
+              _buildActionTile(Icons.description, 'CETAK SURAT PERMOHONAN', 'surat'),
               Divider(height: 1, color: _borderColor, thickness: 1),
-              _buildActionTile(Icons.chat, 'KONSULTASI', 'konsultasi'),
+              _buildActionTile(Icons.assignment, 'BUAT LAPORAN MONITORING', 'laporan'),
               Divider(height: 1, color: _borderColor, thickness: 1),
-              _buildActionTile(Icons.report, 'LAPORAN HARIAN', 'laporan'),
+              _buildActionTile(Icons.group_add, 'ASSIGN PEMBIMBING', 'assign'),
               const SizedBox(height: 20),
             ],
           ),
@@ -186,7 +187,7 @@ class _SiswaMainState extends State<SiswaMain> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: _primaryColor,
-          border: Border.all(color: _borderColor, width: _circleBorderThickness), // 👈 Border lingkaran tipis
+          border: Border.all(color: _borderColor, width: _circleBorderThickness),
         ),
         child: Icon(icon, color: Colors.white, size: 20),
       ),
@@ -204,7 +205,7 @@ class _SiswaMainState extends State<SiswaMain> {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: _primaryColor,
-          border: Border.all(color: _borderColor, width: _circleBorderThickness), // 👈 Border lingkaran tipis
+          border: Border.all(color: _borderColor, width: _circleBorderThickness),
         ),
         child: const Icon(
           Icons.arrow_forward_ios_rounded,
@@ -221,20 +222,24 @@ class _SiswaMainState extends State<SiswaMain> {
 
   void _navigateToAction(String jenisAksi) {
     switch (jenisAksi) {
-      case 'pengajuan':
-        // Navigate to pengajuan PKL
-        break;
       case 'jadwal':
-        // Navigate to jadwal
+        setState(() {
+          _selectedIndex = 1; // Navigasi ke halaman Jadwal
+        });
         break;
-      case 'nilai':
-        // Navigate to nilai
+      case 'industri':
+        setState(() {
+          _selectedIndex = 2; // Navigasi ke halaman Data
+        });
         break;
-      case 'konsultasi':
-        // Navigate to konsultasi
+      case 'surat':
+        _showSnackbar('Membuka generator surat...');
         break;
       case 'laporan':
-        // Navigate to laporan harian
+        _showSnackbar('Membuat laporan monitoring...');
+        break;
+      case 'assign':
+        _showSnackbar('Membuka assign pembimbing...');
         break;
     }
   }
@@ -257,7 +262,7 @@ class _SiswaMainState extends State<SiswaMain> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: _primaryColor,
-            border: Border.all(color: _borderColor, width: _circleBorderThickness), // 👈 Border lingkaran tipis
+            border: Border.all(color: _borderColor, width: _circleBorderThickness),
             boxShadow: [
               BoxShadow(
                 color: _borderColor,
@@ -283,7 +288,7 @@ class _SiswaMainState extends State<SiswaMain> {
             ? BoxDecoration(
                 color: _primaryColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _borderColor, width: _borderThickness), // Border kotak
+                border: Border.all(color: _borderColor, width: _borderThickness),
               )
             : BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
@@ -303,8 +308,7 @@ class _SiswaMainState extends State<SiswaMain> {
       final metrics = notification.metrics;
 
       // Check jika sudah mencapai paling bawah
-      final isAtBottom =
-          metrics.pixels >= metrics.maxScrollExtent - 10; // Buffer 10 pixel
+      final isAtBottom = metrics.pixels >= metrics.maxScrollExtent - 10;
 
       // Cancel timer sebelumnya
       _scrollTimer?.cancel();
@@ -324,18 +328,16 @@ class _SiswaMainState extends State<SiswaMain> {
 
       // Jika tidak di bottom, set timer yang lebih pendek (500ms) untuk show
       if (!isAtBottom && !_isKeyboardVisible) {
-        _scrollTimer?.cancel(); // Cancel timer 3 detik
+        _scrollTimer?.cancel();
         _scrollTimer = Timer(const Duration(milliseconds: 500), () {
           if (!_isKeyboardVisible) {
             _showBottomBar();
           }
         });
       }
-      // Jika di bottom, timer 3 detik tetap berjalan
     }
   }
 
-  // Handler untuk gesture/swipe di halaman yang tidak bisa discroll
   void _handleVerticalDrag(DragUpdateDetails details) {
     // Jangan handle swipe jika keyboard terbuka
     if (_isKeyboardVisible) return;
@@ -353,7 +355,6 @@ class _SiswaMainState extends State<SiswaMain> {
     }
   }
 
-  // Widget untuk wrap setiap page dengan gesture detector
   Widget _buildPageWithGestureDetector(int index, Widget child) {
     return GestureDetector(
       onVerticalDragUpdate: _handleVerticalDrag,
@@ -368,13 +369,28 @@ class _SiswaMainState extends State<SiswaMain> {
     );
   }
 
+  void _showSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: _primaryColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: _borderColor, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _backgroundColor,
       body: Container(
         decoration: BoxDecoration(
-          border: Border.all(color: _borderColor, width: _borderThickness), // Border kotak
+          border: Border.all(color: _borderColor, width: _borderThickness),
         ),
         child: Stack(
           children: [
@@ -411,7 +427,7 @@ class _SiswaMainState extends State<SiswaMain> {
                       color: Colors.white,
                       border: Border.all(
                         color: _borderColor,
-                        width: _borderThickness, // Border kotak
+                        width: _borderThickness,
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -424,8 +440,8 @@ class _SiswaMainState extends State<SiswaMain> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildNavItem(
-                          icon: Icons.home_outlined,
-                          activeIcon: Icons.home_filled,
+                          icon: Icons.dashboard_outlined,
+                          activeIcon: Icons.dashboard,
                           index: 0,
                         ),
                         _buildNavItem(
@@ -440,8 +456,8 @@ class _SiswaMainState extends State<SiswaMain> {
                           isAddButton: true,
                         ),
                         _buildNavItem(
-                          icon: Icons.assignment_outlined,
-                          activeIcon: Icons.assignment,
+                          icon: Icons.business_center_outlined,
+                          activeIcon: Icons.business_center,
                           index: 3,
                         ),
                         _buildNavItem(

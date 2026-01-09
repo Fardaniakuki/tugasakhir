@@ -7,7 +7,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'ajukan_pkl_dialog.dart';
 import '../../login/login_screen.dart';
 import 'detail_popup.dart';
-import 'industri_list_page.dart'; // File baru untuk popup
+import 'industri_list_page.dart';
+import 'websocket_manager.dart'; // Tambahkan ini
+import 'notification_popup.dart'; // File baru untuk popup notifikasi
 
 class SiswaDashboard extends StatefulWidget {
   const SiswaDashboard({super.key});
@@ -28,9 +30,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   Map<String, dynamic>? _pembimbingData;
   Map<String, dynamic>? _processedByData;
 
-  // ========== PERBAIKAN UTAMA ==========
-  // HAPUS SEMUA KEYWORD 'STATIC' DARI CACHE!
-  // Instance cache saja, bukan static cache
+  // Cache variables
   Map<String, dynamic>? _cachedPklData;
   List<dynamic>? _cachedPklApplications;
   Map<String, dynamic>? _cachedIndustriData;
@@ -40,18 +40,24 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   String? _cachedNamaSiswa;
   String? _cachedKelasSiswa;
   int? _cachedKelasId;
-  // =====================================
 
-  // Tambahan: tracking user saat ini
+  // User tracking
   String? _currentUsername;
   StreamSubscription? _prefsSubscription;
 
+  // ========== WEBSOCKET MANAGER ==========
+  late WebSocketManager _webSocketManager;
+  final List<Map<String, dynamic>> _notifications = [];
+  int _unreadNotificationCount = 0;
+  final Color _notificationColor = const Color(0xFFE63946);
+  // =======================================
+
   // Neo Brutalism Colors
-  final Color _primaryColor = const Color(0xFFE63946); // Merah cerah
-  final Color _secondaryColor = const Color(0xFFF1FAEE); // Putih krem
-  final Color _accentColor = const Color(0xFFA8DADC); // Biru muda
-  final Color _darkColor = const Color(0xFF1D3557); // Biru tua
-  final Color _yellowColor = const Color(0xFFFFB703); // Kuning cerah
+  final Color _primaryColor = const Color(0xFFE71543);
+  final Color _secondaryColor = const Color(0xFFE6E3E3);
+  final Color _accentColor = const Color(0xFFA8DADC);
+  final Color _darkColor = const Color(0xFF1D3557);
+  final Color _yellowColor = const Color(0xFFFFB703);
   final Color _blackColor = Colors.black;
 
   // Neo Brutalism Shadows
@@ -62,157 +68,1250 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   );
 
   final BoxShadow _lightShadow = BoxShadow(
-    color: Colors.black.withValues(alpha: 0.2),
+    color: Colors.black.withValues(alpha:0.2),
     offset: const Offset(4, 4),
     blurRadius: 0,
   );
-
   @override
   void initState() {
     super.initState();
-    
+
     print('🚀 SiswaDashboard State dibuat');
-    
-    // ========== SOLUSI PENTING ==========
-    // SELALU CLEAR CACHE SAAT INIT STATE UNTUK USER BARU
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _clearCache(); // Clear cache saat widget pertama kali dibuat
-      _checkAuthAndLoadData();
+
+    _webSocketManager = WebSocketManager();
+    _setupWebSocketListeners();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // ========== PERBAIKAN: LOAD NOTIFIKASI SETELAH SEMUA DATA ==========
+      // Tunggu dulu sampai auth check selesai
+      await _checkAuthAndLoadData();
+
+      // BARU load notifikasi
+      await _loadNotificationsFromPrefs();
+      print('📋 Loaded notifications AFTER auth check');
+      // ==========================================
+
+      // Connect WebSocket
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          _webSocketManager.connect();
+        }
+      });
     });
-    
-    _startPrefsListener(); // Tambahkan listener
+
+    _startPrefsListener();
   }
 
   @override
   void dispose() {
-    _prefsSubscription?.cancel(); // Jangan lupa cancel subscription
+    _webSocketManager.dispose();
+    _prefsSubscription?.cancel();
     super.dispose();
   }
+// ========== WEBSOCKET FUNCTIONS ==========
+void _setupWebSocketListeners() {
+  _webSocketManager.addListener((event) {
+    if (event.type == WebSocketEventType.message) {
+      _handleWebSocketMessage(event.data);
+    }
+    // Hapus bagian connected dan disconnected
+    // else if (event.type == WebSocketEventType.connected) {
+    //   _showConnectedSnackbar();
+    // } else if (event.type == WebSocketEventType.disconnected) {
+    //   _showDisconnectedSnackbar();
+    // }
+  });
+}
 
-  void _startPrefsListener() async {
+  void _handleWebSocketMessage(dynamic message) {
+    print('📨 WebSocket message received');
+
+    try {
+      final Map<String, dynamic> data;
+
+      if (message is String) {
+        data = jsonDecode(message);
+      } else if (message is Map) {
+        data = Map<String, dynamic>.from(message);
+      } else {
+        print('❌ Unknown message type');
+        return;
+      }
+
+      final type = data['type']?.toString() ?? 'unknown';
+
+      print('📊 Message type: $type');
+
+      // Process notification
+      _processNotification(data);
+    } catch (e) {
+      print('❌ Error processing WebSocket message: $e');
+    }
+  }
+
+  Future<void> _processNotification(Map<String, dynamic> data) async {
+    final notificationData = data['data'];
+    if (notificationData == null) return;
+
+    final siswaUsername = notificationData['siswa_username']?.toString();
+    final siswaId = notificationData['siswa_id']?.toString();
+
+    // Get current user info
+    final prefs = await SharedPreferences.getInstance();
+    final currentUsername = prefs.getString('user_name');
+    final currentUserId = prefs.getString('user_id');
+
+    print('👤 Notification check:');
+    print('   - For siswa: $siswaUsername (ID: $siswaId)');
+    print('   - Current user: $currentUsername (ID: $currentUserId)');
+
+    // Check if notification is for current user
+    bool isForCurrentUser = false;
+
+    if (siswaUsername != null && currentUsername != null) {
+      isForCurrentUser = siswaUsername == currentUsername;
+    } else if (siswaId != null && currentUserId != null) {
+      isForCurrentUser = siswaId == currentUserId;
+    }
+
+    if (!isForCurrentUser) {
+      print('⚠️  Notification not for current user');
+      return;
+    }
+
+    print('✅ Notification IS for current user!');
+
+    // Process based on type
+    final String type = data['type'] ?? 'unknown';
+
+    switch (type) {
+      case 'pkl_approved':
+        await _handlePKLApproved(data);
+        break;
+      case 'pkl_rejected':
+        await _handlePKLRejected(data);
+        break;
+      default:
+        print('⚠️ Unknown message type: $type');
+    }
+  }
+
+  Future<void> _saveNotificationsToPrefs() async {
+    print('💾 Attempting to save notifications...');
+    print('   - Current username: $_currentUsername');
+    print('   - Notification count: ${_notifications.length}');
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_currentUsername != null && mounted) {
+        final notificationsJson = jsonEncode(_notifications);
+        await prefs.setString(
+            'notifications_$_currentUsername', notificationsJson);
+
+        // Verify it was saved
+        final saved = prefs.getString('notifications_$_currentUsername');
+        print('✅ Notifications saved successfully!');
+        print('   - Unread count: $_unreadNotificationCount');
+        print('   - Saved JSON length: ${saved?.length ?? 0} characters');
+      } else {
+        print('❌ Cannot save: username is null or widget not mounted');
+        print('   - _currentUsername: $_currentUsername');
+        print('   - mounted: $mounted');
+      }
+    } catch (e) {
+      print('❌ Error saving notifications: $e');
+      print('   - Error type: ${e.runtimeType}');
+    }
+  }
+
+  Future<void> _loadNotificationsOnLogin() async {
+    print('🔔 Loading notifications on login...');
+
+    // Tunggu sebentar untuk memastikan username tersedia
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final prefs = await SharedPreferences.getInstance();
+    final userName = prefs.getString('user_name');
+
+    if (userName != null && userName.isNotEmpty) {
+      _currentUsername = userName;
+      print('👤 Loading notifications for user: $userName');
+      await _loadNotificationsFromPrefs();
+    } else {
+      print('⚠️  Username not available for loading notifications');
+    }
+  }
+
+  Future<void> _loadNotificationsFromPrefs() async {
+    print('📂 ========== LOADING NOTIFICATIONS ==========');
+    print('   - Current username: $_currentUsername');
+    print('   - Widget mounted: $mounted');
+
+    // Jika username belum tersedia, coba ambil dari prefs
+    if (_currentUsername == null) {
+      final prefs = await SharedPreferences.getInstance();
+      _currentUsername = prefs.getString('user_name');
+      print('   - Got username from prefs: $_currentUsername');
+    }
+
+    if (_currentUsername == null) {
+      print('❌ Cannot load: username is null');
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'notifications_$_currentUsername';
+      final notificationsJson = prefs.getString(key);
+
+      print('   - Checking key: $key');
+      print('   - Data exists: ${notificationsJson != null}');
+
+      if (notificationsJson != null && notificationsJson.isNotEmpty) {
+        print('   - JSON length: ${notificationsJson.length}');
+
+        try {
+          final List<dynamic> loadedNotifications =
+              jsonDecode(notificationsJson);
+          print(
+              '   - Successfully parsed ${loadedNotifications.length} notifications');
+
+          // ... rest of the loading code ...
+        } catch (e) {
+          print('❌ Parse error: $e');
+        }
+      } else {
+        print('📭 No notifications found for user $_currentUsername');
+      }
+    } catch (e) {
+      print('❌ Load error: $e');
+    }
+
+    print('📂 ========== END LOADING ==========');
+  }
+
+  Future<void> _handlePKLApproved(Map<String, dynamic> data) async {
+    print('✅ PKL Approved received via WebSocket');
+
+    final notificationData = data['data'];
+    if (notificationData == null) return;
+
+    final industriNama = notificationData['industri_nama'] ?? 'Perusahaan';
+    final catatan = notificationData['catatan'];
+    final applicationId = notificationData['application_id'];
+    final notificationId = 'pkl_approved_$applicationId';
+
+    // ========== CEK DI SHARED PREFERENCES ==========
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyNotifiedKey = 'pkl_notified_$applicationId';
+    final alreadyNotified = prefs.getBool(alreadyNotifiedKey) ?? false;
+    // ================================================
+
+    if (!alreadyNotified) {
+      final notification = {
+        'id': notificationId,
+        'title': 'PKL DISETUJUI! 🎉',
+        'message': 'Pengajuan PKL ke $industriNama telah disetujui',
+        'catatan': catatan,
+        'timestamp': DateTime.now().toIso8601String(),
+        'read': false,
+        'type': 'approved',
+        'data': data,
+      };
+
+      setState(() {
+        _notifications.insert(0, notification);
+        _unreadNotificationCount++;
+      });
+
+      // ========== SIMPAN FLAG ==========
+      await prefs.setBool(alreadyNotifiedKey, true);
+      // ================================
+
+      // Save to SharedPreferences
+      await _saveNotificationsToPrefs();
+
+      print('📝 Saved approval notification to SharedPreferences');
+      print('   - Application ID: $applicationId');
+      print('   - Unread count: $_unreadNotificationCount');
+
+      // Show popup notification
+      if (mounted) {
+        NotificationPopup.showApprovalPopup(
+          context,
+          industriNama: industriNama,
+          catatan: catatan,
+          onViewPressed: () {
+            _loadAllData();
+          },
+        );
+      }
+    } else {
+      print('📌 PKL $applicationId sudah pernah di-notifikasi (WebSocket)');
+    }
+
+    // Refresh data
+    await Future.delayed(const Duration(seconds: 2));
+    await _loadAllData();
+  }
+
+  Future<void> _handlePKLRejected(Map<String, dynamic> data) async {
+    print('❌ PKL Rejected received via WebSocket');
+
+    final notificationData = data['data'];
+    if (notificationData == null) return;
+
+    final industriNama = notificationData['industri_nama'] ?? 'Perusahaan';
+    final catatan = notificationData['catatan'] ?? 'Tidak ada alasan diberikan';
+    final applicationId = notificationData['application_id'];
+    final notificationId = 'pkl_rejected_$applicationId';
+
+    // ========== CEK DI SHARED PREFERENCES ==========
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyNotifiedKey = 'pkl_notified_$applicationId';
+    final alreadyNotified = prefs.getBool(alreadyNotifiedKey) ?? false;
+    // ================================================
+
+    if (!alreadyNotified) {
+      final notification = {
+        'id': notificationId,
+        'title': 'PKL DITOLAK ❌',
+        'message': 'Pengajuan PKL ke $industriNama ditolak',
+        'catatan': catatan,
+        'timestamp': DateTime.now().toIso8601String(),
+        'read': false,
+        'type': 'rejected',
+        'data': data,
+      };
+
+      setState(() {
+        _notifications.insert(0, notification);
+        _unreadNotificationCount++;
+      });
+
+      // ========== SIMPAN FLAG ==========
+      await prefs.setBool(alreadyNotifiedKey, true);
+      // ================================
+
+      // Save to SharedPreferences
+      await _saveNotificationsToPrefs();
+
+      print('📝 Saved rejection notification to SharedPreferences');
+      print('   - Application ID: $applicationId');
+      print('   - Unread count: $_unreadNotificationCount');
+
+      // Show popup notification
+      if (mounted) {
+        NotificationPopup.showRejectionPopup(
+          context,
+          industriNama: industriNama,
+          catatan: catatan,
+          onReapplyPressed: () {
+            _ajukanPKL();
+          },
+        );
+      }
+    } else {
+      print('📌 PKL $applicationId sudah pernah di-notifikasi (WebSocket)');
+    }
+
+    // Refresh data
+    await Future.delayed(const Duration(seconds: 2));
+    await _loadAllData();
+  }
+
+  // Panggil fungsi ini saat berhasil mengajukan PKL
+  Future<void> _resetNotificationFlags() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Listen untuk perubahan token atau username
-    _prefsSubscription = Stream.periodic(const Duration(seconds: 2))
+    // Hapus semua flag pkl_notified_*
+    final keys = prefs.getKeys();
+    for (var key in keys) {
+      if (key.startsWith('pkl_notified_')) {
+        await prefs.remove(key);
+        print('🗑️  Removed notification flag: $key');
+      }
+    }
+  }
+
+// Update fungsi _ajukanPKL():
+  Future<void> _ajukanPKL() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    if (token == null || token.isEmpty) {
+      _redirectToLogin();
+      return;
+    }
+
+    try {
+      if (_kelasId == null) {
+        await _loadProfileData();
+      }
+
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => AjukanPKLDialog(
+          token: token,
+          kelasId: _kelasId,
+        ),
+      );
+
+      if (result != null) {
+        final response = await http.post(
+          Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/applications'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'catatan': result['catatan'],
+            'industri_id': result['industri_id'],
+          }),
+        );
+
+        if (response.statusCode == 201) {
+          // ========== RESET NOTIFICATION FLAGS ==========
+          await _resetNotificationFlags();
+          // =============================================
+
+          _clearCache();
+          await _loadAllData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Pengajuan PKL berhasil dikirim')),
+            );
+          }
+        } else if (response.statusCode == 401) {
+          _redirectToLogin();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Gagal mengajukan PKL: ${response.body}')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Terjadi kesalahan saat mengajukan PKL')),
+        );
+      }
+    }
+  }
+
+void _showNotificationsPanel() {
+  print('🔔 Opening notifications panel...');
+  print('   - Current unread: $_unreadNotificationCount');
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(16),
+            child: Container(
+              width: double.infinity,
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              ),
+              decoration: BoxDecoration(
+                color: _secondaryColor,
+                border: Border.all(color: _blackColor, width: 4),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black,
+                    offset: Offset(6, 6),
+                    blurRadius: 0,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // === HEADER - CLEAN & BOLD ===
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _primaryColor,
+                      border: Border(
+                        bottom: BorderSide(color: _blackColor, width: 4),
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        topRight: Radius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Clean icon
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: _blackColor, width: 3),
+                            shape: BoxShape.circle,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black,
+                                offset: Offset(3, 3),
+                                blurRadius: 0,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.notifications,
+                            color: _primaryColor,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        
+                        // Title only
+                        const Expanded(
+                          child: Text(
+                            'NOTIFIKASI PKL',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // === NOTIFICATIONS CONTENT ===
+                  Expanded(
+                    child: _notifications.isEmpty
+                        ? _buildEmptyNotifications()
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: _notifications.length,
+                            itemBuilder: (context, index) {
+                              final notification = _notifications[index];
+                              final isRead = notification['read'] ?? false;
+                              final isApproved =
+                                  notification['type'] == 'approved';
+                              final isRejected =
+                                  notification['type'] == 'rejected';
+                              
+                              return _buildNotificationCard(
+                                notification,
+                                isRead,
+                                isApproved,
+                                isRejected,
+                                index,
+                                setState,
+                              );
+                            },
+                          ),
+                  ),
+                  
+                  // === ACTION BUTTONS - SIMPLE ===
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _secondaryColor,
+                      border: Border(
+                        top: BorderSide(color: _blackColor, width: 4),
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(16),
+                        bottomRight: Radius.circular(16),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Close button
+                        Expanded(
+                          child: Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: _yellowColor,
+                              border: Border.all(color: _blackColor, width: 3),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black,
+                                  offset: Offset(3, 3),
+                                  blurRadius: 0,
+                                ),
+                              ],
+                            ),
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: TextButton.styleFrom(
+                                foregroundColor: _blackColor,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(9),
+                                ),
+                              ),
+                              child: const Text(
+                                'TUTUP',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 12),
+                        
+                        // Mark all button (only if has unread)
+                        if (_unreadNotificationCount > 0)
+                          Expanded(
+                            child: Container(
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: _primaryColor,
+                                border: Border.all(color: _blackColor, width: 3),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black,
+                                    offset: Offset(3, 3),
+                                    blurRadius: 0,
+                                  ),
+                                ],
+                              ),
+                              child: TextButton(
+                                onPressed: () async {
+                                  for (var notification in _notifications) {
+                                    notification['read'] = true;
+                                  }
+                                  setState(() {
+                                    _unreadNotificationCount = 0;
+                                  });
+                                  await _saveNotificationsToPrefs();
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'TANDAI SEMUA',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    },
+  ).then((_) {
+    if (mounted) {
+      setState(() {});
+    }
+  });
+}
+
+// ========== NOTIFICATION CARD - ENHANCED CONTENT ==========
+
+Widget _buildNotificationCard(
+  Map<String, dynamic> notification,
+  bool isRead,
+  bool isApproved,
+  bool isRejected,
+  int index,
+  StateSetter setState,
+) {
+  final timestamp = DateTime.parse(notification['timestamp']);
+  final timeAgo = _formatTimeAgo(timestamp);
+  final industriNama =
+      notification['data']?['industri_nama'] ?? 'Perusahaan';
+  final catatan = notification['catatan'] ?? '';
+  
+  return GestureDetector(
+    onTap: () {
+      if (!isRead) {
+        setState(() {
+          notification['read'] = true;
+          _unreadNotificationCount--;
+        });
+        _saveNotificationsToPrefs();
+      }
+    },
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isRead ? _secondaryColor : Colors.white,
+        border: Border.all(
+          color: _blackColor,
+          width: isRead ? 2 : 3,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha:isRead ? 0.1 : 0.2),
+            offset: const Offset(4, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // === STATUS BANNER ===
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            decoration: BoxDecoration(
+              color: isRejected
+                  ? const Color(0xFFE63946)
+                  : (isApproved
+                      ? const Color(0xFF06D6A0)
+                      : const Color(0xFFFFB703)),
+              border: Border(
+                bottom: BorderSide(color: _blackColor, width: 2),
+              ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(14),
+                topRight: Radius.circular(14),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Status indicator
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(color: _blackColor, width: 2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isRejected ? Icons.close : Icons.check,
+                    size: 18,
+                    color: isRejected
+                        ? const Color(0xFFE63946)
+                        : const Color(0xFF06D6A0),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                
+                // Status text
+                Expanded(
+                  child: Text(
+                    isRejected ? 'STATUS: DITOLAK' : 'STATUS: DISETUJUI',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                
+                // Unread indicator
+                if (!isRead)
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          
+          // === CONTENT - ENHANCED ===
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // === PERUSAHAAN INFO ===
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _accentColor,
+                    border: Border.all(color: _blackColor, width: 2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: _primaryColor,
+                          border: Border.all(color: _blackColor, width: 2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.business,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'LOKASI PKL',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: _darkColor,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                            Text(
+                              industriNama,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: _blackColor,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // === DETAIL STATUS ===
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isRejected
+                        ? const Color(0xFFE63946).withValues(alpha:0.1)
+                        : const Color(0xFF06D6A0).withValues(alpha:0.1),
+                    border: Border.all(
+                      color: isRejected
+                          ? const Color(0xFFE63946)
+                          : const Color(0xFF06D6A0),
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isRejected ? Icons.warning : Icons.verified,
+                            size: 16,
+                            color: isRejected
+                                ? const Color(0xFFE63946)
+                                : const Color(0xFF06D6A0),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isRejected ? 'PENOLAKAN' : 'PERSETUJUAN',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: _blackColor,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      if (isRejected)
+                        Text(
+                          'Pengajuan PKL Anda ditolak. Perbaiki pengajuan berdasarkan catatan di bawah, lalu ajukan kembali.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _darkColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      else
+                        Text(
+                          'Pengajuan PKL Anda telah disetujui. Siapkan diri untuk memulai kegiatan praktik kerja lapangan.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _darkColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // === CATATAN DETAIL ===
+                if (catatan.isNotEmpty && catatan != 'Tidak ada alasan diberikan')
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: _blackColor, width: 2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: _primaryColor,
+                                border: Border.all(color: _blackColor, width: 1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.description,
+                                size: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'CATATAN',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: _darkColor,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          catatan,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _darkColor,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                
+                const SizedBox(height: 16),
+                
+                // === ACTION BUTTON ===
+                if (isRejected)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _yellowColor,
+                      border: Border.all(color: _blackColor, width: 3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: TextButton(
+                      onPressed: _ajukanPKL,
+                      style: TextButton.styleFrom(
+                        foregroundColor: _blackColor,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.refresh, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'AJUKAN ULANG PKL',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (isApproved)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF06D6A0),
+                      border: Border.all(color: _blackColor, width: 3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Close panel
+                        _loadAllData(); // Refresh dashboard
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.visibility, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'LIHAT DETAIL PKL',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                
+                const SizedBox(height: 12),
+                
+                // === FOOTER ===
+                Container(
+                  padding: const EdgeInsets.only(top: 12),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: _blackColor.withValues(alpha:0.3), width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _secondaryColor,
+                          border: Border.all(color: _blackColor, width: 1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              size: 10,
+                              color: _darkColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              timeAgo.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: _darkColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// ========== EMPTY STATE - CLEAN ==========
+
+Widget _buildEmptyNotifications() {
+  return Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: _secondaryColor,
+              border: Border.all(color: _blackColor, width: 4),
+              shape: BoxShape.circle,
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black,
+                  offset: Offset(4, 4),
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.inbox,
+              size: 40,
+              color: _darkColor,
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              color: _yellowColor,
+              border: Border.all(color: _blackColor, width: 3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              'BELUM ADA NOTIFIKASI',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: _blackColor,
+                letterSpacing: 1.0,
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Semua update status pengajuan PKL akan muncul di sini',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: _darkColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+  String _formatTimeAgo(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inDays > 365) {
+      final years = (difference.inDays / 365).floor();
+      return '$years tahun lalu';
+    } else if (difference.inDays > 30) {
+      final months = (difference.inDays / 30).floor();
+      return '$months bulan lalu';
+    } else if (difference.inDays > 0) {
+      return '${difference.inDays} hari lalu';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} jam lalu';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} menit lalu';
+    } else {
+      return 'Baru saja';
+    }
+  }
+
+
+  void _startPrefsListener() async {
+    print('🔧 Starting prefs listener (read-only mode)');
+
+    final prefs = await SharedPreferences.getInstance();
+
+    _prefsSubscription = Stream.periodic(const Duration(seconds: 5))
         .asyncMap((_) async {
           return {
             'token': prefs.getString('access_token'),
-            'username': prefs.getString('user_name'),
             'shouldClear': prefs.getBool('should_clear_cache') ?? false,
           };
         })
         .distinct()
         .listen((Map<String, dynamic> data) {
           final token = data['token'] as String?;
-          final username = data['username'] as String?;
-          final shouldClear = data['shouldClear'] as bool;
 
-          // Jika ada flag clear cache dari halaman pengaturan
-          if (shouldClear) {
-            print('🔄 Mendapatkan perintah clear cache dari logout');
-            prefs.remove('should_clear_cache');
-            _clearCache();
+          // HANYA handle jika token hilang (logout)
+          if (token == null || token.isEmpty) {
+            print('🔑 Token missing, redirecting to login');
+            _redirectToLogin();
           }
 
-          // Jika token hilang atau username berubah
-          if (token == null ||
-              token.isEmpty ||
-              (_currentUsername != null && _currentUsername != username)) {
-            print('🔄 Token/username berubah, clearing cache...');
-            _clearCache();
-            if (mounted && token == null) {
-              _redirectToLogin();
-            }
-          }
+          // JANGAN handle shouldClear atau username change
+          // Biarkan dashboard tetap utuh
         });
   }
 
   Future<void> _checkAuthAndLoadData() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
+    prefs.getString('access_token');
     final userName = prefs.getString('user_name');
 
     print('🔄 _checkAuthAndLoadData dipanggil');
-    print('   - Username dari SharedPreferences: $userName');
-    print('   - _currentUsername sebelumnya: $_currentUsername');
-    print('   - _isCached: $_isCached');
+    print('   - Username baru: $userName');
+    print('   - Username sebelumnya: $_currentUsername');
 
-    // ========== PERBAIKAN PENTING ==========
-    // VALIDASI USER DENGAN TELITI
-    bool userBerubah = false;
-    
+    // ========== PERBAIKAN: SET USERNAME DULU ==========
     if (userName != null) {
-      if (_currentUsername == null) {
-        // Pertama kali load
-        print('✅ Pertama kali load, set _currentUsername: $userName');
-        _currentUsername = userName;
-      } else if (_currentUsername != userName) {
-        // User berubah
-        print('🚨 DETEKSI PERUBAHAN USER!');
-        print('   - User lama: $_currentUsername');
-        print('   - User baru: $userName');
-        userBerubah = true;
-      }
-    }
-    
-    // Jika user berubah atau cache kosong, load data baru
-    if (userBerubah || !_isCached || _cachedNamaSiswa == null) {
-      if (userBerubah) {
-        _clearCache();
-      }
       _currentUsername = userName;
-      await _loadAllData();
-      return;
+      print('👤 Username set to: $_currentUsername');
     }
-    // =====================================
+    // =================================================
 
-    // Cek apakah ada flag clear cache (dari logout)
+    // Clear cache jika perlu
     final shouldClear = prefs.getBool('should_clear_cache') ?? false;
     if (shouldClear) {
-      print('🔄 Clear cache dari flag logout...');
       await prefs.remove('should_clear_cache');
       _clearCache();
-      _currentUsername = userName;
       await _loadAllData();
       return;
     }
 
-    // Cek apakah ada access token
-    if (token == null || token.isEmpty) {
-      print('❌ Token tidak ada, redirect ke login');
-      _redirectToLogin();
-      return;
-    }
-
-    // ========== LOGIKA CACHE YANG DIPERBAIKI ==========
-    // Gunakan cache HANYA jika semua kondisi terpenuhi
-    if (_isCached && 
-        _currentUsername != null && 
-        userName != null && 
+    // Jika ada cache, load dari cache
+    if (_isCached &&
+        _currentUsername != null &&
+        userName != null &&
         _currentUsername == userName &&
         _cachedNamaSiswa != null &&
         _cachedNamaSiswa == userName) {
-      print('✅ Menggunakan cache untuk user: $userName');
       _loadFromCache();
       setState(() {
         _isLoading = false;
       });
     } else {
-      print('🔄 Load data fresh karena:');
-      print('   - _isCached: $_isCached');
-      print('   - _currentUsername: $_currentUsername');
-      print('   - _cachedNamaSiswa: $_cachedNamaSiswa');
-      print('   - userName: $userName');
+      // Load semua data dari API
       await _loadAllData();
     }
-    // ================================================
   }
 
   void _loadFromCache() {
-    print('📦 Loading dari cache...');
-    print('   - _cachedNamaSiswa: $_cachedNamaSiswa');
-    print('   - _cachedKelasSiswa: $_cachedKelasSiswa');
-    
     if (_cachedPklData != null) _pklData = _cachedPklData;
     if (_cachedPklApplications != null) {
       _pklApplications = _cachedPklApplications!;
@@ -225,21 +1324,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     if (_cachedNamaSiswa != null) _namaSiswa = _cachedNamaSiswa!;
     if (_cachedKelasSiswa != null) _kelasSiswa = _cachedKelasSiswa!;
     if (_cachedKelasId != null) _kelasId = _cachedKelasId;
-    
-    print('✅ Cache loaded untuk $_namaSiswa');
   }
 
   void _saveToCache() {
-    print('💾 _saveToCache() dipanggil');
-    print('   - Username saat save: $_currentUsername');
-    print('   - Nama siswa: $_namaSiswa');
-    print('   - Kelas siswa: $_kelasSiswa');
-
-    // Hanya save jika ada current username
-    if (_currentUsername == null) {
-      print('⚠️  Tidak bisa save cache karena _currentUsername null');
-      return;
-    }
+    if (_currentUsername == null) return;
 
     _cachedPklData = _pklData;
     _cachedPklApplications = _pklApplications;
@@ -250,19 +1338,14 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     _cachedKelasSiswa = _kelasSiswa;
     _cachedKelasId = _kelasId;
     _isCached = true;
-
-    print('✅ Cache disimpan untuk user: $_currentUsername');
   }
 
   void _clearCache() {
     print('🧹 _clearCache() dipanggil - RESET TOTAL');
-    print('   - Sebelum clear: _isCached = $_isCached');
-    print('   - _currentUsername sebelum clear: $_currentUsername');
-    print('   - _cachedNamaSiswa sebelum clear: $_cachedNamaSiswa');
 
-    // Reset semua cache variables
+    // Reset semua cache variables TAPI JANGAN NOTIFIKASI
     _isCached = false;
-    
+
     _cachedPklData = null;
     _cachedPklApplications = null;
     _cachedIndustriData = null;
@@ -271,8 +1354,14 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     _cachedNamaSiswa = null;
     _cachedKelasSiswa = null;
     _cachedKelasId = null;
-    
-    // Reset state data
+
+    // ========== JANGAN CLEAR NOTIFIKASI! ==========
+    // Biarkan notifikasi tetap ada sebagai history
+    // _notifications.clear(); // ← JANGAN PAKAI INI
+    // _unreadNotificationCount = 0; // ← JANGAN PAKAI INI
+    // ==============================================
+
+    // Reset state data lainnya
     if (mounted) {
       setState(() {
         _pklData = null;
@@ -286,17 +1375,166 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         _isLoading = true;
       });
     }
-    
-    print('   - Setelah clear: _isCached = $_isCached');
-    print('   - _cachedNamaSiswa setelah clear: $_cachedNamaSiswa');
-    print('✅ Semua cache telah di-reset');
+
+    print('✅ Semua cache telah di-reset (notifikasi TETAP ADA)');
+    print('   - Notifications count: ${_notifications.length}');
+    print('   - Unread notifications: $_unreadNotificationCount');
   }
 
+  Future<void> _checkLatestPKLStatus() async {
+    print('🔍 Checking latest PKL status...');
+
+    try {
+      await _loadPklApplications();
+
+      if (_pklApplications.isNotEmpty) {
+        final latestPKL = _pklApplications.first;
+        final status = latestPKL['status'].toString().toLowerCase();
+        final applicationId = latestPKL['id'];
+
+        // ========== CEK DI SHARED PREFERENCES ==========
+        final prefs = await SharedPreferences.getInstance();
+        final alreadyNotifiedKey = 'pkl_notified_$applicationId';
+        final alreadyNotified = prefs.getBool(alreadyNotifiedKey) ?? false;
+        // ================================================
+
+        if (!alreadyNotified && (status == 'rejected' || status == 'ditolak')) {
+          final industriId = latestPKL['industri_id'];
+          String industriNama = 'Perusahaan';
+
+          if (industriId != null) {
+            await _loadIndustriData(industriId);
+            industriNama = _industriData?['nama'] ?? 'Perusahaan';
+          }
+
+          final catatan =
+              latestPKL['kaprog_note'] ?? 'Tidak ada alasan diberikan';
+          final notificationId = 'pkl_rejected_$applicationId';
+
+          // Cek apakah sudah ada notifikasi di list
+          final hasNotificationInList =
+              _notifications.any((n) => n['id'] == notificationId);
+
+          if (!hasNotificationInList) {
+            print('🎯 Found NEW rejected PKL - creating notification');
+
+            final notification = {
+              'id': notificationId,
+              'title': 'PKL DITOLAK ❌',
+              'message': 'Pengajuan PKL ke $industriNama ditolak',
+              'catatan': catatan,
+              'timestamp': DateTime.now().toIso8601String(),
+              'read': false,
+              'type': 'rejected',
+              'data': {
+                'type': 'pkl_rejected',
+                'data': {
+                  'application_id': applicationId,
+                  'industri_nama': industriNama,
+                  'catatan': catatan,
+                }
+              },
+            };
+
+            setState(() {
+              _notifications.insert(0, notification);
+              _unreadNotificationCount++;
+            });
+
+            // ========== SIMPAN FLAG ==========
+            await prefs.setBool(alreadyNotifiedKey, true);
+            // ================================
+
+            // Save notifications
+            await _saveNotificationsToPrefs();
+
+            // Show popup hanya jika belum dibaca
+            if (mounted) {
+              NotificationPopup.showRejectionPopup(
+                context,
+                industriNama: industriNama,
+                catatan: catatan,
+                onReapplyPressed: () {
+                  _ajukanPKL();
+                },
+              );
+            }
+          }
+        } else if (!alreadyNotified &&
+            (status == 'approved' || status == 'disetujui')) {
+          final industriId = latestPKL['industri_id'];
+          String industriNama = 'Perusahaan';
+
+          if (industriId != null) {
+            await _loadIndustriData(industriId);
+            industriNama = _industriData?['nama'] ?? 'Perusahaan';
+          }
+
+          final catatan = latestPKL['kaprog_note'];
+          final notificationId = 'pkl_approved_$applicationId';
+
+          final hasNotificationInList =
+              _notifications.any((n) => n['id'] == notificationId);
+
+          if (!hasNotificationInList) {
+            print('🎯 Found NEW approved PKL - creating notification');
+
+            final notification = {
+              'id': notificationId,
+              'title': 'PKL DISETUJUI! 🎉',
+              'message': 'Pengajuan PKL ke $industriNama telah disetujui',
+              'catatan': catatan,
+              'timestamp': DateTime.now().toIso8601String(),
+              'read': false,
+              'type': 'approved',
+              'data': {
+                'type': 'pkl_approved',
+                'data': {
+                  'application_id': applicationId,
+                  'industri_nama': industriNama,
+                  'catatan': catatan,
+                }
+              },
+            };
+
+            setState(() {
+              _notifications.insert(0, notification);
+              _unreadNotificationCount++;
+            });
+
+            // ========== SIMPAN FLAG ==========
+            await prefs.setBool(alreadyNotifiedKey, true);
+            // ================================
+
+            // Save notifications
+            await _saveNotificationsToPrefs();
+
+            // Show popup hanya jika belum dibaca
+            if (mounted) {
+              NotificationPopup.showApprovalPopup(
+                context,
+                industriNama: industriNama,
+                catatan: catatan,
+                onViewPressed: () {
+                  _loadAllData();
+                },
+              );
+            }
+          }
+        } else if (alreadyNotified) {
+          print('📌 PKL $applicationId sudah pernah di-notifikasi');
+        }
+      }
+    } catch (e) {
+      print('❌ Error checking PKL status: $e');
+    }
+  }
+
+// Di _loadAllData():
   Future<void> _loadAllData() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
-    // Cek token lagi sebelum load data
     if (token == null || token.isEmpty) {
       _redirectToLogin();
       return;
@@ -309,6 +1547,13 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     try {
       await _loadProfileData();
       await _loadPklApplications();
+
+      // ========== TAMBAHKAN INI ==========
+      // Load notifications setelah semua data selesai
+      await _loadNotificationsOnLogin();
+      // ===================================
+
+      _checkLatestPKLStatus();
       _saveToCache();
     } catch (e) {
       if (e.toString().contains('401') ||
@@ -339,19 +1584,13 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     final token = prefs.getString('access_token');
     final userName = prefs.getString('user_name');
 
-    print('🔍 DEBUG _loadProfileData:');
-    print('   - Token: ${token != null ? "Ada" : "Tidak ada"}');
-    print('   - Username: $userName');
-
     if (token == null || token.isEmpty) {
-      print('❌ Token tidak ada, redirect ke login');
       _redirectToLogin();
       return;
     }
 
     try {
       final apiUrl = '${dotenv.env['API_BASE_URL']}/api/siswa?search=$userName';
-      print('🌐 Mengambil data siswa dari API: $apiUrl');
 
       final response = await http.get(
         Uri.parse(apiUrl),
@@ -361,57 +1600,25 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         },
       );
 
-      print('📊 Response Status: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ API Response Body:');
-        print('   - success: ${data['success']}');
-        print('   - data: ${data['data'] != null ? "Ada" : "Tidak ada"}');
-
-        if (data['data'] != null) {
-          print(
-              '   - data.data: ${data['data']['data'] != null ? "Ada" : "Tidak ada"}');
-          print(
-              '   - data.data length: ${data['data']['data'] != null ? data['data']['data'].length : 0}');
-        }
 
         if (data['success'] == true &&
             data['data'] != null &&
             data['data']['data'] != null &&
             data['data']['data'].isNotEmpty) {
           final List<dynamic> siswaList = data['data']['data'];
-          print('👥 Ditemukan ${siswaList.length} siswa');
-
-          // Print detail setiap siswa untuk debugging
-          for (var i = 0; i < siswaList.length; i++) {
-            final siswa = siswaList[i];
-            print('   Siswa $i:');
-            print('     - nama_lengkap: ${siswa['nama_lengkap']}');
-            print('     - kelas_id: ${siswa['kelas_id']}');
-            print('     - kelas: ${siswa['kelas']}');
-            print('     - kelas_nama: ${siswa['kelas_nama']}');
-          }
 
           final matchedSiswa = siswaList.firstWhere(
               (siswa) => siswa['nama_lengkap'] == userName, orElse: () {
-            print(
-                '⚠️  Tidak menemukan siswa dengan nama $userName, ambil siswa pertama');
             return siswaList.first;
           });
-
-          print('🎯 Siswa yang dipilih:');
-          print('   - nama_lengkap: ${matchedSiswa['nama_lengkap']}');
-          print('   - kelas_id: ${matchedSiswa['kelas_id']}');
 
           final kelasId = matchedSiswa['kelas_id'];
           String kelasNama = 'Kelas Tidak Tersedia';
 
-          // ========= PERBAIKAN UTAMA =========
-          // Ambil nama kelas dari endpoint terpisah
           if (kelasId != null) {
             try {
-              print('📚 Mengambil data kelas dari API...');
               final kelasResponse = await http.get(
                 Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/$kelasId'),
                 headers: {
@@ -422,76 +1629,25 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
               if (kelasResponse.statusCode == 200) {
                 final kelasData = jsonDecode(kelasResponse.body);
-                print('✅ Data kelas: $kelasData');
-
                 if (kelasData['success'] == true && kelasData['data'] != null) {
                   kelasNama =
                       kelasData['data']['nama'] ?? 'Kelas Tidak Tersedia';
-                  print('✅ Nama kelas ditemukan: $kelasNama');
-                } else {
-                  print('❌ Data kelas tidak valid');
-                }
-              } else {
-                print(
-                    '❌ Gagal mengambil data kelas. Status: ${kelasResponse.statusCode}');
-                print('   Response: ${kelasResponse.body}');
-
-                // Coba alternatif: cari kelas dari list semua kelas
-                try {
-                  print('🔄 Mencoba alternatif: mengambil semua kelas');
-                  final allKelasResponse = await http.get(
-                    Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas'),
-                    headers: {
-                      'Authorization': 'Bearer $token',
-                      'Content-Type': 'application/json',
-                    },
-                  );
-
-                  if (allKelasResponse.statusCode == 200) {
-                    final allKelasData = jsonDecode(allKelasResponse.body);
-                    if (allKelasData['success'] == true &&
-                        allKelasData['data'] != null &&
-                        allKelasData['data']['data'] != null) {
-                      final kelasList = allKelasData['data']['data'] as List;
-                      final kelasItem = kelasList.firstWhere(
-                          (kelas) => kelas['id'] == kelasId,
-                          orElse: () => null);
-
-                      if (kelasItem != null) {
-                        kelasNama = kelasItem['nama'] ?? 'Kelas Tidak Tersedia';
-                        print('✅ Nama kelas ditemukan dari list: $kelasNama');
-                      } else {
-                        print('❌ Kelas tidak ditemukan dalam list semua kelas');
-                      }
-                    }
-                  }
-                } catch (e) {
-                  print('❌ Error mengambil semua kelas: $e');
                 }
               }
             } catch (e) {
               print('❌ Error mengambil data kelas: $e');
             }
-          } else {
-            print('⚠️  kelas_id null, tidak bisa mengambil data kelas');
           }
-          // ===================================
 
-          print('💾 Menyimpan data ke SharedPreferences:');
-          print('   - kelas_id: $kelasId');
-          print('   - kelas_nama: $kelasNama');
+          final userId = matchedSiswa['id']?.toString();
+          if (userId != null) {
+            await prefs.setString('user_id', userId);
+          }
 
           await prefs.setInt('kelas_id', kelasId);
           await prefs.setInt('user_kelas_id', kelasId);
           await prefs.setString('kelas_nama', kelasNama);
           await prefs.setString('user_kelas', kelasNama);
-
-          // Verifikasi penyimpanan
-          final savedKelasId = prefs.getInt('kelas_id');
-          final savedKelasNama = prefs.getString('kelas_nama');
-          print('✅ Data tersimpan:');
-          print('   - saved kelas_id: $savedKelasId');
-          print('   - saved kelas_nama: $savedKelasNama');
 
           if (mounted) {
             setState(() {
@@ -499,31 +1655,17 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
               _kelasSiswa = kelasNama;
               _kelasId = kelasId;
             });
-
-            print('🎨 State diupdate:');
-            print('   - _namaSiswa: $_namaSiswa');
-            print('   - _kelasSiswa: $_kelasSiswa');
-            print('   - _kelasId: $_kelasId');
           }
           return;
-        } else {
-          print('❌ Struktur data tidak sesuai atau kosong');
         }
       } else if (response.statusCode == 401) {
-        print('❌ Unauthorized (401), redirect ke login');
         _redirectToLogin();
         return;
-      } else {
-        print('❌ Status code tidak 200: ${response.statusCode}');
-        print('   Response body: ${response.body}');
       }
     } catch (e) {
       print('❌ Error loading profile from API: $e');
-      print('   Stack trace: ${e.toString()}');
     }
 
-    // Fallback jika gagal dari API
-    print('🔄 Menggunakan fallback dari SharedPreferences');
     if (mounted) {
       final kelasIdFromPrefs =
           prefs.getInt('kelas_id') ?? prefs.getInt('user_kelas_id');
@@ -531,20 +1673,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           prefs.getString('user_kelas') ??
           'Kelas Tidak Tersedia';
 
-      print('📋 Data dari SharedPreferences:');
-      print('   - kelasIdFromPrefs: $kelasIdFromPrefs');
-      print('   - kelasNamaFromPrefs: $kelasNamaFromPrefs');
-
       setState(() {
         _namaSiswa = userName ?? 'Nama Tidak Tersedia';
         _kelasSiswa = kelasNamaFromPrefs;
         _kelasId = kelasIdFromPrefs;
       });
-
-      print('🎨 Fallback state diupdate:');
-      print('   - _namaSiswa: $_namaSiswa');
-      print('   - _kelasSiswa: $_kelasSiswa');
-      print('   - _kelasId: $_kelasId');
     }
   }
 
@@ -598,15 +1731,13 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
               await _loadProcessedByData(_pklData!['processed_by']);
             }
           } else {
-            // Jika tidak ada yang disetujui, ambil pengajuan terbaru
             final latestApplication = _pklApplications.first;
             if (mounted) {
               setState(() {
                 _pklData = latestApplication;
               });
             }
-            
-            // Load data terkait untuk aplikasi terbaru
+
             if (latestApplication['industri_id'] != null) {
               await _loadIndustriData(latestApplication['industri_id']);
             }
@@ -614,7 +1745,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
               await _loadProcessedByData(latestApplication['processed_by']);
             }
             if (latestApplication['pembimbing_guru_id'] != null) {
-              await _loadPembimbingData(latestApplication['pembimbing_guru_id']);
+              await _loadPembimbingData(
+                  latestApplication['pembimbing_guru_id']);
             }
           }
         } else {
@@ -721,70 +1853,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     } catch (_) {}
   }
 
-  // Fungsi untuk mengajukan PKL
-  Future<void> _ajukanPKL() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-
-    if (token == null || token.isEmpty) {
-      _redirectToLogin();
-      return;
-    }
-
-    try {
-      if (_kelasId == null) {
-        await _loadProfileData();
-      }
-
-      final result = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (context) => AjukanPKLDialog(
-          token: token,
-          kelasId: _kelasId,
-        ),
-      );
-
-      if (result != null) {
-        final response = await http.post(
-          Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/applications'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'catatan': result['catatan'],
-            'industri_id': result['industri_id'],
-          }),
-        );
-
-        if (response.statusCode == 201) {
-          _clearCache();
-          await _loadAllData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Pengajuan PKL berhasil dikirim')),
-            );
-          }
-        } else if (response.statusCode == 401) {
-          _redirectToLogin();
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Gagal mengajukan PKL: ${response.body}')),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Terjadi kesalahan saat mengajukan PKL')),
-        );
-      }
-    }
-  }
-
   Future<void> _bukaIndustri() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
@@ -803,7 +1871,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     }
   }
 
-  // Fungsi untuk membuka popup riwayat PKL
   Future<void> _bukaRiwayat() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
@@ -818,7 +1885,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         await _loadPklApplications();
       }
 
-      // Panggil fungsi dari file terpisah
       if (mounted) {
         await DetailPopup.showRiwayatPopup(
           context,
@@ -835,7 +1901,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       }
     }
   }
-
 
   String _formatTanggal(String? dateString) {
     if (dateString == null || dateString.isEmpty) return '-';
@@ -922,7 +1987,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Header dengan sapaan dan notifikasi - Neo Brutalism Style
+              // Header dengan WebSocket status
               Container(
                 margin: const EdgeInsets.all(16),
                 padding: const EdgeInsets.all(20),
@@ -967,38 +2032,92 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                               border: Border.all(color: _blackColor, width: 2),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(
-                              'Dashboard PKL',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: _blackColor,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Dashboard PKL',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: _blackColor,
+                                  ),
+                                ),
+                                // WebSocket status indicator
+                                Container(
+                                  margin: const EdgeInsets.only(left: 8),
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: _webSocketManager.isConnected
+                                        ? Colors.green
+                                        : Colors.red,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: _blackColor, width: 1),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: _yellowColor,
-                        border: Border.all(color: _blackColor, width: 3),
-                        boxShadow: [_lightShadow],
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.notifications,
-                        size: 28,
-                        color: _blackColor,
-                      ),
+                    // Notification icon with badge
+                    Stack(
+                      children: [
+                        GestureDetector(
+                          onTap: _showNotificationsPanel,
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: _yellowColor,
+                              border: Border.all(color: _blackColor, width: 3),
+                              boxShadow: [_lightShadow],
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.notifications,
+                              size: 28,
+                              color: _blackColor,
+                            ),
+                          ),
+                        ),
+                        if (_unreadNotificationCount > 0)
+                          Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: _notificationColor,
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: _blackColor, width: 2),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              child: Text(
+                                '${_unreadNotificationCount > 9 ? '9+' : _unreadNotificationCount}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
               ),
 
-              // Container waktu PKL dengan progress bar - Neo Brutalism
+              // Container waktu PKL
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(20),
@@ -1012,7 +2131,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                     ? _buildTimeSectionSkeleton()
                     : Column(
                         children: [
-                          // Baris untuk tanggal mulai dan selesai
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -1035,10 +2153,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                       : '-'),
                             ],
                           ),
-
                           const SizedBox(height: 20),
-
-                          // Progress bar dengan style brutalism
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1053,7 +2168,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                 ),
                                 child: Stack(
                                   children: [
-                                    // Background progress
                                     Container(
                                       width:
                                           (MediaQuery.of(context).size.width -
@@ -1094,7 +2208,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                       ),
               ),
 
-              // Container utama dengan background putih - Neo Brutalism
+              // Container utama
               Container(
                 margin: const EdgeInsets.only(top: 24),
                 decoration: BoxDecoration(
@@ -1110,7 +2224,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      // Aksi cepat dengan style brutalism
+                      // Aksi cepat
                       _isLoading
                           ? _buildQuickActionsSkeleton()
                           : Container(
@@ -1125,7 +2239,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                               ),
                               child: Stack(
                                 children: [
-                                  // Garis vertikal tebal
                                   Positioned(
                                     left: 150,
                                     top: 20,
@@ -1135,8 +2248,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                       color: _blackColor,
                                     ),
                                   ),
-
-                                  // Garis horizontal tebal
                                   Positioned(
                                     left: 166,
                                     right: 20,
@@ -1146,24 +2257,18 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                       color: _blackColor,
                                     ),
                                   ),
-
-                                  // Menu 1: Pengajuan
                                   Positioned(
                                     left: 30,
                                     top: 25,
                                     child: _buildMenuOptionKiri('Pengajuan',
                                         Icons.assignment_add, _ajukanPKL),
                                   ),
-
-                                  // Menu 2: Industri
                                   Positioned(
                                     right: 40,
                                     top: 20,
                                     child: _buildMenuOptionKanan('Industri',
                                         Icons.factory, _bukaIndustri),
                                   ),
-
-                                  // Menu 3: Riwayat
                                   Positioned(
                                     right: 40,
                                     bottom: 15,
@@ -1173,10 +2278,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                 ],
                               ),
                             ),
-
                       const SizedBox(height: 32),
-
-                      // Judul Daftar Pengajuan PKL - Brutalism Style
+                      // Judul Daftar Pengajuan PKL
                       _isLoading
                           ? _buildTitleSkeleton()
                           : Container(
@@ -1227,9 +2330,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                 ],
                               ),
                             ),
-
                       const SizedBox(height: 20),
-
                       // Tampilkan pengajuan
                       if (_isLoading)
                         _buildPKLCardSkeleton()
@@ -1252,7 +2353,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                         })
                       else
                         _buildNoPengajuanCard(),
-
                       const SizedBox(height: 30),
                     ],
                   ),
@@ -1265,7 +2365,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     );
   }
 
-  // ========== SKELETON LOADING WIDGETS ==========
+  // ========== SKELETON LOADING WIDGETS (SAMA) ==========
   Widget _buildTimeSectionSkeleton() {
     return Column(
       children: [
@@ -1301,7 +2401,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         Container(
           width: 50,
           height: 12,
-          color: _blackColor.withValues(alpha: 0.3),
+          color: _blackColor.withValues(alpha:0.3),
         ),
         const SizedBox(height: 8),
         Container(
@@ -1342,11 +2442,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-              width: 150,
-              height: 20,
-              color: _blackColor.withValues(alpha: 0.3)),
-          Container(
-              width: 80, height: 20, color: _blackColor.withValues(alpha: 0.3)),
+              width: 150, height: 20, color: _blackColor.withValues(alpha:0.3)),
+          Container(width: 80, height: 20, color: _blackColor.withValues(alpha:0.3)),
         ],
       ),
     );
@@ -1375,19 +2472,15 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           ),
           const SizedBox(height: 16),
           Container(
-              width: 200,
-              height: 24,
-              color: _blackColor.withValues(alpha: 0.2)),
+              width: 200, height: 24, color: _blackColor.withValues(alpha:0.2)),
           const SizedBox(height: 12),
           Container(
               width: double.infinity,
               height: 16,
-              color: _blackColor.withValues(alpha: 0.2)),
+              color: _blackColor.withValues(alpha:0.2)),
           const SizedBox(height: 8),
           Container(
-              width: 150,
-              height: 16,
-              color: _blackColor.withValues(alpha: 0.2)),
+              width: 150, height: 16, color: _blackColor.withValues(alpha:0.2)),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
@@ -1402,12 +2495,12 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                 Container(
                     width: 100,
                     height: 14,
-                    color: _blackColor.withValues(alpha: 0.2)),
+                    color: _blackColor.withValues(alpha:0.2)),
                 const SizedBox(height: 8),
                 Container(
                     width: double.infinity,
                     height: 14,
-                    color: _blackColor.withValues(alpha: 0.2)),
+                    color: _blackColor.withValues(alpha:0.2)),
               ],
             ),
           ),
@@ -1491,8 +2584,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     );
   }
 
-  // ========== END SKELETON LOADING WIDGETS ==========
-
+  // ========== CARD BUILDERS ==========
   Widget _buildPengajuanCard(Map<String, dynamic> pengajuan) {
     final status = pengajuan['status'];
     final isApproved = status.toLowerCase() == 'approved' ||
@@ -1500,9 +2592,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     final isRejected =
         status.toLowerCase() == 'rejected' || status.toLowerCase() == 'ditolak';
 
-    // Warna berdasarkan status
-    final statusColor = isRejected 
-        ? const Color(0xFFE63946) 
+    final statusColor = isRejected
+        ? const Color(0xFFE63946)
         : (isApproved ? const Color(0xFF06D6A0) : const Color(0xFFFFB703));
 
     return Container(
@@ -1576,7 +2667,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                 ? 'Pengajuan PKL Anda telah disetujui'
                                 : 'Pengajuan PKL Anda sedang diproses'),
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.white.withValues(alpha:0.9),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1598,11 +2689,12 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isRejected 
-                        ? const Color(0xFFE63946).withValues(alpha: 0.1) 
-                        : _primaryColor.withValues(alpha: 0.1),
+                    color: isRejected
+                        ? const Color(0xFFE63946).withValues(alpha:0.1)
+                        : _primaryColor.withValues(alpha:0.1),
                     border: Border.all(
-                      color: isRejected ? const Color(0xFFE63946) : _primaryColor, 
+                      color:
+                          isRejected ? const Color(0xFFE63946) : _primaryColor,
                       width: 3,
                     ),
                     borderRadius: BorderRadius.circular(16),
@@ -1613,7 +2705,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                         width: 50,
                         height: 50,
                         decoration: BoxDecoration(
-                          color: isRejected ? const Color(0xFFE63946) : _primaryColor,
+                          color: isRejected
+                              ? const Color(0xFFE63946)
+                              : _primaryColor,
                           border: Border.all(color: _blackColor, width: 3),
                           shape: BoxShape.circle,
                         ),
@@ -1658,9 +2752,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
                 const SizedBox(height: 20),
 
-                // CATATAN PENGAJUAN (TAMPIL UNTUK SEMUA STATUS KECUALI DITOLAK JIKA ADA KAPROG_NOTE)
-                if (pengajuan['catatan'] != null && 
-                    pengajuan['catatan'].isNotEmpty && 
+                // CATATAN PENGAJUAN
+                if (pengajuan['catatan'] != null &&
+                    pengajuan['catatan'].isNotEmpty &&
                     pengajuan['catatan'] != '-')
                   Container(
                     width: double.infinity,
@@ -1681,7 +2775,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                               height: 30,
                               decoration: BoxDecoration(
                                 color: _primaryColor,
-                                border: Border.all(color: _blackColor, width: 2),
+                                border:
+                                    Border.all(color: _blackColor, width: 2),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
@@ -1725,12 +2820,12 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
                 // TAMPILAN KHUSUS UNTUK STATUS DITOLAK
                 if (isRejected) ...[
-                  // ALASAN PENOLAKAN (PENTING!)
+                  // ALASAN PENOLAKAN
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE63946).withValues(alpha: 0.15),
+                      color: const Color(0xFFE63946).withValues(alpha:0.15),
                       border: Border.all(
                         color: const Color(0xFFE63946),
                         width: 3,
@@ -1747,7 +2842,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                               height: 36,
                               decoration: BoxDecoration(
                                 color: const Color(0xFFE63946),
-                                border: Border.all(color: _blackColor, width: 2),
+                                border:
+                                    Border.all(color: _blackColor, width: 2),
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(
@@ -1778,7 +2874,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            pengajuan['kaprog_note'] ?? 'Tidak ada alasan yang diberikan',
+                            pengajuan['kaprog_note'] ??
+                                'Tidak ada alasan yang diberikan',
                             style: const TextStyle(
                               fontSize: 14,
                               color: Colors.black87,
@@ -1947,18 +3044,19 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                       ],
                     ),
                   ),
-                  
+
                   // CATATAN APPROVAL JIKA ADA
-                  if (pengajuan['kaprog_note'] != null && 
-                      pengajuan['kaprog_note'].isNotEmpty && 
+                  if (pengajuan['kaprog_note'] != null &&
+                      pengajuan['kaprog_note'].isNotEmpty &&
                       pengajuan['kaprog_note'] != 'Tidak ada catatan')
                     Container(
                       width: double.infinity,
                       margin: const EdgeInsets.only(top: 20),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF06D6A0).withValues(alpha: 0.1),
-                        border: Border.all(color: const Color(0xFF06D6A0), width: 3),
+                        color: const Color(0xFF06D6A0).withValues(alpha:0.1),
+                        border: Border.all(
+                            color: const Color(0xFF06D6A0), width: 3),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
@@ -1971,7 +3069,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                 height: 30,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF06D6A0),
-                                  border: Border.all(color: _blackColor, width: 2),
+                                  border:
+                                      Border.all(color: _blackColor, width: 2),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
@@ -2038,7 +3137,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                           value: 'Menunggu Persetujuan',
                         ),
                         const SizedBox(height: 16),
-                        if (pengajuan['diproses_oleh'] != null && 
+                        if (pengajuan['diproses_oleh'] != null &&
                             pengajuan['diproses_oleh'] != '-')
                           _buildInfoRowCompact(
                             icon: Icons.person_outline,
@@ -2058,7 +3157,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     );
   }
 
-  // WIDGET HELPER UNTUK INFO ROW KOMPAK
   Widget _buildInfoRowCompact({
     required IconData icon,
     required Color iconColor,
@@ -2074,7 +3172,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       ),
       child: Row(
         children: [
-          // Icon
           Container(
             width: 36,
             height: 36,
@@ -2089,10 +3186,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
               color: Colors.white,
             ),
           ),
-
           const SizedBox(width: 12),
-
-          // Title & Value
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

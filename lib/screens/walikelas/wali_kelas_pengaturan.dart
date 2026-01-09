@@ -1,27 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../login/login_screen.dart';
+import '../login/login_screen.dart';
 
-class SiswaPengaturan extends StatefulWidget {
-  const SiswaPengaturan({super.key});
+class WaliKelasPengaturan extends StatefulWidget {
+  const WaliKelasPengaturan({super.key});
 
   @override
-  State<SiswaPengaturan> createState() => _SiswaPengaturanState();
+  State<WaliKelasPengaturan> createState() => _WaliKelasPengaturanState();
 }
 
-class _SiswaPengaturanState extends State<SiswaPengaturan> {
-  String _namaSiswa = 'Nama Siswa';
+class _WaliKelasPengaturanState extends State<WaliKelasPengaturan> {
+  String _namaWaliKelas = 'Wali Kelas';
   bool _isLoading = true;
 
-  // Warna tema Neo Brutalism
-  final Color _primaryColor = const Color(0xFF8B0000);
-  final Color _borderColor = const Color(0xFF000000);
+  // Warna tema Neo Brutalism - konsisten dengan dashboard
+  final Color _primaryColor = const Color(0xFFE71543);
+  final Color _backgroundColor = const Color(0xFF1D3557);
+  final Color _borderColor = Colors.black;
+  final Color _yellowColor = const Color(0xFFFFB703);
   
   // Atur ketebalan border di sini
-  final double _borderThickness = 2.0;
+  final double _borderThickness = 3.0;
   
-  // 👇 KHUSUS UNTUK SHADOW LINGKARAN (profile, loading, dialog)
-  final double _circleShadowOffset = 1.0;
+  // Shadow untuk lingkaran (profile, loading, dialog)
+  final double _circleShadowOffset = 4.0;
 
   @override
   void initState() {
@@ -33,14 +35,14 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
     final prefs = await SharedPreferences.getInstance();
     
     setState(() {
-      _namaSiswa = prefs.getString('user_name') ?? 'Nama Siswa';
+      _namaWaliKelas = prefs.getString('user_name') ?? 'Wali Kelas';
       _isLoading = false;
     });
   }
 
   // ========== VOID LOGOUT YANG DIPERBAIKI ==========
   Future<void> _logout(BuildContext context) async {
-    print('🚪 Logout initiated');
+    print('🚪 Logout initiated from Wali Kelas');
     
     // 1. Tampilkan dialog konfirmasi
     final shouldLogout = await showDialog<bool>(
@@ -118,8 +120,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                           border: Border.all(color: _borderColor, width: _borderThickness),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black,
-                              offset: Offset(_circleShadowOffset, _circleShadowOffset),
+                              color: _borderColor,
+                              offset: Offset(_circleShadowOffset / 2, _circleShadowOffset / 2),
                             ),
                           ],
                         ),
@@ -142,7 +144,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _namaSiswa,
+                              _namaWaliKelas,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
@@ -171,8 +173,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                           border: Border.all(color: _borderColor, width: _borderThickness),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black,
-                              offset: Offset(_circleShadowOffset, _circleShadowOffset),
+                              color: _borderColor,
+                              offset: Offset(_circleShadowOffset / 2, _circleShadowOffset / 2),
                             ),
                           ],
                         ),
@@ -277,7 +279,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
             boxShadow: [
               BoxShadow(
                 color: _borderColor,
-                offset: Offset(_circleShadowOffset, _circleShadowOffset),
+                offset: Offset(_circleShadowOffset / 2, _circleShadowOffset / 2),
               ),
             ],
           ),
@@ -294,7 +296,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                   boxShadow: [
                     BoxShadow(
                       color: _borderColor,
-                      offset: Offset(_circleShadowOffset, _circleShadowOffset),
+                      offset: Offset(_circleShadowOffset / 2, _circleShadowOffset / 2),
                     ),
                   ],
                 ),
@@ -339,57 +341,43 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
     
     print('👤 Current username: $currentUsername');
     
-    // ========== STRATEGI AMAN ==========
-    // 1. JANGAN SET 'should_clear_cache' - ini penyebab masalah!
-    // 2. Hanya hapus data login saja
-    // 3. BIARKAN notifikasi tetap ada di SharedPreferences
+    // Hapus data login saja
+    print('🗑️ Removing login data...');
+    await prefs.remove('access_token');
+    await prefs.remove('kelas_nama');
+    await prefs.remove('user_role');
+    await prefs.remove('user_name');
     
     // Simpan username untuk logging
     final usernameForLog = currentUsername ?? 'unknown_user';
     
-    // Hapus data login saja
-    print('🗑️ Removing login data...');
-    await prefs.remove('access_token');
-    await prefs.remove('kelas_id');
-    await prefs.remove('kelas_nama');
-    await prefs.remove('user_kelas_id');
-    await prefs.remove('user_kelas');
-    await prefs.remove('user_id');
-    
-    // Hapus username TERAKHIR
-    await prefs.remove('user_name');
-    
     // JANGAN hapus notifikasi! Biarkan sebagai history
     print('💾 Preserving notifications for user: $usernameForLog');
-    print('   - Key: notifications_$usernameForLog (NOT REMOVED)');
-    print('   - User can see notifications when login again');
     
     // Logging detail
     print('✅ Logout completed successfully');
     print('   - User: $usernameForLog');
     print('   - Login data: REMOVED');
     print('   - Notifications: PRESERVED');
-    
-    // Optional: Jika ingin hapus notifikasi saat logout (tidak disarankan)
-    // await prefs.remove('notifications_$usernameForLog');
-    // print('🗑️ Notifications also removed');
   }
   // ==============================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _primaryColor,
+      backgroundColor: _backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
+            // Header dengan tombol kembali
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: const Row(
-                children: [              
-                  SizedBox(width: 8),
+                children: [
+                  
+                  SizedBox(width: 12),
                   Text(
-                    'PENGATURAN',
+                    'PENGATURAN WALI KELAS',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -401,6 +389,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
               ),
             ),
 
+            // Konten Utama
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -419,6 +408,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
                   child: Column(
                     children: [
+                      // Profile Section
                       Container(
                         margin: const EdgeInsets.only(top: 20, bottom: 30),
                         child: Column(
@@ -439,7 +429,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                                 ],
                               ),
                               child: const Icon(
-                                Icons.person_rounded,
+                                Icons.school_rounded,
                                 size: 60,
                                 color: Colors.white,
                               ),
@@ -450,21 +440,40 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                                 : Column(
                                     children: [
                                       Text(
-                                        _namaSiswa.toUpperCase(),
+                                        _namaWaliKelas.toUpperCase(),
                                         style: const TextStyle(
-                                          fontSize: 24,
+                                          fontSize: 22,
                                           fontWeight: FontWeight.w900,
                                           color: Colors.black,
                                           letterSpacing: 1,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: _yellowColor,
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: _borderColor, width: _borderThickness),
+                                        ),
+                                        child: const Text(
+                                          'WALI KELAS',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                  
                                     ],
                                   ),
                           ],
                         ),
                       ),
 
+                      // Menu Section
                       _buildMenuSection(
                         title: '',
                         items: [
@@ -472,21 +481,27 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                             icon: Icons.help_outline_rounded,
                             title: 'BANTUAN & PANDUAN',
                             subtitle: 'Cara menggunakan aplikasi',
-                            iconColor: const Color(0xFF795548),
-                            onTap: () {},
+                            iconColor: const Color(0xFF795548), // Brown
+                            onTap: () {
+                              _showUnderDevelopment('Bantuan & Panduan');
+                            },
                           ),
                           _buildMenuCard(
                             icon: Icons.info_outline_rounded,
                             title: 'TENTANG APLIKASI',
                             subtitle: 'Versi & informasi aplikasi',
-                            iconColor: const Color(0xFF607D8B),
-                            onTap: () {},
+                            iconColor: const Color(0xFF607D8B), // Blue Grey
+                            onTap: () {
+                              _showAboutDialog();
+                            },
                           ),
+                       
                         ],
                       ),
 
                       const SizedBox(height: 32),
 
+                      // Logout Button
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
@@ -509,7 +524,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _primaryColor,
+                            backgroundColor: const Color(0xFFE63946), // Warna merah untuk logout
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                             shape: RoundedRectangleBorder(
@@ -522,6 +537,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
 
                       const SizedBox(height: 24),
 
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
@@ -540,18 +556,20 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 8, bottom: 12),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              color: _primaryColor,
-              letterSpacing: 1,
+        if (title.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(left: 8, bottom: 12),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: _primaryColor,
+                letterSpacing: 1,
+              ),
             ),
           ),
-        ),
+        ],
         ...items,
       ],
     );
@@ -673,7 +691,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
         ),
         const SizedBox(height: 8),
         Container(
-          width: 80,
+          width: 100,
           height: 18,
           decoration: BoxDecoration(
             color: _borderColor.withValues(alpha:0.1),
@@ -681,6 +699,203 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
           ),
         ),
       ],
+    );
+  }
+
+  void _showUnderDevelopment(String featureName) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: _borderColor, width: _borderThickness),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: _borderColor,
+                offset: const Offset(4, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: _yellowColor,
+                  border: Border.all(color: _borderColor, width: _borderThickness),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.construction,
+                  color: Colors.black,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'FITUR DALAM PENGEMBANGAN',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                  letterSpacing: -0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '$featureName sedang dalam tahap pengembangan dan akan segera hadir.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[800],
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  border: Border.all(color: _borderColor, width: _borderThickness),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                  ),
+                  child: const Text(
+                    'MENGERTI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: _borderColor, width: _borderThickness),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: _borderColor,
+                offset: const Offset(4, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  border: Border.all(color: _borderColor, width: _borderThickness),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.info,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'TENTANG APLIKASI',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'SISFO PKL - WALI KELAS',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: _primaryColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Versi: 1.0.0\nBuild: 2024.01',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Aplikasi untuk monitoring dan laporan siswa PKL bagi Wali Kelas',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[800],
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  border: Border.all(color: _borderColor, width: _borderThickness),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                  ),
+                  child: const Text(
+                    'TUTUP',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

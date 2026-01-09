@@ -5,7 +5,78 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'kaprog_profile_page.dart';
 import 'kaprog_dashboard_skeleton.dart';
-import '../login/login_screen.dart'; // IMPORT HALAMAN LOGIN
+import '../login/login_screen.dart';
+
+// === ANIMATED BUTTON CLASS ===
+class PressableButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final bool isPrimary;
+
+  const PressableButton({
+    required this.child,
+    required this.onTap,
+    this.isPrimary = false,
+    super.key,
+  });
+
+  @override
+  State<PressableButton> createState() => _PressableButtonState();
+}
+
+class _PressableButtonState extends State<PressableButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+      lowerBound: 0.95,
+      upperBound: 1.0,
+    );
+    _scaleAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onTapDown(TapDownDetails details) {
+    _controller.reverse();
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    _controller.forward().then((_) {
+      widget.onTap();
+    });
+  }
+
+  void _onTapCancel() {
+    _controller.forward();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: widget.child,
+      ),
+    );
+  }
+}
 
 class KaprogDashboard extends StatefulWidget {
   const KaprogDashboard({super.key});
@@ -18,14 +89,31 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
   String _namaKaprog = 'Loading...';
   bool _isLoading = true;
   bool _hasError = false;
-  bool _isCheckingToken = true; // Tambah state untuk checking token
+  bool _isCheckingToken = true;
 
   // Data dari API
   List<dynamic> _pendingApplications = [];
   List<dynamic> _approvedApplications = [];
   List<dynamic> _industries = [];
-  List<dynamic> _teachers = []; // Tetap dipertahankan untuk kode lain
-  Map<String, dynamic>? _currentTeacher;
+  List<dynamic> _teachers = [];
+
+  // === HANYA 3 WARNA ===
+  final Color _primaryColor = const Color(0xFFE6E3E3); // Abu-abu muda
+  final Color _secondaryColor = const Color(0xFF262626); // Hitam gelap
+  final Color _accentColor = const Color(0xFFE71543); // Merah cerah
+
+  // Neo Brutalism Shadows
+  static const BoxShadow _heavyShadow = BoxShadow(
+    color: Colors.black,
+    offset: Offset(4, 4),
+    blurRadius: 0,
+  );
+
+  final BoxShadow _lightShadow = BoxShadow(
+    color: Colors.black.withValues(alpha: 0.2),
+    offset: const Offset(2, 2),
+    blurRadius: 0,
+  );
 
   @override
   void initState() {
@@ -33,22 +121,18 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     _checkTokenAndLoadData();
   }
 
-  // PERUBAHAN: Fungsi untuk cek token terlebih dahulu
   Future<void> _checkTokenAndLoadData() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
-    // Jika tidak ada token, redirect ke login
     if (token == null || token.isEmpty) {
       _redirectToLogin();
       return;
     }
 
-    // Jika ada token, lanjut load data
     await _loadAllData();
   }
 
-  // PERUBAHAN: Fungsi untuk redirect ke halaman login
   void _redirectToLogin() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -60,7 +144,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
 
   Future<void> _loadAllData() async {
     setState(() {
-      _isCheckingToken = false; // Sudah selesai cek token
+      _isCheckingToken = false;
       _isLoading = true;
       _hasError = false;
     });
@@ -73,7 +157,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
         _fetchApplications('Approved')
             .then((value) => _approvedApplications = value),
         _fetchIndustries(),
-        _fetchTeachers(), // Tetap dijalankan untuk kebutuhan lain
+        _fetchTeachers(),
       ]);
     } catch (e) {
       setState(() => _hasError = true);
@@ -83,145 +167,91 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
       }
     }
   }
-Future<void> _loadProfileData() async {
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('access_token');
-  
-  if (token == null) {
-    _redirectToLogin();
-    return;
-  }
 
-  // DEBUG: Print data dari SharedPreferences
-  print('=== DATA DARI SHAREDPREFERENCES ===');
-  final userId = prefs.getInt('user_id');
-  final kodeGuru = prefs.getString('kode_guru');
-  final userName = prefs.getString('user_name');
-  print('User ID: $userId');
-  print('Kode Guru: $kodeGuru');
-  print('User Name: $userName');
+  Future<void> _loadProfileData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
 
-  // Coba ambil dari SharedPreferences dulu
-  if (userName != null) {
-    print('=== MENGAMBIL NAMA DARI SHAREDPREFERENCES ===');
-    setState(() {
-      _namaKaprog = userName;
-    });
-  }
+    if (token == null) {
+      _redirectToLogin();
+      return;
+    }
 
-  try {
-    final response = await http.get(
-      Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/pembimbing'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
+    final userName = prefs.getString('user_name');
+    if (userName != null) {
+      setState(() {
+        _namaKaprog = userName;
+      });
+    }
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      print('=== RESPONSE API PEMBIMBING ===');
-      print('Response type: ${data.runtimeType}');
-      
-      List<dynamic> guruList;
-      
-      // Handle struktur response yang berbeda
-      if (data is List) {
-        // Response langsung berupa List
-        print('Response is direct List');
-        guruList = data;
-      } else if (data is Map && data.containsKey('data')) {
-        // Response berupa Map dengan key 'data'
-        print('Response is Map with data key');
-        if (data['data'] is List) {
-          guruList = data['data'];
-        } else if (data['data'] is Map && data['data']['data'] is List) {
-          // Nested structure
-          guruList = data['data']['data'];
+    try {
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/pembimbing'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        List<dynamic> guruList;
+
+        if (data is List) {
+          guruList = data;
+        } else if (data is Map && data.containsKey('data')) {
+          if (data['data'] is List) {
+            guruList = data['data'];
+          } else if (data['data'] is Map && data['data']['data'] is List) {
+            guruList = data['data']['data'];
+          } else {
+            return;
+          }
         } else {
-          print('Unexpected data structure: $data');
           return;
         }
-      } else {
-        print('Unexpected response format: $data');
-        return;
-      }
 
-      if (guruList.isEmpty) {
-        print('=== LIST GURU KOSONG ===');
-        return;
-      }
+        if (guruList.isEmpty) return;
 
-      print('=== SEMUA DATA GURU DARI API ===');
-      for (var i = 0; i < guruList.length; i++) {
-        final guru = guruList[i];
-        print('Guru $i: ${guru['nama']} - ID: ${guru['id']}');
-      }
+        Map<String, dynamic>? myProfile;
+        final userId = prefs.getInt('user_id');
 
-      // CARI GURU YANG SESUAI DENGAN USER YANG LOGIN
-      Map<String, dynamic>? myProfile;
-      
-      // Cari berdasarkan user_id (yang seharusnya ada di SharedPreferences)
-      if (userId != null) {
-        print('=== MENCARI BERDASARKAN USER_ID: $userId ===');
-        for (var guru in guruList) {
-          // Periksa berbagai kemungkinan field ID
-          final guruId = guru['id'] ?? guru['user_id'] ?? guru['guru_id'];
-          if (guruId == userId) {
-            myProfile = guru;
-            print('=== DITEMUKAN BERDASARKAN USER_ID ===');
-            print('Nama: ${guru['nama']}');
-            print('ID: $guruId');
-            break;
+        if (userId != null) {
+          for (var guru in guruList) {
+            final guruId = guru['id'] ?? guru['user_id'] ?? guru['guru_id'];
+            if (guruId == userId) {
+              myProfile = guru;
+              break;
+            }
           }
         }
-      }
-      
-      // Jika tidak ditemukan dengan user_id, coba dengan nama
-      if (myProfile == null && userName != null) {
-        print('=== MENCARI BERDASARKAN NAMA: $userName ===');
-        for (var guru in guruList) {
-          if (guru['nama']?.toString().toLowerCase() == userName.toLowerCase()) {
-            myProfile = guru;
-            print('=== DITEMUKAN BERDASARKAN NAMA ===');
-            print('Nama: ${guru['nama']}');
-            break;
+
+        if (myProfile == null && userName != null) {
+          for (var guru in guruList) {
+            if (guru['nama']?.toString().toLowerCase() ==
+                userName.toLowerCase()) {
+              myProfile = guru;
+              break;
+            }
           }
         }
-      }
-      
-      // Jika ditemukan, update data
-      if (myProfile != null) {
-        final namaLengkap = myProfile['nama'] ?? userName ?? 'Kaprodi';
-        setState(() {
-          _currentTeacher = myProfile;
-          _namaKaprog = namaLengkap;
-        });
-        
-        print('=== DATA GURU YANG DIGUNAKAN ===');
-        print('Nama: $namaLengkap');
-        print('NIP: ${myProfile['nip']}');
-        
-      } else {
-        print('=== TIDAK DITEMUKAN, AMBIL DATA PERTAMA ===');
-        // Fallback ke data pertama
-        if (guruList.isNotEmpty) {
+
+        if (myProfile != null) {
+          final namaLengkap = myProfile['nama'] ?? userName ?? 'Kaprodi';
+          setState(() {
+            _namaKaprog = namaLengkap;
+          });
+        } else if (guruList.isNotEmpty) {
           final firstGuru = guruList.first;
           final namaLengkap = firstGuru['nama'] ?? 'Kaprodi';
           setState(() {
-            _currentTeacher = firstGuru;
             _namaKaprog = namaLengkap;
           });
-          print('Mengambil data pertama: $namaLengkap');
         }
       }
-    } else {
-      print('=== ERROR RESPONSE API ===');
-      print('Status Code: ${response.statusCode}');
-      print('Response: ${response.body}');
+    } catch (e) {
+      print('Error loading profile: $e');
     }
-  } catch (e) {
-    print('Error loading profile: $e');
-    // Tetap gunakan data dari SharedPreferences jika ada error
   }
-}
+
   Future<List<dynamic>> _fetchApplications(String status) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
@@ -318,14 +348,14 @@ Future<void> _loadProfileData() async {
       );
 
       if (response.statusCode == 200) {
-        _showSnackBar('Pengajuan berhasil disetujui', Colors.green);
+        _showSnackBar('Pengajuan berhasil disetujui');
         _loadAllData();
       } else {
-        _showSnackBar('Pengajuan diproses', Colors.orange);
+        _showSnackBar('Pengajuan diproses');
         _loadAllData();
       }
     } catch (e) {
-      _showSnackBar('Error: $e', Colors.red);
+      _showSnackBar('Error: $e');
     }
   }
 
@@ -350,13 +380,13 @@ Future<void> _loadProfileData() async {
       );
 
       if (response.statusCode == 200) {
-        _showSnackBar('Pengajuan berhasil ditolak', Colors.green);
+        _showSnackBar('Pengajuan berhasil ditolak');
         _loadAllData();
       } else {
-        _showSnackBar('Gagal menolak pengajuan', Colors.red);
+        _showSnackBar('Gagal menolak pengajuan');
       }
     } catch (e) {
-      _showSnackBar('Error: $e', Colors.red);
+      _showSnackBar('Error: $e');
     }
   }
 
@@ -381,23 +411,35 @@ Future<void> _loadProfileData() async {
       );
 
       if (response.statusCode == 200) {
-        _showSnackBar('Kuota berhasil diupdate', Colors.green);
+        _showSnackBar('Kuota berhasil diupdate');
         _fetchIndustries();
       } else {
-        _showSnackBar('Gagal mengupdate kuota', Colors.red);
+        _showSnackBar('Gagal mengupdate kuota');
       }
     } catch (e) {
-      _showSnackBar('Error: $e', Colors.red);
+      _showSnackBar('Error: $e');
     }
   }
 
-  void _showSnackBar(String message, Color color) {
+  void _showSnackBar(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message),
-          backgroundColor: color,
+          content: Text(
+            message,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              color: _primaryColor,
+            ),
+          ),
+          backgroundColor: _secondaryColor,
           duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: _primaryColor, width: 2),
+          ),
         ),
       );
     }
@@ -406,13 +448,13 @@ Future<void> _loadProfileData() async {
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
-        return Colors.green;
+        return _accentColor.withValues(alpha:0.8);
       case 'rejected':
-        return Colors.red;
+        return _secondaryColor.withValues(alpha:0.8);
       case 'completed':
-        return Colors.blue;
+        return _primaryColor.withValues(alpha:0.6);
       default:
-        return Colors.orange;
+        return _primaryColor.withValues(alpha:0.4);
     }
   }
 
@@ -435,14 +477,12 @@ Future<void> _loadProfileData() async {
         'Nov',
         'Des'
       ];
-
       return '${date.day} ${bulan[date.month - 1]} ${date.year}';
     } catch (e) {
       return '-';
     }
   }
 
-  // Navigate to Profile Page
   void _navigateToProfile() {
     Navigator.push(
       context,
@@ -452,31 +492,30 @@ Future<void> _loadProfileData() async {
 
   @override
   Widget build(BuildContext context) {
-    // PERUBAHAN: Tampilkan loading screen saat cek token
     if (_isCheckingToken) {
-      return const Scaffold(
+      return Scaffold(
+        backgroundColor: _secondaryColor,
         body: Center(
-          child: CircularProgressIndicator(),
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: _primaryColor,
+              border: Border.all(color: _primaryColor, width: 3),
+              boxShadow: const [_heavyShadow],
+            ),
+            child: CircularProgressIndicator(
+              color: _accentColor,
+            ),
+          ),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person, color: Colors.black),
-            onPressed: _navigateToProfile,
-            tooltip: 'Profile',
-          ),
-        ],
-      ),
+      backgroundColor: _secondaryColor,
       body: _isLoading
-          ? const KaprogDashboardSkeleton() // Menggunakan komponen skeleton terpisah
+          ? const KaprogDashboardSkeleton()
           : _hasError
               ? _buildErrorState()
               : _buildContent(),
@@ -486,191 +525,195 @@ Future<void> _loadProfileData() async {
   Widget _buildContent() {
     return RefreshIndicator(
       onRefresh: _loadAllData,
-      backgroundColor: Colors.white,
-      color: Colors.black,
+      backgroundColor: _primaryColor,
+      color: _accentColor,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Profile - Background Putih
-            _buildProfileCard(),
-            const SizedBox(height: 20),
+            // === HEADER TEXT (TANPA KOTAK) ===
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'KEPALA PROGRAM ',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: _primaryColor,
+                                letterSpacing: -1,
+                              ),
+                            ),
+                            Text(
+                              _namaKaprog.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: _primaryColor,
+                                letterSpacing: -0.5,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: _primaryColor,
+                          border: Border.all(color: _primaryColor, width: 2),
+                          boxShadow: [_lightShadow],
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.person, color: _secondaryColor),
+                          onPressed: _navigateToProfile,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _accentColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'DASHBOARD PKL',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: _primaryColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-            // Statistics Grid - Kecil dan Rapi
-            _buildCompactStatisticsGrid(),
-            const SizedBox(height: 20),
+            // === STATISTICS ROW (4 KOLOM SEBARIS) ===
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _primaryColor,
+                border:
+                    Border.all(color: _primaryColor.withValues(alpha:0.3), width: 2),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [_heavyShadow],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildStatItem(
+                    value: _pendingApplications.length.toString(),
+                    label: 'MENUNGGU',
+                    color: _primaryColor.withValues(alpha:0.4),
+                  ),
+                  _buildStatItem(
+                    value: _approvedApplications.length.toString(),
+                    label: 'DISETUJUI',
+                    color: _primaryColor.withValues(alpha:0.3),
+                  ),
+                  _buildStatItem(
+                    value: _industries.length.toString(),
+                    label: 'INDUSTRI',
+                    color: _primaryColor.withValues(alpha:0.6),
+                  ),
+                  _buildStatItem(
+                    value: _teachers.length.toString(),
+                    label: 'GURU',
+                    color: _secondaryColor.withValues(alpha:0.2),
+                  ),
+                ],
+              ),
+            ),
 
-            // Pengajuan Menunggu
-            _buildPendingApplicationsSection(),
-            const SizedBox(height: 20),
+            // === MAIN CONTENT AREA ===
+            Container(
+              margin: const EdgeInsets.only(top: 16),
+              decoration: BoxDecoration(
+                color: _primaryColor,
+                border: Border.all(color: _primaryColor, width: 4),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+                boxShadow: const [_heavyShadow],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // === PENGAJUAN MENUNGGU ===
+                    _buildPendingApplicationsSection(),
+                    const SizedBox(height: 20),
 
-            // Data Industri
-            _buildIndustriesSection(),
+                    // === DATA INDUSTRI ===
+                    _buildIndustriesSection(),
+
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.school, color: Colors.black, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _namaKaprog,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  'Koordinator Program Keahlian',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
-                if (_currentTeacher != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'NIP: ${_currentTeacher!['nip']}',
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactStatisticsGrid() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Ringkasan Data',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildCompactStatItem(
-                value: _pendingApplications.length.toString(),
-                label: 'Menunggu',
-                icon: Icons.pending_actions,
-              ),
-              _buildCompactStatItem(
-                value: _approvedApplications.length.toString(),
-                label: 'Disetujui',
-                icon: Icons.check_circle,
-              ),
-              _buildCompactStatItem(
-                value: _industries.length.toString(),
-                label: 'Industri',
-                icon: Icons.business,
-              ),
-              _buildCompactStatItem(
-                value: _teachers.length.toString(),
-                label: 'Guru',
-                icon: Icons.people,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactStatItem({
+  Widget _buildStatItem({
     required String value,
     required String label,
-    required IconData icon,
+    required Color color,
   }) {
-    return Column(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.05),
-            shape: BoxShape.circle,
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: _secondaryColor,
+                ),
+              ),
+            ),
           ),
-          child: Icon(icon, size: 18, color: Colors.black),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: _secondaryColor,
+            ),
+            textAlign: TextAlign.center,
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -681,29 +724,38 @@ Future<void> _loadProfileData() async {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Pengajuan Menunggu Persetujuan',
+            Text(
+              'PENGAJUAN MENUNGGU',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: _secondaryColor,
+                letterSpacing: -0.5,
               ),
             ),
-            Text(
-              '${_pendingApplications.length} items',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _accentColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${_pendingApplications.length}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _primaryColor,
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         _pendingApplications.isEmpty
             ? _buildEmptyState(
-                'Tidak ada pengajuan menunggu',
-                Icons.check_circle_outline,
-                'Semua pengajuan sudah diproses',
+                icon: Icons.inbox,
+                title: 'TIDAK ADA PENGAJUAN',
+                subtitle: 'Semua pengajuan telah diproses',
               )
             : Column(
                 children: _pendingApplications.map((appData) {
@@ -722,29 +774,38 @@ Future<void> _loadProfileData() async {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Data Industri',
+            Text(
+              'DATA INDUSTRI',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: _secondaryColor,
+                letterSpacing: -0.5,
               ),
             ),
-            Text(
-              '${_industries.length} industri',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _accentColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '${_industries.length}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: _primaryColor,
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         _industries.isEmpty
             ? _buildEmptyState(
-                'Tidak ada data industri',
-                Icons.business,
-                'Belum ada industri terdaftar',
+                icon: Icons.factory,
+                title: 'BELUM ADA INDUSTRI',
+                subtitle: 'Tambahkan industri untuk memulai',
               )
             : Column(
                 children: _industries.map((industry) {
@@ -757,296 +818,576 @@ Future<void> _loadProfileData() async {
 
   Widget _buildApplicationCard(
       Map<String, dynamic> appData, Map<String, dynamic> application) {
+    final status = application['status'] ?? 'PENDING';
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade100),
+        color: _primaryColor,
+        border: Border.all(color: _secondaryColor, width: 3),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [_heavyShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      appData['siswa_username'] ?? 'Siswa',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      appData['industri_nama'] ?? 'Industri',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
+          // HEADER STATUS
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _statusColor(status),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _statusColor(application['status'])
-                      .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  application['status'] ?? 'Pending',
-                  style: TextStyle(
-                    color: _statusColor(application['status']),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10,
+              border: Border(
+                bottom: BorderSide(color: _secondaryColor, width: 3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _primaryColor,
+                    border: Border.all(color: _secondaryColor, width: 2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    status == 'Pending'
+                        ? Icons.access_time
+                        : (status == 'Approved'
+                            ? Icons.check_circle
+                            : Icons.cancel),
+                    color: _secondaryColor,
+                    size: 20,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Details
-          Row(
-            children: [
-              _buildCompactDetailItem('Kelas', appData['kelas_nama']),
-              const SizedBox(width: 12),
-              if (application['tanggal_permohonan'] != null)
-                _buildCompactDetailItem('Tanggal',
-                    _formatTanggal(application['tanggal_permohonan'])),
-            ],
-          ),
-          if (application['catatan'] != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Catatan: ${application['catatan']}',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[600],
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-
-          // Actions for pending applications
-          if (application['status'] == 'Pending') ...[
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _buildActionButton(
-                  icon: Icons.check,
-                  label: 'Setujui',
-                  color: Colors.black,
-                  onPressed: () => _showApproveDialog(application, appData),
-                ),
-                const SizedBox(width: 8),
-                _buildActionButton(
-                  icon: Icons.close,
-                  label: 'Tolak',
-                  color: Colors.red,
-                  onPressed: () => _showRejectDialog(application, appData),
-                  isOutlined: true,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        status.toUpperCase(),
+                        style: TextStyle(
+                          color: _secondaryColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        appData['siswa_username'] ?? 'Siswa',
+                        style: TextStyle(
+                          color: _secondaryColor.withValues(alpha:0.7),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
+          ),
+
+          // KONTEN UTAMA
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // INDUSTRI
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withValues(alpha:0.8),
+                    border: Border.all(color: _secondaryColor, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: _accentColor,
+                          border: Border.all(color: _secondaryColor, width: 2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.factory,
+                          color: _primaryColor,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'LOKASI PKL',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: _secondaryColor,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            Text(
+                              appData['industri_nama'] ?? 'Industri',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: _secondaryColor,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // DETAIL
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _primaryColor,
+                    border: Border.all(color: _secondaryColor, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildInfoRowCompact(
+                        icon: Icons.class_,
+                        title: 'KELAS',
+                        value: appData['kelas_nama'] ?? '-',
+                      ),
+                      const SizedBox(height: 8),
+                      _buildInfoRowCompact(
+                        icon: Icons.calendar_today,
+                        title: 'DIAJUKAN',
+                        value:
+                            _formatTanggal(application['tanggal_permohonan']),
+                      ),
+                      const SizedBox(height: 8),
+                      if (appData['guru_nama'] != null)
+                        _buildInfoRowCompact(
+                          icon: Icons.person_outline,
+                          title: 'GURU PEMBIMBING',
+                          value: appData['guru_nama'],
+                        ),
+                    ],
+                  ),
+                ),
+
+                // CATATAN JIKA ADA
+                if (application['catatan'] != null &&
+                    application['catatan'].isNotEmpty &&
+                    application['catatan'] != '-')
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _primaryColor.withValues(alpha:0.8),
+                      border: Border.all(color: _secondaryColor, width: 2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: _accentColor,
+                                border: Border.all(
+                                    color: _secondaryColor, width: 1.5),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.note_add,
+                                size: 12,
+                                color: _primaryColor,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'CATATAN SISWA',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: _secondaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _primaryColor,
+                            border:
+                                Border.all(color: _secondaryColor, width: 1.5),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            application['catatan'],
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _secondaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // ACTIONS for pending status dengan animasi
+                if (status == 'Pending') ...[
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        // TOMBOL TOLAK (KIRI) dengan animasi
+                        Expanded(
+                          child: PressableButton(
+                            onTap: () =>
+                                _showRejectDialog(application, appData),
+                            child: Container(
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: _primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                                border:
+                                    Border.all(color: _secondaryColor, width: 3),
+                                boxShadow: const [_heavyShadow],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.close,
+                                    size: 22,
+                                    color: _secondaryColor,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'TOLAK',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: _secondaryColor,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // TOMBOL SETUJUI (KANAN) dengan animasi
+                        Expanded(
+                          child: PressableButton(
+                            onTap: () =>
+                                _showApproveDialog(application, appData),
+                            child: Container(
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: _accentColor,
+                                borderRadius: BorderRadius.circular(12),
+                                border:
+                                    Border.all(color: _secondaryColor, width: 3),
+                                boxShadow: const [_heavyShadow],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.check,
+                                    size: 22,
+                                    color: _primaryColor,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    'SETUJUI',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      color: _primaryColor,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildIndustryCard(Map<String, dynamic> industry) {
+    final kuota = industry['kuota_siswa'] ?? 0;
+    final sisa = industry['remaining_slots'] ?? 0;
+    final siswa = industry['active_students'] ?? 0;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.shade100),
+        color: _primaryColor,
+        border: Border.all(color: _secondaryColor, width: 3),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [_heavyShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  industry['nama'] ?? 'Industri',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.black,
+          // HEADER
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _primaryColor.withValues(alpha:0.6),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+              border: Border(
+                bottom: BorderSide(color: _secondaryColor, width: 3),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    industry['nama'] ?? 'INDUSTRI',
+                    style: TextStyle(
+                      color: _secondaryColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit, size: 18, color: Colors.black),
-                onPressed: () => _showUpdateQuotaDialog(industry),
-              ),
-            ],
+                PressableButton(
+                  onTap: () => _showUpdateQuotaDialog(industry),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: _accentColor,
+                      border: Border.all(color: _secondaryColor, width: 2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.edit,
+                      size: 16,
+                      color: _primaryColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildIndustryInfoItem(
-                  'Kuota', '${industry['kuota_siswa'] ?? '0'}'),
-              _buildIndustryInfoItem(
-                  'Sisa', '${industry['remaining_slots'] ?? '0'}'),
-              _buildIndustryInfoItem(
-                  'Siswa', '${industry['active_students'] ?? '0'}'),
-            ],
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // STATISTICS
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withValues(alpha:0.8),
+                    border: Border.all(color: _secondaryColor, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildIndustryStat(
+                        'KUOTA',
+                        kuota.toString(),
+                      ),
+                      _buildIndustryStat(
+                        'SISA',
+                        sisa.toString(),
+                      ),
+                      _buildIndustryStat(
+                        'SISWA',
+                        siswa.toString(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildIndustryInfoItem(String label, String value) {
+  Widget _buildInfoRowCompact({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: _primaryColor,
+        border: Border.all(color: _secondaryColor, width: 1.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: _accentColor,
+              border: Border.all(color: _secondaryColor, width: 1.5),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 14,
+              color: _primaryColor,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: _secondaryColor,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: _secondaryColor,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIndustryStat(String label, String value) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+          decoration: BoxDecoration(
+            color: _accentColor,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: _secondaryColor, width: 1.5),
+          ),
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: _primaryColor,
+            ),
           ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 4),
         Text(
           label,
           style: TextStyle(
             fontSize: 10,
-            color: Colors.grey[600],
+            fontWeight: FontWeight.w700,
+            color: _secondaryColor,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCompactDetailItem(String label, dynamic value) {
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey[500],
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value?.toString() ?? '-',
-            style: const TextStyle(
-              fontSize: 12,
-              color: Colors.black,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
+  Widget _buildEmptyState({
     required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-    bool isOutlined = false,
+    required String title,
+    required String subtitle,
   }) {
-    if (isOutlined) {
-      return OutlinedButton.icon(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: color,
-          side: BorderSide(color: color),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-        icon: Icon(icon, size: 14),
-        label: Text(
-          label,
-          style: const TextStyle(fontSize: 12),
-        ),
-      );
-    } else {
-      return ElevatedButton.icon(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-        icon: Icon(icon, size: 14),
-        label: Text(
-          label,
-          style: const TextStyle(fontSize: 12),
-        ),
-      );
-    }
-  }
-
-  Widget _buildEmptyState(String title, IconData icon, String subtitle) {
     return Container(
-      padding: const EdgeInsets.all(32),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        color: _primaryColor,
+        border: Border.all(color: _secondaryColor, width: 3),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [_heavyShadow],
       ),
       child: Column(
         children: [
-          Icon(icon, size: 40, color: Colors.grey[400]),
-          const SizedBox(height: 12),
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: _accentColor,
+              border: Border.all(color: _secondaryColor, width: 2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 30,
+              color: _primaryColor,
+            ),
+          ),
+          const SizedBox(height: 16),
           Text(
             title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: _secondaryColor,
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           Text(
             subtitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: Colors.grey,
+              fontWeight: FontWeight.w600,
+              color: _secondaryColor,
             ),
             textAlign: TextAlign.center,
           ),
@@ -1062,40 +1403,69 @@ Future<void> _loadProfileData() async {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: _primaryColor,
+                border: Border.all(color: _secondaryColor, width: 3),
+                boxShadow: const [_heavyShadow],
+              ),
+              child: Icon(
+                Icons.error_outline,
+                size: 30,
+                color: _accentColor,
+              ),
+            ),
             const SizedBox(height: 16),
-            const Text(
-              'Terjadi Kesalahan',
+            Text(
+              'KESALAHAN SISTEM',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+                fontWeight: FontWeight.w900,
+                color: _primaryColor,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Gagal memuat data dashboard',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.grey,
+                color: _primaryColor,
                 fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _loadAllData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(
+            const SizedBox(height: 16),
+            PressableButton(
+              onTap: _loadAllData,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _accentColor,
                   borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _primaryColor, width: 2),
+                  boxShadow: const [_heavyShadow],
                 ),
-              ),
-              child: const Text(
-                'Coba Lagi',
-                style: TextStyle(fontSize: 12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.refresh,
+                      size: 18,
+                      color: _primaryColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'COBA LAGI',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: _primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -1126,7 +1496,7 @@ Future<void> _loadProfileData() async {
         OverlayEntry? teacherOverlayEntry;
         List<dynamic> filteredTeachers = [];
 
-        // Fungsi untuk filter teacher - dideklarasikan dulu
+        // Fungsi untuk filter teacher
         void filterTeacherList() {
           final query = searchTeacherController.text.toLowerCase();
           filteredTeachers = _teachers.where((teacher) {
@@ -1154,17 +1524,18 @@ Future<void> _loadProfileData() async {
         // Widget untuk list guru
         Widget buildTeacherList() {
           if (_teachers.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.person_outline, size: 40, color: Colors.grey),
-                    SizedBox(height: 8),
+                    Icon(Icons.person_outline,
+                        size: 40, color: _secondaryColor),
+                    const SizedBox(height: 8),
                     Text(
                       'Tidak ada data guru',
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: _secondaryColor),
                     ),
                   ],
                 ),
@@ -1173,17 +1544,17 @@ Future<void> _loadProfileData() async {
           }
 
           if (filteredTeachers.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.search_off, size: 40, color: Colors.grey),
-                    SizedBox(height: 8),
+                    Icon(Icons.search_off, size: 40, color: _secondaryColor),
+                    const SizedBox(height: 8),
                     Text(
                       'Tidak ditemukan',
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: _secondaryColor),
                     ),
                   ],
                 ),
@@ -1211,9 +1582,12 @@ Future<void> _loadProfileData() async {
                   decoration: BoxDecoration(
                     border: index == 0
                         ? null
-                        : Border(top: BorderSide(color: Colors.grey.shade100)),
-                    color:
-                        isSelected ? Colors.blue.shade50 : Colors.transparent,
+                        : Border(
+                            top: BorderSide(
+                                color: _primaryColor.withValues(alpha:0.3))),
+                    color: isSelected
+                        ? _accentColor.withValues(alpha:0.1)
+                        : Colors.transparent,
                   ),
                   child: Row(
                     children: [
@@ -1221,11 +1595,12 @@ Future<void> _loadProfileData() async {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
+                          color: _primaryColor,
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: _secondaryColor),
                         ),
-                        child: const Icon(Icons.person,
-                            color: Colors.blue, size: 20),
+                        child: Icon(Icons.person,
+                            color: _secondaryColor, size: 20),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -1234,25 +1609,26 @@ Future<void> _loadProfileData() async {
                           children: [
                             Text(
                               teacher['nama'] ?? 'Guru',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w500,
                                 fontSize: 14,
+                                color: _secondaryColor,
                               ),
                             ),
                             const SizedBox(height: 2),
                             if (teacher['nip'] != null)
                               Text(
                                 'NIP: ${teacher['nip']}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey,
+                                  color: _secondaryColor.withValues(alpha:0.7),
                                 ),
                               ),
                           ],
                         ),
                       ),
                       if (isSelected)
-                        const Icon(Icons.check, color: Colors.blue, size: 20),
+                        Icon(Icons.check, color: _accentColor, size: 20),
                     ],
                   ),
                 ),
@@ -1300,9 +1676,10 @@ Future<void> _loadProfileData() async {
                   child: Container(
                     constraints: BoxConstraints(maxHeight: maxHeight),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _primaryColor,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: _secondaryColor),
+                      boxShadow: const [_heavyShadow],
                     ),
                     child: Column(
                       children: [
@@ -1316,15 +1693,14 @@ Future<void> _loadProfileData() async {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
+                                    color: _primaryColor,
                                     borderRadius: BorderRadius.circular(8),
-                                    border:
-                                        Border.all(color: Colors.grey.shade300),
+                                    border: Border.all(color: _secondaryColor),
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.search,
-                                          color: Colors.grey, size: 20),
+                                      Icon(Icons.search,
+                                          color: _secondaryColor, size: 20),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: TextField(
@@ -1332,13 +1708,18 @@ Future<void> _loadProfileData() async {
                                           focusNode: searchTeacherFocusNode,
                                           onChanged: (value) =>
                                               filterTeacherList(),
-                                          decoration: const InputDecoration(
+                                          decoration: InputDecoration(
                                             hintText: 'Cari guru...',
+                                            hintStyle: TextStyle(
+                                                color: _secondaryColor
+                                                    .withValues(alpha:0.6)),
                                             border: InputBorder.none,
                                             contentPadding: EdgeInsets.zero,
                                             isDense: true,
                                           ),
-                                          style: const TextStyle(fontSize: 14),
+                                          style: TextStyle(
+                                              fontSize: 14,
+                                              color: _secondaryColor),
                                         ),
                                       ),
                                       if (searchTeacherController
@@ -1348,8 +1729,8 @@ Future<void> _loadProfileData() async {
                                             searchTeacherController.clear();
                                             filterTeacherList();
                                           },
-                                          child: const Icon(Icons.clear,
-                                              size: 16, color: Colors.grey),
+                                          child: Icon(Icons.clear,
+                                              size: 16, color: _secondaryColor),
                                         ),
                                     ],
                                   ),
@@ -1361,10 +1742,11 @@ Future<void> _loadProfileData() async {
                                 child: Container(
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade200,
+                                    color: _secondaryColor,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(Icons.close, size: 18),
+                                  child: Icon(Icons.close,
+                                      size: 18, color: _primaryColor),
                                 ),
                               ),
                             ],
@@ -1392,7 +1774,7 @@ Future<void> _loadProfileData() async {
         return StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
-              backgroundColor: Colors.white,
+              backgroundColor: _primaryColor,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16)),
               child: SingleChildScrollView(
@@ -1402,28 +1784,99 @@ Future<void> _loadProfileData() async {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
                           Icon(Icons.check_circle_outline,
-                              size: 20, color: Colors.black),
-                          SizedBox(width: 8),
+                              size: 20, color: _accentColor),
+                          const SizedBox(width: 8),
                           Text(
                             'Setujui Pengajuan',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color: _secondaryColor,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
 
-                      // Catatan
-                      const Text(
+                      // === GURU PEMBIMBING (URUTAN PERTAMA) ===
+                      Text(
+                        'Guru Pembimbing',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: _secondaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () => showTeacherPopupOverlay(context),
+                        child: Container(
+                          key: teacherFieldKey,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: _secondaryColor),
+                            borderRadius: BorderRadius.circular(8),
+                            color: _primaryColor,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: selectedTeacherId == null
+                                    ? Text(
+                                        'Pilih guru pembimbing',
+                                        style: TextStyle(
+                                          color:
+                                              _secondaryColor.withValues(alpha:0.6),
+                                          fontSize: 14,
+                                        ),
+                                      )
+                                    : Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            selectedTeacherName ?? 'Guru',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: _secondaryColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'ID: $selectedTeacherId',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: _secondaryColor
+                                                  .withValues(alpha:0.6),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                              Icon(
+                                showTeacherPopup
+                                    ? Icons.expand_less
+                                    : Icons.expand_more,
+                                color: _secondaryColor.withValues(alpha:0.6),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // === CATATAN (URUTAN KEDUA) ===
+                      Text(
                         'Catatan',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
+                          color: _secondaryColor,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1431,25 +1884,27 @@ Future<void> _loadProfileData() async {
                         controller: catatanController,
                         decoration: InputDecoration(
                           hintText: 'Masukkan catatan (opsional)',
+                          hintStyle: TextStyle(
+                              color: _secondaryColor.withValues(alpha:0.6)),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey.shade400),
+                            borderSide: BorderSide(color: _secondaryColor),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
-                          hintStyle: const TextStyle(fontSize: 12),
                         ),
-                        style: const TextStyle(fontSize: 12),
+                        style: TextStyle(fontSize: 12, color: _secondaryColor),
                         maxLines: 2,
                       ),
                       const SizedBox(height: 12),
 
-                      // Tanggal Mulai
-                      const Text(
+                      // === TANGGAL MULAI (URUTAN KETIGA) ===
+                      Text(
                         'Tanggal Mulai',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
+                          color: _secondaryColor,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1463,9 +1918,9 @@ Future<void> _loadProfileData() async {
                             builder: (context, child) {
                               return Theme(
                                 data: Theme.of(context).copyWith(
-                                  colorScheme: const ColorScheme.light(
-                                    primary: Colors.black,
-                                    onPrimary: Colors.white,
+                                  colorScheme: ColorScheme.light(
+                                    primary: _accentColor,
+                                    onPrimary: _primaryColor,
                                   ),
                                 ),
                                 child: child!,
@@ -1483,13 +1938,13 @@ Future<void> _loadProfileData() async {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade400),
+                            border: Border.all(color: _secondaryColor),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             children: [
                               Icon(Icons.calendar_today,
-                                  size: 18, color: Colors.grey.shade700),
+                                  size: 18, color: _secondaryColor),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -1499,8 +1954,8 @@ Future<void> _loadProfileData() async {
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: selectedStartDate != null
-                                        ? Colors.black
-                                        : Colors.grey.shade600,
+                                        ? _secondaryColor
+                                        : _secondaryColor.withValues(alpha:0.6),
                                   ),
                                 ),
                               ),
@@ -1510,12 +1965,13 @@ Future<void> _loadProfileData() async {
                       ),
                       const SizedBox(height: 12),
 
-                      // Tanggal Selesai
-                      const Text(
+                      // === TANGGAL SELESAI (URUTAN KEEMPAT) ===
+                      Text(
                         'Tanggal Selesai',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
+                          color: _secondaryColor,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1529,9 +1985,9 @@ Future<void> _loadProfileData() async {
                             builder: (context, child) {
                               return Theme(
                                 data: Theme.of(context).copyWith(
-                                  colorScheme: const ColorScheme.light(
-                                    primary: Colors.black,
-                                    onPrimary: Colors.white,
+                                  colorScheme: ColorScheme.light(
+                                    primary: _accentColor,
+                                    onPrimary: _primaryColor,
                                   ),
                                 ),
                                 child: child!,
@@ -1549,13 +2005,13 @@ Future<void> _loadProfileData() async {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade400),
+                            border: Border.all(color: _secondaryColor),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             children: [
                               Icon(Icons.calendar_today,
-                                  size: 18, color: Colors.grey.shade700),
+                                  size: 18, color: _secondaryColor),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -1565,8 +2021,8 @@ Future<void> _loadProfileData() async {
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: selectedEndDate != null
-                                        ? Colors.black
-                                        : Colors.grey.shade600,
+                                        ? _secondaryColor
+                                        : _secondaryColor.withValues(alpha:0.6),
                                   ),
                                 ),
                               ),
@@ -1574,123 +2030,64 @@ Future<void> _loadProfileData() async {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
-
-                      // Guru Pembimbing - Custom Dropdown
-                      const Text(
-                        'Guru Pembimbing',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      GestureDetector(
-                        onTap: () => showTeacherPopupOverlay(context),
-                        child: Container(
-                          key: teacherFieldKey,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(8),
-                            color: Colors.white,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: selectedTeacherId == null
-                                    ? Text(
-                                        'Pilih guru pembimbing',
-                                        style: TextStyle(
-                                          color: Colors.black
-                                              .withValues(alpha: 0.6),
-                                          fontSize: 14,
-                                        ),
-                                      )
-                                    : Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            selectedTeacherName ?? 'Guru',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'ID: $selectedTeacherId',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                              Icon(
-                                showTeacherPopup
-                                    ? Icons.expand_less
-                                    : Icons.expand_more,
-                                color: Colors.black.withValues(alpha: 0.6),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 24),
 
-                      // Tombol Aksi
+                      // Tombol Aksi dengan animasi
                       Row(
                         children: [
+                          // Tombol Batal dengan animasi
                           Expanded(
-                            child: OutlinedButton(
-                              onPressed: () {
+                            child: PressableButton(
+                              onTap: () {
                                 removeTeacherOverlay();
                                 Navigator.pop(context);
                               },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.black,
-                                side: const BorderSide(color: Colors.black),
+                              child: Container(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
+                                decoration: BoxDecoration(
+                                  color: _primaryColor,
                                   borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: _secondaryColor, width: 2),
+                                  boxShadow: const [_heavyShadow],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'BATAL',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                      color: _secondaryColor,
+                                    ),
+                                  ),
                                 ),
                               ),
-                              child: const Text('Batal',
-                                  style: TextStyle(fontSize: 12)),
                             ),
                           ),
                           const SizedBox(width: 12),
+                          // Tombol Setujui dengan animasi
                           Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
+                            child: PressableButton(
+                              onTap: () {
                                 // Validasi
                                 if (selectedStartDate == null) {
-                                  _showSnackBar(
-                                      'Pilih tanggal mulai', Colors.red);
+                                  _showSnackBar('Pilih tanggal mulai');
                                   return;
                                 }
                                 if (selectedEndDate == null) {
-                                  _showSnackBar(
-                                      'Pilih tanggal selesai', Colors.red);
+                                  _showSnackBar('Pilih tanggal selesai');
                                   return;
                                 }
                                 if (selectedTeacherId == null) {
-                                  _showSnackBar(
-                                      'Pilih guru pembimbing', Colors.red);
+                                  _showSnackBar('Pilih guru pembimbing');
                                   return;
                                 }
 
                                 if (selectedEndDate!
                                     .isBefore(selectedStartDate!)) {
                                   _showSnackBar(
-                                      'Tanggal selesai harus setelah tanggal mulai',
-                                      Colors.red);
+                                      'Tanggal selesai harus setelah tanggal mulai');
                                   return;
                                 }
 
@@ -1709,17 +2106,27 @@ Future<void> _loadProfileData() async {
                                 removeTeacherOverlay();
                                 Navigator.pop(context);
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.black,
-                                foregroundColor: Colors.white,
+                              child: Container(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
+                                decoration: BoxDecoration(
+                                  color: _accentColor,
                                   borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                      color: _secondaryColor, width: 2),
+                                  boxShadow: const [_heavyShadow],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'SETUJUI',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                      color: _primaryColor,
+                                    ),
+                                  ),
                                 ),
                               ),
-                              child: const Text('Setujui',
-                                  style: TextStyle(fontSize: 12)),
                             ),
                           ),
                         ],
@@ -1742,83 +2149,151 @@ Future<void> _loadProfileData() async {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: Colors.white,
+        backgroundColor: _primaryColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Tolak Pengajuan',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.cancel_outlined,
+                        size: 20, color: _accentColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Tolak Pengajuan',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _secondaryColor,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Siswa: ${appData['siswa_username']}',
-                style: const TextStyle(fontSize: 12),
-              ),
-              Text(
-                'Industri: ${appData['industri_nama']}',
-                style: const TextStyle(fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: catatanController,
-                decoration: const InputDecoration(
-                  labelText: 'Alasan Penolakan',
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withValues(alpha:0.8),
+                    border: Border.all(color: _secondaryColor, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Siswa: ${appData['siswa_username']}',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _secondaryColor),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Industri: ${appData['industri_nama']}',
+                        style: TextStyle(
+                            fontSize: 12, color: _secondaryColor),
+                      ),
+                    ],
+                  ),
                 ),
-                style: const TextStyle(fontSize: 12),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        side: const BorderSide(color: Colors.black),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 16),
+                Text(
+                  'Alasan Penolakan',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: _secondaryColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: catatanController,
+                  decoration: InputDecoration(
+                    hintText: 'Masukkan alasan penolakan...',
+                    hintStyle: TextStyle(
+                        color: _secondaryColor.withValues(alpha: 0.6)),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: _secondaryColor),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                  style: TextStyle(fontSize: 12, color: _secondaryColor),
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    // Tombol Batal dengan animasi
+                    Expanded(
+                      child: PressableButton(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _primaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border:
+                                Border.all(color: _secondaryColor, width: 2),
+                            boxShadow: const [_heavyShadow],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'BATAL',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: _secondaryColor,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      child:
-                          const Text('Batal', style: TextStyle(fontSize: 12)),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        _rejectApplication(
-                            application['id'], catatanController.text);
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    const SizedBox(width: 12),
+                    // Tombol Tolak dengan animasi
+                    Expanded(
+                      child: PressableButton(
+                        onTap: () {
+                          if (catatanController.text.isEmpty) {
+                            _showSnackBar('Masukkan alasan penolakan');
+                            return;
+                          }
+                          _rejectApplication(
+                              application['id'], catatanController.text);
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _accentColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border:
+                                Border.all(color: _secondaryColor, width: 2),
+                            boxShadow: const [_heavyShadow],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'TOLAK',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: _primaryColor,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      child:
-                          const Text('Tolak', style: TextStyle(fontSize: 12)),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1832,75 +2307,142 @@ Future<void> _loadProfileData() async {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        backgroundColor: Colors.white,
+        backgroundColor: _primaryColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Update Kuota - ${industry['nama']}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: quotaController,
-                decoration: const InputDecoration(
-                  labelText: 'Kuota Siswa',
-                  border: OutlineInputBorder(),
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-                style: const TextStyle(fontSize: 12),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.black,
-                        side: const BorderSide(color: Colors.black),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.edit, size: 20, color: _accentColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Update Kuota',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _secondaryColor,
                       ),
-                      child:
-                          const Text('Batal', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withValues(alpha: 0.8),
+                    border: Border.all(color: _secondaryColor, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    industry['nama'] ?? 'Industri',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _secondaryColor,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        final newQuota =
-                            int.tryParse(quotaController.text) ?? 0;
-                        _updateIndustryQuota(industry['industri_id'], newQuota);
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Kuota Siswa',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: _secondaryColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: quotaController,
+                  decoration: InputDecoration(
+                    hintText: 'Masukkan jumlah kuota...',
+                    hintStyle:
+                        TextStyle(color: _secondaryColor.withValues(alpha:0.6)),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: _secondaryColor),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                  style: TextStyle(fontSize: 12, color: _secondaryColor),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    // Tombol Batal dengan animasi
+                    Expanded(
+                      child: PressableButton(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _primaryColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border:
+                                Border.all(color: _secondaryColor, width: 2),
+                            boxShadow: const [_heavyShadow],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'BATAL',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: _secondaryColor,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      child:
-                          const Text('Update', style: TextStyle(fontSize: 12)),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 12),
+                    // Tombol Update dengan animasi
+                    Expanded(
+                      child: PressableButton(
+                        onTap: () {
+                          final newQuota =
+                              int.tryParse(quotaController.text) ?? 0;
+                          if (newQuota <= 0) {
+                            _showSnackBar('Masukkan kuota yang valid');
+                            return;
+                          }
+                          _updateIndustryQuota(
+                              industry['industri_id'], newQuota);
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _accentColor,
+                            borderRadius: BorderRadius.circular(8),
+                            border:
+                                Border.all(color: _secondaryColor, width: 2),
+                            boxShadow: const [_heavyShadow],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'UPDATE',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: _primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
