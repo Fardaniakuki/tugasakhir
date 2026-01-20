@@ -5,12 +5,12 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Import screens
-import 'package:tes_flutter/screens/kapro/kaprog_dashboard.dart';
+import 'package:tes_flutter/screens/kapro/kaprog_main_screen.dart';
 import 'package:tes_flutter/screens/koordinator/koordinator_main.dart';
 import '../admin/admin_main.dart';
 import '../guru/guru_dashboard.dart';
-import '../pembimbing/pembimbing_dashboard.dart';
-import '../walikelas/wali_kelas_main.dart';
+import '../pembimbing/main_dashboard.dart';
+import '../walikelas/walikelas_main_screen.dart';
 import '../siswa/siswa_main.dart';
 
 // Import dialog
@@ -104,13 +104,13 @@ class _LoginScreenState extends State<LoginScreen> {
           targetPage = const GuruDashboard();
           break;
         case 'Pembimbing':
-          targetPage = const PembimbingDashboard();
+          targetPage = const PembimbingMainScreen ();
           break;
         case 'Wali Kelas':
-          targetPage = const WaliKelasMain();
+          targetPage = const WalikelasMainScreen();
           break;
         case 'Kaprog':
-          targetPage = const KaprogDashboard();
+          targetPage = const KaprogMainScreen();
           break;
         case 'Admin':
           targetPage = const AdminMain();
@@ -195,13 +195,13 @@ class _LoginScreenState extends State<LoginScreen> {
             Widget targetPage;
             switch (role) {
               case 'Pembimbing':
-                targetPage = const PembimbingDashboard();
+                targetPage = const PembimbingMainScreen ();
                 break;
               case 'Wali Kelas':
-                targetPage = const WaliKelasMain();
+                targetPage = const WalikelasMainScreen();
                 break;
               case 'Kaprog':
-                targetPage = const KaprogDashboard();
+                targetPage = const KaprogMainScreen();
                 break;
               case 'Admin':
                 targetPage = const AdminMain();

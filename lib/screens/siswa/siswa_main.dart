@@ -19,7 +19,7 @@ class _SiswaMainState extends State<SiswaMain> {
   bool _isKeyboardVisible = false;
 
   // Warna tema Neo Brutalism
-  final Color _primaryColor = const Color.fromARGB(255, 206, 16, 57);
+  final Color _primaryColor = const Color(0xFF9f0712);
   final Color _backgroundColor = Colors.white;
   final Color _borderColor = const Color(0xFF000000);
   final double _borderThickness = 2.0; // Untuk border kotak

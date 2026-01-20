@@ -30,7 +30,7 @@ class _IndustriListPageState extends State<IndustriListPage> {
 
   // Neo Brutalism Colors - SAMA DENGAN SISWA DASHBOARD
   final Color _primaryColor = const Color(0xFFE63946); // Merah cerah
-  final Color _secondaryColor = const Color(0xFFF1FAEE); // Putih krem
+  final Color _secondaryColor = const Color.fromARGB(255, 244, 255, 241); // Putih krem
   final Color _accentColor = const Color(0xFFA8DADC); // Biru muda
   final Color _darkColor = const Color(0xFF1D3557); // Biru tua
   final Color _yellowColor = const Color(0xFFFFB703); // Kuning cerah

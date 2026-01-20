@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'dashboard/koordinator_dashboard.dart';
-import 'dashboard/koordinator_jadwal.dart';
-import 'dashboard/koordinator_data.dart';
-import 'dashboard/koordinator_pengaturan.dart';
+import 'dashboard_page.dart';
+import 'masalah_ijin_page.dart';
+import 'pengaturan_page.dart';
+import 'upload_page.dart';
 
-class KoordinatorMain extends StatefulWidget {
-  const KoordinatorMain({super.key});
+class PembimbingMainScreen extends StatefulWidget {
+  const PembimbingMainScreen ({super.key});
 
   @override
-  State<KoordinatorMain> createState() => _KoordinatorMainState();
+  State<PembimbingMainScreen > createState() => _PembimbingMainScreen ();
 }
 
-class _KoordinatorMainState extends State<KoordinatorMain> {
+class _PembimbingMainScreen  extends State<PembimbingMainScreen > {
   int _currentIndex = 0;
   
   // Cache untuk menyimpan widget halaman
@@ -28,10 +28,6 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
 
   late final List<Widget> _pageBuilders;
 
-  // WARNA SAMA PERSIS DENGAN PEMBIMBING
-  final Color _primaryColor = const Color(0xFF641E20); // MAROON/MERAH TUA (sama dengan pembimbing)
-  final Color _blackColor = Colors.black;
-
   @override
   void initState() {
     super.initState();
@@ -39,8 +35,8 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     // Inisialisasi page builders
     _pageBuilders = [
       _buildDashboardPage(),
-      _buildJadwalPage(),
-      _buildDataPage(),
+      _buildUploadPage(),
+      _buildMasalahIjinPage(),
       _buildPengaturanPage(),
     ];
   }
@@ -54,39 +50,68 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     super.dispose();
   }
 
+  // Neo Brutalism Colors
+  final Color _primaryColor = const Color(0xFF641E20);
+  final Color _secondaryColor = const Color(0xFFE6E3E3);
+  final Color _accentColor = const Color(0xFFA8DADC);
+  final Color _darkColor = const Color(0xFF641E20);
+  final Color _yellowColor = const Color(0xFFFFB703);
+  final Color _blackColor = Colors.black;
+
   // Builder untuk halaman Dashboard dengan caching sederhana
   Widget _buildDashboardPage() {
     return _buildCachedPage(
       index: 0,
       builder: () {
-        return const KoordinatorDashboard(
+
+
+        return const PembimbingDashboard(
           key: ValueKey('dashboard_page'),
         );
       },
     );
   }
 
-  // Builder untuk halaman Jadwal dengan caching sederhana
-  Widget _buildJadwalPage() {
+  // Builder untuk halaman Upload dengan caching sederhana
+  Widget _buildUploadPage() {
     return _buildCachedPage(
       index: 1,
       builder: () {
-        return const KoordinatorJadwal(
-          key: ValueKey('jadwal_page'),
+        const heavyShadow = BoxShadow(
+          color: Colors.black,
+          offset: Offset(6, 6),
+          blurRadius: 0,
+        );
+
+        final lightShadow = BoxShadow(
+          color: Colors.black.withValues(alpha:0.2),
+          offset: const Offset(4, 4),
+          blurRadius: 0,
+        );
+
+        return UploadPage(
+          primaryColor: _primaryColor,
+          secondaryColor: _secondaryColor,
+          accentColor: _accentColor,
+          darkColor: _darkColor,
+          yellowColor: _yellowColor,
+          blackColor: _blackColor,
+          heavyShadow: heavyShadow,
+          lightShadow: lightShadow,
+          key: const ValueKey('upload_page'),
+          scrollController: _scrollControllers[1],
         );
       },
     );
   }
 
-  // Builder untuk halaman Data dengan caching sederhana
-  Widget _buildDataPage() {
+  // Builder untuk halaman Masalah Ijin dengan caching sederhana
+  Widget _buildMasalahIjinPage() {
     return _buildCachedPage(
       index: 2,
-      builder: () {
-        return const KoordinatorData(
-          key: ValueKey('data_page'),
-        );
-      },
+      builder: () => const KelolaPerizinanTabScreen(
+        key: ValueKey('masalah_ijin_page'),
+      ),
     );
   }
 
@@ -95,7 +120,10 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     return _buildCachedPage(
       index: 3,
       builder: () {
-        return const KoordinatorPengaturan(
+
+
+        return const PengaturanPage(
+      
           key: ValueKey('pengaturan_page'),
         );
       },
@@ -155,7 +183,7 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _KoordinatorBottomBar(
+            child: _PembimbingBottomBar(
               currentIndex: _currentIndex,
               onTabSelected: _onTabSelected,
               primaryColor: _primaryColor,
@@ -182,13 +210,13 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
 
 // ============== BOTTOM NAVIGATION BAR ==============
 
-class _KoordinatorBottomBar extends StatefulWidget {
+class _PembimbingBottomBar extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTabSelected;
   final Color primaryColor;
   final Color blackColor;
 
-  const _KoordinatorBottomBar({
+  const _PembimbingBottomBar({
     required this.currentIndex,
     required this.onTabSelected,
     required this.primaryColor,
@@ -196,10 +224,10 @@ class _KoordinatorBottomBar extends StatefulWidget {
   });
 
   @override
-  State<_KoordinatorBottomBar> createState() => __KoordinatorBottomBarState();
+  State<_PembimbingBottomBar> createState() => __PembimbingBottomBarState();
 }
 
-class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
+class __PembimbingBottomBarState extends State<_PembimbingBottomBar> {
   final Color _inactiveColor = const Color(0xFF9E9E9E);
 
   @override
@@ -212,12 +240,19 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
+        // HAPUS BORDER DI SINI ↓↓↓
+        // border: Border(  // ← HAPUS BARIS INI
+        //   top: BorderSide(color: widget.blackColor, width: 1),  // ← HAPUS
+        //   left: BorderSide(color: widget.blackColor, width: 1), // ← HAPUS
+        //   right: BorderSide(color: widget.blackColor, width: 1),// ← HAPUS
+        // ), // ← HAPUS BARIS INI JUGA
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha:0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
+          // Neo brutalism shadow - hanya di bawah
           BoxShadow(
             color: widget.blackColor,
             offset: const Offset(0, 0),
@@ -231,25 +266,25 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
           // Menu 1: Dashboard
           _buildTabItem(
             index: 0,
-            icon: Icons.dashboard_outlined,
-            activeIcon: Icons.dashboard,
+            icon: Icons.home_outlined,
+            activeIcon: Icons.home_filled,
             label: 'Dashboard',
           ),
 
-          // Menu 2: Jadwal
+          // Menu 2: Upload
           _buildTabItem(
             index: 1,
-            icon: Icons.calendar_today_outlined,
-            activeIcon: Icons.calendar_today,
-            label: 'Jadwal',
+            icon: Icons.cloud_upload_outlined,
+            activeIcon: Icons.cloud_upload,
+            label: 'Upload',
           ),
 
-          // Menu 3: Data
+          // Menu 3: Masalah Ijin
           _buildTabItem(
             index: 2,
-            icon: Icons.business_center_outlined,
-            activeIcon: Icons.business_center,
-            label: 'Data',
+            icon: Icons.report_problem_outlined,
+            activeIcon: Icons.report_problem,
+            label: 'Masalah',
           ),
 
           // Menu 4: Pengaturan

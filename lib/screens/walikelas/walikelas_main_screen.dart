@@ -1,17 +1,18 @@
+// walikelas_main_screen.dart
 import 'package:flutter/material.dart';
-import 'dashboard/koordinator_dashboard.dart';
-import 'dashboard/koordinator_jadwal.dart';
-import 'dashboard/koordinator_data.dart';
-import 'dashboard/koordinator_pengaturan.dart';
 
-class KoordinatorMain extends StatefulWidget {
-  const KoordinatorMain({super.key});
+// Import halaman-halaman
+import 'wali_kelas_dashboard.dart';
+import 'kelola_perizinan_screen.dart';
+
+class WalikelasMainScreen extends StatefulWidget {
+  const WalikelasMainScreen({super.key});
 
   @override
-  State<KoordinatorMain> createState() => _KoordinatorMainState();
+  State<WalikelasMainScreen> createState() => _WalikelasMainScreenState();
 }
 
-class _KoordinatorMainState extends State<KoordinatorMain> {
+class _WalikelasMainScreenState extends State<WalikelasMainScreen> {
   int _currentIndex = 0;
   
   // Cache untuk menyimpan widget halaman
@@ -22,15 +23,12 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
   final List<ScrollController> _scrollControllers = [
     ScrollController(),
     ScrollController(),
-    ScrollController(),
-    ScrollController(),
   ];
 
   late final List<Widget> _pageBuilders;
 
-  // WARNA SAMA PERSIS DENGAN PEMBIMBING
-  final Color _primaryColor = const Color(0xFF641E20); // MAROON/MERAH TUA (sama dengan pembimbing)
-  final Color _blackColor = Colors.black;
+  // WARNA UNTUK WALI KELAS
+  final Color _primaryColor = const Color(0xFF6B1B1B); // WARNA WALI KELAS
 
   @override
   void initState() {
@@ -39,9 +37,7 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     // Inisialisasi page builders
     _pageBuilders = [
       _buildDashboardPage(),
-      _buildJadwalPage(),
-      _buildDataPage(),
-      _buildPengaturanPage(),
+      _buildSiaPage(),
     ];
   }
 
@@ -54,54 +50,28 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     super.dispose();
   }
 
-  // Builder untuk halaman Dashboard dengan caching sederhana
+  // Builder untuk halaman Dashboard
   Widget _buildDashboardPage() {
     return _buildCachedPage(
       index: 0,
-      builder: () {
-        return const KoordinatorDashboard(
-          key: ValueKey('dashboard_page'),
-        );
-      },
+      builder: () => WaliKelasDashboard(
+        key: const ValueKey('dashboard_page'),
+        scrollController: _scrollControllers[0],
+      ),
     );
   }
 
-  // Builder untuk halaman Jadwal dengan caching sederhana
-  Widget _buildJadwalPage() {
+  // Builder untuk halaman SIA
+  Widget _buildSiaPage() {
     return _buildCachedPage(
       index: 1,
-      builder: () {
-        return const KoordinatorJadwal(
-          key: ValueKey('jadwal_page'),
-        );
-      },
+      builder: () => KelolaPerizinanTabScreen(
+        key: const ValueKey('sia_page'),
+        scrollController: _scrollControllers[1],
+      ),
     );
   }
-
-  // Builder untuk halaman Data dengan caching sederhana
-  Widget _buildDataPage() {
-    return _buildCachedPage(
-      index: 2,
-      builder: () {
-        return const KoordinatorData(
-          key: ValueKey('data_page'),
-        );
-      },
-    );
-  }
-
-  // Builder untuk halaman Pengaturan dengan caching sederhana
-  Widget _buildPengaturanPage() {
-    return _buildCachedPage(
-      index: 3,
-      builder: () {
-        return const KoordinatorPengaturan(
-          key: ValueKey('pengaturan_page'),
-        );
-      },
-    );
-  }
-
+  
   // Fungsi untuk caching halaman sederhana
   Widget _buildCachedPage({
     required int index,
@@ -155,11 +125,10 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
             left: 0,
             right: 0,
             bottom: 0,
-            child: _KoordinatorBottomBar(
+            child: _WalikelasBottomBar(
               currentIndex: _currentIndex,
               onTabSelected: _onTabSelected,
               primaryColor: _primaryColor,
-              blackColor: _blackColor,
             ),
           ),
         ],
@@ -182,24 +151,22 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
 
 // ============== BOTTOM NAVIGATION BAR ==============
 
-class _KoordinatorBottomBar extends StatefulWidget {
+class _WalikelasBottomBar extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTabSelected;
   final Color primaryColor;
-  final Color blackColor;
 
-  const _KoordinatorBottomBar({
+  const _WalikelasBottomBar({
     required this.currentIndex,
     required this.onTabSelected,
     required this.primaryColor,
-    required this.blackColor,
   });
 
   @override
-  State<_KoordinatorBottomBar> createState() => __KoordinatorBottomBarState();
+  State<_WalikelasBottomBar> createState() => __WalikelasBottomBarState();
 }
 
-class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
+class __WalikelasBottomBarState extends State<_WalikelasBottomBar> {
   final Color _inactiveColor = const Color(0xFF9E9E9E);
 
   @override
@@ -214,13 +181,13 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
-          BoxShadow(
-            color: widget.blackColor,
-            offset: const Offset(0, 0),
+          const BoxShadow(
+            color: Colors.black,
+            offset: Offset(0, 0),
             blurRadius: 0,
           ),
         ],
@@ -236,28 +203,12 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
             label: 'Dashboard',
           ),
 
-          // Menu 2: Jadwal
+          // Menu 2: SIA
           _buildTabItem(
             index: 1,
-            icon: Icons.calendar_today_outlined,
-            activeIcon: Icons.calendar_today,
-            label: 'Jadwal',
-          ),
-
-          // Menu 3: Data
-          _buildTabItem(
-            index: 2,
-            icon: Icons.business_center_outlined,
-            activeIcon: Icons.business_center,
-            label: 'Data',
-          ),
-
-          // Menu 4: Pengaturan
-          _buildTabItem(
-            index: 3,
-            icon: Icons.settings_outlined,
-            activeIcon: Icons.settings,
-            label: 'Pengaturan',
+            icon: Icons.assignment_outlined,
+            activeIcon: Icons.assignment,
+            label: 'SIA',
           ),
         ],
       ),
@@ -287,7 +238,7 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: isActive 
-                    ? activeColor.withValues(alpha:0.1)
+                    ? activeColor.withValues(alpha: 0.1)
                     : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),

@@ -8,9 +8,9 @@ import 'package:tes_flutter/screens/login/login_screen.dart';
 import 'package:tes_flutter/screens/admin/admin_main.dart';
 import 'package:tes_flutter/screens/guru/guru_dashboard.dart';
 import 'package:tes_flutter/screens/siswa/siswa_main.dart';
-import 'package:tes_flutter/screens/pembimbing/pembimbing_dashboard.dart';
-import 'package:tes_flutter/screens/walikelas/wali_kelas_main.dart';
-import 'package:tes_flutter/screens/kapro/kaprog_dashboard.dart';
+import 'package:tes_flutter/screens/pembimbing/main_dashboard.dart';
+import 'package:tes_flutter/screens/kapro/kaprog_main_screen.dart';
+import 'package:tes_flutter/screens/walikelas/walikelas_main_screen.dart';
 
 class SplashScreen1 extends StatefulWidget {
   const SplashScreen1({super.key});
@@ -55,13 +55,13 @@ class _SplashScreen1State extends State<SplashScreen1>
           nextPage = const GuruDashboard();
           break;
         case 'Pembimbing':
-          nextPage = const PembimbingDashboard();
+          nextPage = const PembimbingMainScreen ();
           break;
         case 'Wali Kelas':
-          nextPage = const WaliKelasMain();
+          nextPage = const WalikelasMainScreen();
           break;
         case 'Kaprog':
-          nextPage = const KaprogDashboard();
+          nextPage = const KaprogMainScreen();
           break;
         case 'Koordinator':
           nextPage = const KoordinatorMain();

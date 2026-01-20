@@ -1,293 +1,71 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../login/login_screen.dart';
 
-class KaprogProfilePage extends StatefulWidget {
-  const KaprogProfilePage({super.key});
+class WaliKelasProfilePage extends StatefulWidget {
+  const WaliKelasProfilePage({super.key, required String kelasWali, required String namaWaliKelas});
 
   @override
-  State<KaprogProfilePage> createState() => _KaprogProfilePageState();
+  State<WaliKelasProfilePage> createState() => _WaliKelasProfilePageState();
 }
 
-class _KaprogProfilePageState extends State<KaprogProfilePage> {
-  // Warna-warna profesional
+class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
+  // Warna-warna sama persis dengan KaprogProfilePage
   static const Color _primaryColor = Color(0xFF6B1B1B); // Merah marun
-// Abu-abu gelap
   static const Color _accentColor = Color(0xFF9F0712); // Merah
   static const Color _lightColor = Color(0xFFF5F5F5); // Abu-abu muda
   static const Color _textColor = Color(0xFF333333); // Teks gelap
   static const Color _borderColor = Color(0xFFE0E0E0); // Border abu-abu muda
 
   Map<String, String> _profileData = {
-    'nama': 'KAPROG',
+    'nama': 'WALI KELAS',
     'nip': '-',
-    'kodeGuru': '-'
   };
   bool _isLoading = true;
-  String _debugInfo = '';
 
   @override
   void initState() {
     super.initState();
     _loadProfileData();
   }
-Future<void> _loadProfileData() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    final userId = prefs.getInt('user_id');
 
-    _debugInfo = 'Memulai load profile...\n';
-    
-    if (token == null) {
-      _debugInfo += 'Token tidak ditemukan\n';
-      await _loadFromSharedPrefs();
-      return;
-    }
-
-    if (userId == null) {
-      _debugInfo += 'User ID tidak ditemukan\n';
-      await _loadFromSharedPrefs();
-      return;
-    }
-
-    _debugInfo += 'User ID: $userId\n';
-
-    // COBA: Ambil data guru dari endpoint yang benar
+  Future<void> _loadProfileData() async {
     try {
-      // Pertama, kita perlu ID guru dari user_id
-      // Dari data sebelumnya, user_id: 26 -> guru_id: 12
+      final prefs = await SharedPreferences.getInstance();
       
-      // Cari guru_id terlebih dahulu dari endpoint pembimbing
-      final pembimbingUrl = '${dotenv.env['API_BASE_URL']}/api/pkl/pembimbing';
-      _debugInfo += 'Mencari guru_id dari: $pembimbingUrl\n';
+      print('📥 Loading profile data for Wali Kelas...');
       
-      final pembimbingResponse = await http.get(
-        Uri.parse(pembimbingUrl),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (pembimbingResponse.statusCode == 200) {
-        final dynamic pembimbingData = jsonDecode(pembimbingResponse.body);
-        
-        int? guruId;
-        
-        if (pembimbingData is List) {
-          for (var guru in pembimbingData) {
-            if (guru is Map) {
-              final Map<String, dynamic> guruMap = _convertToStringMap(guru);
-              final dynamic guruUserId = guruMap['user_id'];
-              
-              if (guruUserId != null && guruUserId.toString() == userId.toString()) {
-                guruId = int.tryParse(guruMap['id']?.toString() ?? '');
-                _debugInfo += 'Found guru_id: $guruId from user_id match\n';
-                break;
-              }
-              
-              // Juga cek berdasarkan nama
-              final String userName = prefs.getString('user_name') ?? '';
-              final String guruNama = guruMap['nama']?.toString() ?? '';
-              if (guruNama.toLowerCase() == userName.toLowerCase()) {
-                guruId = int.tryParse(guruMap['id']?.toString() ?? '');
-                _debugInfo += 'Found guru_id: $guruId from name match\n';
-                break;
-              }
-            }
-          }
-        }
-        
-        // Jika tidak ditemukan, gunakan user_id langsung (dari contoh, user_id 26 -> guru_id 12)
-        if (guruId == null) {
-          // Coba dengan asumsi user_id = guru_id atau pattern tertentu
-          // Dari data: user_id 26 -> guru_id 12, mungkin ada hubungan
-          _debugInfo += 'Guru not found in pembimbing list, trying alternative...\n';
-          
-          // Coba endpoint guru dengan user_id langsung
-          final guruUrl = '${dotenv.env['API_BASE_URL']}/api/guru/$userId';
-          _debugInfo += 'Trying direct guru URL: $guruUrl\n';
-          
-          final guruResponse = await http.get(
-            Uri.parse(guruUrl),
-            headers: {'Authorization': 'Bearer $token'},
-          );
-          
-          if (guruResponse.statusCode == 200) {
-            final dynamic guruData = jsonDecode(guruResponse.body);
-            print('=== GURU BY USER_ID RESPONSE ===');
-            print('Full response: $guruData');
-            
-            await _processGuruData(guruData, prefs);
-            return;
-          } else {
-            _debugInfo += 'Guru by user_id failed: ${guruResponse.statusCode}\n';
-          }
-        } else {
-          // Gunakan guru_id yang ditemukan
-          final guruUrl = '${dotenv.env['API_BASE_URL']}/api/guru/$guruId';
-          _debugInfo += 'Fetching guru data from: $guruUrl\n';
-          
-          final guruResponse = await http.get(
-            Uri.parse(guruUrl),
-            headers: {'Authorization': 'Bearer $token'},
-          );
-          
-          if (guruResponse.statusCode == 200) {
-            final dynamic guruData = jsonDecode(guruResponse.body);
-            print('=== GURU BY ID RESPONSE ===');
-            print('Full response: $guruData');
-            
-            await _processGuruData(guruData, prefs);
-            return;
-          } else {
-            _debugInfo += 'Guru by id failed: ${guruResponse.statusCode}\n';
-          }
-        }
-      } else {
-        _debugInfo += 'Pembimbing API failed: ${pembimbingResponse.statusCode}\n';
-      }
+      // SEDERHANA: Ambil dari SharedPreferences saja
+      final String? userName = prefs.getString('user_name');
+      final String? nama = prefs.getString('nama');
+      final String? nip = prefs.getString('nip');
       
-      // Fallback ke SharedPreferences
-      _debugInfo += 'Falling back to SharedPreferences\n';
-      await _loadFromSharedPrefs();
-      
-    } catch (e) {
-      _debugInfo += 'API Error: $e\n';
-      print('Error fetching from API: $e');
-      await _loadFromSharedPrefs();
-    }
-    
-  } catch (e) {
-    _debugInfo += 'General Error: $e\n';
-    print('Error loading profile: $e');
-    await _loadFromSharedPrefs();
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
-    
-    print('=== DEBUG INFO ===');
-    print(_debugInfo);
-    print('=== END DEBUG ===');
-  }
-}
-
-Future<void> _processGuruData(dynamic guruData, SharedPreferences prefs) async {
-  try {
-    if (guruData is Map) {
-      Map<String, dynamic>? guruMap;
-      
-      if (guruData.containsKey('data') && guruData['data'] is Map) {
-        guruMap = _convertToStringMap(guruData['data'] as Map);
-      } else {
-        guruMap = _convertToStringMap(guruData);
-      }
-      
-      print('=== PROCESSED GURU DATA ===');
-      guruMap.forEach((key, value) {
-        print('$key: $value');
-      });
-      
-      // Ambil data dengan field yang benar
-      final String nama = guruMap['nama']?.toString() ?? 'KAPROG';
-      final String nip = guruMap['nip']?.toString() ?? '-';
-      final String kodeGuru = guruMap['kode_guru']?.toString() ?? '-';
-      
-      _debugInfo += 'Nama: $nama\n';
-      _debugInfo += 'NIP: $nip\n';
-      _debugInfo += 'Kode Guru: $kodeGuru\n';
+      print('   user_name: $userName');
+      print('   nama: $nama');
+      print('   nip: $nip');
       
       setState(() {
         _profileData = {
-          'nama': nama.toUpperCase(),
-          'nip': nip,
-          'kodeGuru': kodeGuru,
+          'nama': (userName ?? nama ?? 'WALI KELAS').toUpperCase(),
+          'nip': nip ?? '-',
         };
+        _isLoading = false;
       });
       
-      // Simpan ke cache
-      await prefs.setString('user_nip', nip);
-      await prefs.setString('kode_guru', kodeGuru);
-      await prefs.setString('nama', nama);
+      print('✅ Profile loaded: ${_profileData['nama']}');
       
-      return;
-        }
-    
-    _debugInfo += 'Invalid guru data format\n';
-    await _loadFromSharedPrefs();
-    
-  } catch (e) {
-    _debugInfo += 'Process error: $e\n';
-    await _loadFromSharedPrefs();
-  }
-}
-
-Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
-  final Map<String, dynamic> result = {};
-  map.forEach((key, value) {
-    result[key.toString()] = value;
-  });
-  return result;
-}
-  Future<void> _loadFromSharedPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    _debugInfo += 'Loading from SharedPreferences...\n';
-    
-    // Print semua keys untuk debugging
-    final Set<String> allKeys = prefs.getKeys();
-    _debugInfo += 'All SharedPreferences keys: ${allKeys.join(', ')}\n';
-    
-    final String? userName = prefs.getString('user_name');
-    final String? name = prefs.getString('nama');
-    final String? guruName = prefs.getString('guru_nama');
-    
-    _debugInfo += 'user_name: $userName\n';
-    _debugInfo += 'nama: $name\n';
-    _debugInfo += 'guru_nama: $guruName\n';
-    
-    // Cari NIP dari berbagai kemungkinan key
-    String? nip;
-    for (var key in allKeys) {
-      if (key.toLowerCase().contains('nip')) {
-        final String? value = prefs.getString(key);
-        _debugInfo += 'Found NIP in $key: $value\n';
-        if (value != null && value.isNotEmpty && value != '-') {
-          nip = value;
-          break;
-        }
-      }
+    } catch (e) {
+      print('❌ Error loading profile: $e');
+      
+      setState(() {
+        _profileData = {
+          'nama': 'WALI KELAS',
+          'nip': '-',
+        };
+        _isLoading = false;
+      });
     }
-    
-    // Cari kode guru dari berbagai kemungkinan key
-    String? kodeGuru;
-    for (var key in allKeys) {
-      if (key.toLowerCase().contains('kode') || key.toLowerCase().contains('code')) {
-        final String? value = prefs.getString(key);
-        _debugInfo += 'Found kode in $key: $value\n';
-        if (value != null && value.isNotEmpty && value != '-') {
-          kodeGuru = value;
-          break;
-        }
-      }
-    }
-    
-    final String namaTerpilih = userName ?? name ?? guruName ?? 'KAPROG';
-    final String nipTerpilih = nip ?? '-';
-    final String kodeGuruTerpilih = kodeGuru ?? '-';
-    
-    _debugInfo += 'Final - Nama: $namaTerpilih, NIP: $nipTerpilih, Kode Guru: $kodeGuruTerpilih\n';
-    
-    setState(() {
-      _profileData = {
-        'nama': namaTerpilih.toUpperCase(),
-        'nip': nipTerpilih,
-        'kodeGuru': kodeGuruTerpilih,
-      };
-    });
   }
 
   @override
@@ -297,7 +75,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
       body: SafeArea(
         child: Column(
           children: [
-            // App Bar
+            // App Bar - SAMA DENGAN KAPROG
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
@@ -322,7 +100,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                   ),
                   const SizedBox(width: 8),
                   const Text(
-                    'Profil Kaprog',
+                    'Profil Wali Kelas',
                     style: TextStyle(
                       color: _primaryColor,
                       fontSize: 20,
@@ -338,7 +116,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
                   children: [
-                    // Profile Section
+                    // Profile Section - SAMA DENGAN KAPROG
                     Container(
                       margin: const EdgeInsets.only(bottom: 24),
                       child: Column(
@@ -387,7 +165,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                                         ),
                                       ),
                                       child: const Text(
-                                        'KOORDINATOR PROGRAM KEAHLIAN',
+                                        'WALI KELAS',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
@@ -401,7 +179,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                       ),
                     ),
 
-                    // Informasi Pribadi Card
+                    // Informasi Pribadi Card - SAMA DENGAN KAPROG
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -446,7 +224,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                           const Divider(color: _borderColor),
                           const SizedBox(height: 16),
 
-                          // NIP
+                          // NIP - SAMA DENGAN KAPROG
                           _buildInfoItem(
                             icon: Icons.badge_outlined,
                             label: 'NIP',
@@ -456,21 +234,11 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                                     ? _profileData['nip']! 
                                     : 'NIP tidak ditemukan'),
                           ),
-
-                          const SizedBox(height: 16),
-
-                          // KODE GURU
-                          _buildInfoItem(
-                            icon: Icons.code_outlined,
-                            label: 'Kode Guru',
-                            value: _isLoading ? 'Memuat...' : _profileData['kodeGuru']!,
-                          ),
-
                         ],
                       ),
                     ),
 
-                    // Menu Section
+                    // Menu Section - SAMA DENGAN KAPROG
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -524,7 +292,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                       ),
                     ),
 
-                    // Logout Button
+                    // Logout Button - SAMA DENGAN KAPROG
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -698,7 +466,6 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
     );
   }
 
-
   void _showUnderDevelopment(String featureName, BuildContext context) {
     showDialog(
       context: context,
@@ -771,7 +538,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'SISFO PKL - KAPROG',
+              'SISFO PKL - WALI KELAS',
               style: TextStyle(
                 fontSize: 16,
                 color: _primaryColor,
@@ -788,7 +555,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
             ),
             const SizedBox(height: 12),
             Text(
-              'Aplikasi untuk pengelolaan dan koordinasi siswa PKL bagi Kaprog',
+              'Aplikasi untuk pengelolaan dan monitoring siswa PKL bagi Wali Kelas',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey[700],
@@ -914,11 +681,8 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
     // Hapus data login
     await prefs.remove('access_token');
     await prefs.remove('user_name');
-    await prefs.remove('user_nip');
     await prefs.remove('nip');
-    await prefs.remove('guru_nip');
-    await prefs.remove('kode_guru');
-    await prefs.remove('guru_kode');
+    await prefs.remove('nip');
     await prefs.remove('nama');
   }
 }

@@ -23,6 +23,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   String _kelasSiswa = 'Loading...';
   int? _kelasId;
   bool _isLoading = true;
+  bool _hasToken = false;
 
   Map<String, dynamic>? _pklData;
   List<dynamic> _pklApplications = [];
@@ -49,14 +50,14 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   late WebSocketManager _webSocketManager;
   final List<Map<String, dynamic>> _notifications = [];
   int _unreadNotificationCount = 0;
-  final Color _notificationColor = const Color(0xFFE63946);
+  final Color _notificationColor = const Color(0xFF9f0712);
   // =======================================
 
-  // Neo Brutalism Colors
-  final Color _primaryColor = const Color(0xFFE71543);
+  // Neo Brutalism Colors 641E20
+  final Color _primaryColor = const Color(0xFF9f0712);
   final Color _secondaryColor = const Color(0xFFE6E3E3);
   final Color _accentColor = const Color(0xFFA8DADC);
-  final Color _darkColor = const Color(0xFF1D3557);
+  final Color _darkColor = const Color(0xFF641E20);
   final Color _yellowColor = const Color(0xFFFFB703);
   final Color _blackColor = Colors.black;
 
@@ -68,30 +69,39 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   );
 
   final BoxShadow _lightShadow = BoxShadow(
-    color: Colors.black.withValues(alpha:0.2),
+    color: Colors.black.withValues(alpha: 0.2),
     offset: const Offset(4, 4),
     blurRadius: 0,
   );
+  
   @override
   void initState() {
     super.initState();
 
     print('🚀 SiswaDashboard State dibuat');
 
-    _webSocketManager = WebSocketManager();
-    _setupWebSocketListeners();
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // ========== PERBAIKAN: LOAD NOTIFIKASI SETELAH SEMUA DATA ==========
-      // Tunggu dulu sampai auth check selesai
-      await _checkAuthAndLoadData();
+      // ========== CEK ACCESS TOKEN PERTAMA ==========
+      final tokenValid = await _checkTokenOnStartup();
+      
+      if (!tokenValid) {
+        print('❌ Token tidak valid, redirect ke login');
+        _redirectToLogin();
+        return;
+      }
+      
+      print('✅ Token valid, melanjutkan inisialisasi...');
+      
+      // ========== INISIALISASI WEBSOCKET ==========
+      _webSocketManager = WebSocketManager();
+      _setupWebSocketListeners();
 
-      // BARU load notifikasi
+      // ========== LOAD DATA ==========
+      await _checkAuthAndLoadData();
       await _loadNotificationsFromPrefs();
       print('📋 Loaded notifications AFTER auth check');
-      // ==========================================
 
-      // Connect WebSocket
+      // ========== CONNECT WEBSOCKET ==========
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
           _webSocketManager.connect();
@@ -108,20 +118,97 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     _prefsSubscription?.cancel();
     super.dispose();
   }
-// ========== WEBSOCKET FUNCTIONS ==========
-void _setupWebSocketListeners() {
-  _webSocketManager.addListener((event) {
-    if (event.type == WebSocketEventType.message) {
-      _handleWebSocketMessage(event.data);
+
+  // ========== TOKEN CHECK FUNCTIONS ==========
+  Future<bool> _checkTokenOnStartup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      
+      print('🔐 Token check on startup:');
+      print('   - Token exists: ${token != null}');
+      print('   - Token length: ${token?.length ?? 0}');
+      
+      if (token == null || token.isEmpty) {
+        print('❌ Token tidak ditemukan di SharedPreferences');
+        return false;
+      }
+      
+      // Cek validitas token dengan API endpoint yang sederhana
+      try {
+        final response = await http.get(
+          Uri.parse('${dotenv.env['API_BASE_URL']}/api/auth/me'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Accept': 'application/json',
+          },
+        ).timeout(const Duration(seconds: 10));
+        
+        print('🔍 Token validation response: ${response.statusCode}');
+        
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          print('❌ Token expired/invalid (HTTP ${response.statusCode})');
+          return false;
+        }
+        
+        if (response.statusCode == 200) {
+          print('✅ Token valid dan terverifikasi');
+          setState(() {
+            _hasToken = true;
+          });
+          return true;
+        }
+        
+        print('⚠️  Token validation response unexpected: ${response.statusCode}');
+        return true; // Tetap lanjut jika bukan 401/403
+        
+      } catch (e) {
+        print('⚠️  Token validation skipped (network error): $e');
+        // Asumsikan token masih valid jika ada jaringan error
+        setState(() {
+          _hasToken = true;
+        });
+        return true;
+      }
+      
+    } catch (e) {
+      print('❌ Error checking token: $e');
+      return false;
     }
-    // Hapus bagian connected dan disconnected
-    // else if (event.type == WebSocketEventType.connected) {
-    //   _showConnectedSnackbar();
-    // } else if (event.type == WebSocketEventType.disconnected) {
-    //   _showDisconnectedSnackbar();
-    // }
-  });
-}
+  }
+
+  Future<bool> _isTokenValid() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      
+      return token != null && token.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _redirectToLogin() {
+    print('🔄 Redirecting to login screen...');
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (Route<dynamic> route) => false,
+        );
+      }
+    });
+  }
+
+  // ========== WEBSOCKET FUNCTIONS ==========
+  void _setupWebSocketListeners() {
+    _webSocketManager.addListener((event) {
+      if (event.type == WebSocketEventType.message) {
+        _handleWebSocketMessage(event.data);
+      }
+    });
+  }
 
   void _handleWebSocketMessage(dynamic message) {
     print('📨 WebSocket message received');
@@ -434,8 +521,14 @@ void _setupWebSocketListeners() {
     }
   }
 
-// Update fungsi _ajukanPKL():
+  // Update fungsi _ajukanPKL():
   Future<void> _ajukanPKL() async {
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -502,144 +595,61 @@ void _setupWebSocketListeners() {
     }
   }
 
-void _showNotificationsPanel() {
-  print('🔔 Opening notifications panel...');
-  print('   - Current unread: $_unreadNotificationCount');
+  void _showNotificationsPanel() {
+    print('🔔 Opening notifications panel...');
+    print('   - Current unread: $_unreadNotificationCount');
 
-  showDialog(
-    context: context,
-    builder: (context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.all(16),
-            child: Container(
-              width: double.infinity,
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.85,
-              ),
-              decoration: BoxDecoration(
-                color: _secondaryColor,
-                border: Border.all(color: _blackColor, width: 4),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black,
-                    offset: Offset(6, 6),
-                    blurRadius: 0,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // === HEADER - CLEAN & BOLD ===
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _primaryColor,
-                      border: Border(
-                        bottom: BorderSide(color: _blackColor, width: 4),
-                      ),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                      ),
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(16),
+              child: Container(
+                width: double.infinity,
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.85,
+                ),
+                decoration: BoxDecoration(
+                  color: _secondaryColor,
+                  border: Border.all(color: _blackColor, width: 4),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black,
+                      offset: Offset(6, 6),
+                      blurRadius: 0,
                     ),
-                    child: Row(
-                      children: [
-                        // Clean icon
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: _blackColor, width: 3),
-                            shape: BoxShape.circle,
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black,
-                                offset: Offset(3, 3),
-                                blurRadius: 0,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.notifications,
-                            color: _primaryColor,
-                            size: 24,
-                          ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // === HEADER - CLEAN & BOLD ===
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: _primaryColor,
+                        border: Border(
+                          bottom: BorderSide(color: _blackColor, width: 4),
                         ),
-                        const SizedBox(width: 16),
-                        
-                        // Title only
-                        const Expanded(
-                          child: Text(
-                            'NOTIFIKASI PKL',
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
                         ),
-                      ],
-                    ),
-                  ),
-                  
-                  // === NOTIFICATIONS CONTENT ===
-                  Expanded(
-                    child: _notifications.isEmpty
-                        ? _buildEmptyNotifications()
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            physics: const BouncingScrollPhysics(),
-                            itemCount: _notifications.length,
-                            itemBuilder: (context, index) {
-                              final notification = _notifications[index];
-                              final isRead = notification['read'] ?? false;
-                              final isApproved =
-                                  notification['type'] == 'approved';
-                              final isRejected =
-                                  notification['type'] == 'rejected';
-                              
-                              return _buildNotificationCard(
-                                notification,
-                                isRead,
-                                isApproved,
-                                isRejected,
-                                index,
-                                setState,
-                              );
-                            },
-                          ),
-                  ),
-                  
-                  // === ACTION BUTTONS - SIMPLE ===
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _secondaryColor,
-                      border: Border(
-                        top: BorderSide(color: _blackColor, width: 4),
                       ),
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        // Close button
-                        Expanded(
-                          child: Container(
-                            height: 52,
+                      child: Row(
+                        children: [
+                          // Clean icon
+                          Container(
+                            width: 44,
+                            height: 44,
                             decoration: BoxDecoration(
-                              color: _yellowColor,
+                              color: Colors.white,
                               border: Border.all(color: _blackColor, width: 3),
-                              borderRadius: BorderRadius.circular(12),
+                              shape: BoxShape.circle,
                               boxShadow: const [
                                 BoxShadow(
                                   color: Colors.black,
@@ -648,36 +658,81 @@ void _showNotificationsPanel() {
                                 ),
                               ],
                             ),
-                            child: TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: TextButton.styleFrom(
-                                foregroundColor: _blackColor,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(9),
-                                ),
-                              ),
-                              child: const Text(
-                                'TUTUP',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
+                            child: Icon(
+                              Icons.notifications,
+                              color: _primaryColor,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Title only
+                          const Expanded(
+                            child: Text(
+                              'NOTIFIKASI PKL',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: 1.0,
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+
+                    // === NOTIFICATIONS CONTENT ===
+                    Expanded(
+                      child: _notifications.isEmpty
+                          ? _buildEmptyNotifications()
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              physics: const BouncingScrollPhysics(),
+                              itemCount: _notifications.length,
+                              itemBuilder: (context, index) {
+                                final notification = _notifications[index];
+                                final isRead = notification['read'] ?? false;
+                                final isApproved =
+                                    notification['type'] == 'approved';
+                                final isRejected =
+                                    notification['type'] == 'rejected';
+
+                                return _buildNotificationCard(
+                                  notification,
+                                  isRead,
+                                  isApproved,
+                                  isRejected,
+                                  index,
+                                  setState,
+                                );
+                              },
+                            ),
+                    ),
+
+                    // === ACTION BUTTONS - SIMPLE ===
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _secondaryColor,
+                        border: Border(
+                          top: BorderSide(color: _blackColor, width: 4),
                         ),
-                        
-                        const SizedBox(width: 12),
-                        
-                        // Mark all button (only if has unread)
-                        if (_unreadNotificationCount > 0)
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          // Close button
                           Expanded(
                             child: Container(
                               height: 52,
                               decoration: BoxDecoration(
-                                color: _primaryColor,
-                                border: Border.all(color: _blackColor, width: 3),
+                                color: _yellowColor,
+                                border:
+                                    Border.all(color: _blackColor, width: 3),
                                 borderRadius: BorderRadius.circular(12),
                                 boxShadow: const [
                                   BoxShadow(
@@ -688,23 +743,15 @@ void _showNotificationsPanel() {
                                 ],
                               ),
                               child: TextButton(
-                                onPressed: () async {
-                                  for (var notification in _notifications) {
-                                    notification['read'] = true;
-                                  }
-                                  setState(() {
-                                    _unreadNotificationCount = 0;
-                                  });
-                                  await _saveNotificationsToPrefs();
-                                },
+                                onPressed: () => Navigator.pop(context),
                                 style: TextButton.styleFrom(
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: _blackColor,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(9),
                                   ),
                                 ),
                                 child: const Text(
-                                  'TANDAI SEMUA',
+                                  'TUTUP',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w900,
@@ -714,269 +761,257 @@ void _showNotificationsPanel() {
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
-    },
-  ).then((_) {
-    if (mounted) {
-      setState(() {});
-    }
-  });
-}
 
-// ========== NOTIFICATION CARD - ENHANCED CONTENT ==========
+                          const SizedBox(width: 12),
 
-Widget _buildNotificationCard(
-  Map<String, dynamic> notification,
-  bool isRead,
-  bool isApproved,
-  bool isRejected,
-  int index,
-  StateSetter setState,
-) {
-  final timestamp = DateTime.parse(notification['timestamp']);
-  final timeAgo = _formatTimeAgo(timestamp);
-  final industriNama =
-      notification['data']?['industri_nama'] ?? 'Perusahaan';
-  final catatan = notification['catatan'] ?? '';
-  
-  return GestureDetector(
-    onTap: () {
-      if (!isRead) {
-        setState(() {
-          notification['read'] = true;
-          _unreadNotificationCount--;
-        });
-        _saveNotificationsToPrefs();
-      }
-    },
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: isRead ? _secondaryColor : Colors.white,
-        border: Border.all(
-          color: _blackColor,
-          width: isRead ? 2 : 3,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:isRead ? 0.1 : 0.2),
-            offset: const Offset(4, 4),
-            blurRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // === STATUS BANNER ===
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-            decoration: BoxDecoration(
-              color: isRejected
-                  ? const Color(0xFFE63946)
-                  : (isApproved
-                      ? const Color(0xFF06D6A0)
-                      : const Color(0xFFFFB703)),
-              border: Border(
-                bottom: BorderSide(color: _blackColor, width: 2),
-              ),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(14),
-                topRight: Radius.circular(14),
-              ),
-            ),
-            child: Row(
-              children: [
-                // Status indicator
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: _blackColor, width: 2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isRejected ? Icons.close : Icons.check,
-                    size: 18,
-                    color: isRejected
-                        ? const Color(0xFFE63946)
-                        : const Color(0xFF06D6A0),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                
-                // Status text
-                Expanded(
-                  child: Text(
-                    isRejected ? 'STATUS: DITOLAK' : 'STATUS: DISETUJUI',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-                
-                // Unread indicator
-                if (!isRead)
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          
-          // === CONTENT - ENHANCED ===
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // === PERUSAHAAN INFO ===
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _accentColor,
-                    border: Border.all(color: _blackColor, width: 2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: _primaryColor,
-                          border: Border.all(color: _blackColor, width: 2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.business,
-                          size: 18,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'LOKASI PKL',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: _darkColor,
-                                letterSpacing: 1.0,
+                          // Mark all button (only if has unread)
+                          if (_unreadNotificationCount > 0)
+                            Expanded(
+                              child: Container(
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  color: _primaryColor,
+                                  border:
+                                      Border.all(color: _blackColor, width: 3),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Colors.black,
+                                      offset: Offset(3, 3),
+                                      blurRadius: 0,
+                                    ),
+                                  ],
+                                ),
+                                child: TextButton(
+                                  onPressed: () async {
+                                    for (var notification in _notifications) {
+                                      notification['read'] = true;
+                                    }
+                                    setState(() {
+                                      _unreadNotificationCount = 0;
+                                    });
+                                    await _saveNotificationsToPrefs();
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(9),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'TANDAI SEMUA',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                            Text(
-                              industriNama,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: _blackColor,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // === DETAIL STATUS ===
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isRejected
-                        ? const Color(0xFFE63946).withValues(alpha:0.1)
-                        : const Color(0xFF06D6A0).withValues(alpha:0.1),
-                    border: Border.all(
-                      color: isRejected
-                          ? const Color(0xFFE63946)
-                          : const Color(0xFF06D6A0),
-                      width: 2,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            isRejected ? Icons.warning : Icons.verified,
-                            size: 16,
-                            color: isRejected
-                                ? const Color(0xFFE63946)
-                                : const Color(0xFF06D6A0),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            isRejected ? 'PENOLAKAN' : 'PERSETUJUAN',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: _blackColor,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      
-                      if (isRejected)
-                        Text(
-                          'Pengajuan PKL Anda ditolak. Perbaiki pengajuan berdasarkan catatan di bawah, lalu ajukan kembali.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _darkColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                      else
-                        Text(
-                          'Pengajuan PKL Anda telah disetujui. Siapkan diri untuk memulai kegiatan praktik kerja lapangan.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _darkColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                
-                const SizedBox(height: 16),
-                
-                // === CATATAN DETAIL ===
-                if (catatan.isNotEmpty && catatan != 'Tidak ada alasan diberikan')
+              ),
+            );
+          },
+        );
+      },
+    ).then((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  // ========== NOTIFICATION CARD - ENHANCED CONTENT ==========
+
+  Widget _buildNotificationCard(
+    Map<String, dynamic> notification,
+    bool isRead,
+    bool isApproved,
+    bool isRejected,
+    int index,
+    StateSetter setState,
+  ) {
+    final timestamp = DateTime.parse(notification['timestamp']);
+    final timeAgo = _formatTimeAgo(timestamp);
+    final industriNama = notification['data']?['industri_nama'] ?? 'Perusahaan';
+    final catatan = notification['catatan'] ?? '';
+
+    return GestureDetector(
+      onTap: () {
+        if (!isRead) {
+          setState(() {
+            notification['read'] = true;
+            _unreadNotificationCount--;
+          });
+          _saveNotificationsToPrefs();
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: isRead ? _secondaryColor : Colors.white,
+          border: Border.all(
+            color: _blackColor,
+            width: isRead ? 2 : 3,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isRead ? 0.1 : 0.2),
+              offset: const Offset(4, 4),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // === STATUS BANNER ===
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+              decoration: BoxDecoration(
+                color: isRejected
+                    ? const Color(0xFFE63946)
+                    : (isApproved
+                        ? const Color(0xFF06D6A0)
+                        : const Color(0xFFFFB703)),
+                border: Border(
+                  bottom: BorderSide(color: _blackColor, width: 2),
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(14),
+                  topRight: Radius.circular(14),
+                ),
+              ),
+              child: Row(
+                children: [
+                  // Status indicator
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border.all(color: _blackColor, width: 2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isRejected ? Icons.close : Icons.check,
+                      size: 18,
+                      color: isRejected
+                          ? const Color(0xFFE63946)
+                          : const Color(0xFF06D6A0),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Status text
+                  Expanded(
+                    child: Text(
+                      isRejected ? 'STATUS: DITOLAK' : 'STATUS: DISETUJUI',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+
+                  // Unread indicator
+                  if (!isRead)
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // === CONTENT - ENHANCED ===
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // === PERUSAHAAN INFO ===
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _accentColor,
+                      border: Border.all(color: _blackColor, width: 2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: _primaryColor,
+                            border: Border.all(color: _blackColor, width: 2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.business,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'LOKASI PKL',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: _darkColor,
+                                  letterSpacing: 1.0,
+                                ),
+                              ),
+                              Text(
+                                industriNama,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: _blackColor,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // === DETAIL STATUS ===
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isRejected
+                          ? const Color(0xFFE63946).withValues(alpha: 0.1)
+                          : const Color(0xFF06D6A0).withValues(alpha: 0.1),
+                      border: Border.all(
+                        color: isRejected
+                            ? const Color(0xFFE63946)
+                            : const Color(0xFF06D6A0),
+                        width: 2,
+                      ),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Column(
@@ -984,241 +1019,298 @@ Widget _buildNotificationCard(
                       children: [
                         Row(
                           children: [
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: _primaryColor,
-                                border: Border.all(color: _blackColor, width: 1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.description,
-                                size: 12,
-                                color: Colors.white,
-                              ),
+                            Icon(
+                              isRejected ? Icons.warning : Icons.verified,
+                              size: 16,
+                              color: isRejected
+                                  ? const Color(0xFFE63946)
+                                  : const Color(0xFF06D6A0),
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'CATATAN',
+                              isRejected ? 'PENOLAKAN' : 'PERSETUJUAN',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w900,
-                                color: _darkColor,
-                                letterSpacing: 0.5,
+                                color: _blackColor,
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          catatan,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _darkColor,
-                            height: 1.4,
+                        if (isRejected)
+                          Text(
+                            'Pengajuan PKL Anda ditolak. Perbaiki pengajuan berdasarkan catatan di bawah, lalu ajukan kembali.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _darkColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        else
+                          Text(
+                            'Pengajuan PKL Anda telah disetujui. Siapkan diri untuk memulai kegiatan praktik kerja lapangan.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _darkColor,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
-                
-                const SizedBox(height: 16),
-                
-                // === ACTION BUTTON ===
-                if (isRejected)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _yellowColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: TextButton(
-                      onPressed: _ajukanPKL,
-                      style: TextButton.styleFrom(
-                        foregroundColor: _blackColor,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(7),
-                        ),
+
+                  const SizedBox(height: 16),
+
+                  // === CATATAN DETAIL ===
+                  if (catatan.isNotEmpty &&
+                      catatan != 'Tidak ada alasan diberikan')
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: _blackColor, width: 2),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.refresh, size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            'AJUKAN ULANG PKL',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.3,
-                            ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  color: _primaryColor,
+                                  border:
+                                      Border.all(color: _blackColor, width: 1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.description,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'CATATAN',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: _darkColor,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (isApproved)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF06D6A0),
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.pop(context); // Close panel
-                        _loadAllData(); // Refresh dashboard
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.visibility, size: 18),
-                          SizedBox(width: 8),
+                          const SizedBox(height: 8),
                           Text(
-                            'LIHAT DETAIL PKL',
+                            catatan,
                             style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                
-                const SizedBox(height: 12),
-                
-                // === FOOTER ===
-                Container(
-                  padding: const EdgeInsets.only(top: 12),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(color: _blackColor.withValues(alpha:0.3), width: 1),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _secondaryColor,
-                          border: Border.all(color: _blackColor, width: 1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              size: 10,
+                              fontSize: 13,
                               color: _darkColor,
+                              height: 1.4,
                             ),
-                            const SizedBox(width: 6),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  // === ACTION BUTTON ===
+                  if (isRejected)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _yellowColor,
+                        border: Border.all(color: _blackColor, width: 3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: TextButton(
+                        onPressed: _ajukanPKL,
+                        style: TextButton.styleFrom(
+                          foregroundColor: _blackColor,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.refresh, size: 18),
+                            SizedBox(width: 8),
                             Text(
-                              timeAgo.toUpperCase(),
+                              'AJUKAN ULANG PKL',
                               style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: _darkColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ],
                         ),
                       ),
-                    
-                    ],
+                    )
+                  else if (isApproved)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF06D6A0),
+                        border: Border.all(color: _blackColor, width: 3),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pop(context); // Close panel
+                          _loadAllData(); // Refresh dashboard
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.visibility, size: 18),
+                            SizedBox(width: 8),
+                            Text(
+                              'LIHAT DETAIL PKL',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 12),
+
+                  // === FOOTER ===
+                  Container(
+                    padding: const EdgeInsets.only(top: 12),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        top: BorderSide(
+                            color: _blackColor.withValues(alpha: 0.3),
+                            width: 1),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _secondaryColor,
+                            border: Border.all(color: _blackColor, width: 1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                size: 10,
+                                color: _darkColor,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                timeAgo.toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: _darkColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-// ========== EMPTY STATE - CLEAN ==========
-
-Widget _buildEmptyNotifications() {
-  return Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: _secondaryColor,
-              border: Border.all(color: _blackColor, width: 4),
-              shape: BoxShape.circle,
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black,
-                  offset: Offset(4, 4),
-                  blurRadius: 0,
-                ),
-              ],
-            ),
-            child: Icon(
-              Icons.inbox,
-              size: 40,
-              color: _darkColor,
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            decoration: BoxDecoration(
-              color: _yellowColor,
-              border: Border.all(color: _blackColor, width: 3),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              'BELUM ADA NOTIFIKASI',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: _blackColor,
-                letterSpacing: 1.0,
+                ],
               ),
             ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'Semua update status pengajuan PKL akan muncul di sini',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ========== EMPTY STATE - CLEAN ==========
+
+  Widget _buildEmptyNotifications() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: _secondaryColor,
+                border: Border.all(color: _blackColor, width: 4),
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black,
+                    offset: Offset(4, 4),
+                    blurRadius: 0,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.inbox,
+                size: 40,
                 color: _darkColor,
-                fontWeight: FontWeight.w600,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: _yellowColor,
+                border: Border.all(color: _blackColor, width: 3),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'BELUM ADA NOTIFIKASI',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: _blackColor,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Semua update status pengajuan PKL akan muncul di sini',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _darkColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   String _formatTimeAgo(DateTime timestamp) {
     final now = DateTime.now();
@@ -1240,7 +1332,6 @@ Widget _buildEmptyNotifications() {
       return 'Baru saja';
     }
   }
-
 
   void _startPrefsListener() async {
     print('🔧 Starting prefs listener (read-only mode)');
@@ -1270,8 +1361,13 @@ Widget _buildEmptyNotifications() {
   }
 
   Future<void> _checkAuthAndLoadData() async {
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+    
     final prefs = await SharedPreferences.getInstance();
-    prefs.getString('access_token');
     final userName = prefs.getString('user_name');
 
     print('🔄 _checkAuthAndLoadData dipanggil');
@@ -1530,8 +1626,14 @@ Widget _buildEmptyNotifications() {
     }
   }
 
-// Di _loadAllData():
+  // Di _loadAllData():
   Future<void> _loadAllData() async {
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -1556,6 +1658,7 @@ Widget _buildEmptyNotifications() {
       _checkLatestPKLStatus();
       _saveToCache();
     } catch (e) {
+      print('❌ Error in _loadAllData: $e');
       if (e.toString().contains('401') ||
           e.toString().contains('Unauthorized')) {
         _redirectToLogin();
@@ -1568,18 +1671,13 @@ Widget _buildEmptyNotifications() {
     }
   }
 
-  void _redirectToLogin() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (Route<dynamic> route) => false,
-        );
-      }
-    });
-  }
-
   Future<void> _loadProfileData() async {
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     final userName = prefs.getString('user_name');
@@ -1682,6 +1780,12 @@ Widget _buildEmptyNotifications() {
   }
 
   Future<void> _loadPklApplications() async {
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -1763,6 +1867,12 @@ Widget _buildEmptyNotifications() {
   }
 
   Future<void> _loadIndustriData(int industriId) async {
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -1793,6 +1903,12 @@ Widget _buildEmptyNotifications() {
 
   Future<void> _loadPembimbingData(int? guruId) async {
     if (guruId == null) return;
+    
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
@@ -1824,6 +1940,12 @@ Widget _buildEmptyNotifications() {
 
   Future<void> _loadProcessedByData(int? guruId) async {
     if (guruId == null) return;
+    
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
@@ -1854,6 +1976,12 @@ Widget _buildEmptyNotifications() {
   }
 
   Future<void> _bukaIndustri() async {
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -1872,6 +2000,12 @@ Widget _buildEmptyNotifications() {
   }
 
   Future<void> _bukaRiwayat() async {
+    // Cek token terlebih dahulu
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+    
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -1981,6 +2115,54 @@ Widget _buildEmptyNotifications() {
 
   @override
   Widget build(BuildContext context) {
+    // Jika tidak ada token, tampilkan loading screen yang akan redirect
+    if (!_hasToken && _isLoading) {
+      return Scaffold(
+        backgroundColor: _darkColor,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  border: Border.all(color: _blackColor, width: 2),
+                  shape: BoxShape.circle,
+                  boxShadow: const [_heavyShadow],
+                ),
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _yellowColor,
+                  border: Border.all(color: _blackColor, width: 3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'MEMERIKSA LOGIN...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+           
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _darkColor,
       body: SafeArea(
@@ -2401,7 +2583,7 @@ Widget _buildEmptyNotifications() {
         Container(
           width: 50,
           height: 12,
-          color: _blackColor.withValues(alpha:0.3),
+          color: _blackColor.withValues(alpha: 0.3),
         ),
         const SizedBox(height: 8),
         Container(
@@ -2442,8 +2624,11 @@ Widget _buildEmptyNotifications() {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
-              width: 150, height: 20, color: _blackColor.withValues(alpha:0.3)),
-          Container(width: 80, height: 20, color: _blackColor.withValues(alpha:0.3)),
+              width: 150,
+              height: 20,
+              color: _blackColor.withValues(alpha: 0.3)),
+          Container(
+              width: 80, height: 20, color: _blackColor.withValues(alpha: 0.3)),
         ],
       ),
     );
@@ -2472,15 +2657,19 @@ Widget _buildEmptyNotifications() {
           ),
           const SizedBox(height: 16),
           Container(
-              width: 200, height: 24, color: _blackColor.withValues(alpha:0.2)),
+              width: 200,
+              height: 24,
+              color: _blackColor.withValues(alpha: 0.2)),
           const SizedBox(height: 12),
           Container(
               width: double.infinity,
               height: 16,
-              color: _blackColor.withValues(alpha:0.2)),
+              color: _blackColor.withValues(alpha: 0.2)),
           const SizedBox(height: 8),
           Container(
-              width: 150, height: 16, color: _blackColor.withValues(alpha:0.2)),
+              width: 150,
+              height: 16,
+              color: _blackColor.withValues(alpha: 0.2)),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
@@ -2495,12 +2684,12 @@ Widget _buildEmptyNotifications() {
                 Container(
                     width: 100,
                     height: 14,
-                    color: _blackColor.withValues(alpha:0.2)),
+                    color: _blackColor.withValues(alpha: 0.2)),
                 const SizedBox(height: 8),
                 Container(
                     width: double.infinity,
                     height: 14,
-                    color: _blackColor.withValues(alpha:0.2)),
+                    color: _blackColor.withValues(alpha: 0.2)),
               ],
             ),
           ),
@@ -2667,7 +2856,7 @@ Widget _buildEmptyNotifications() {
                                 ? 'Pengajuan PKL Anda telah disetujui'
                                 : 'Pengajuan PKL Anda sedang diproses'),
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha:0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -2690,8 +2879,8 @@ Widget _buildEmptyNotifications() {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: isRejected
-                        ? const Color(0xFFE63946).withValues(alpha:0.1)
-                        : _primaryColor.withValues(alpha:0.1),
+                        ? const Color(0xFFE63946).withValues(alpha: 0.1)
+                        : _primaryColor.withValues(alpha: 0.1),
                     border: Border.all(
                       color:
                           isRejected ? const Color(0xFFE63946) : _primaryColor,
@@ -2825,7 +3014,7 @@ Widget _buildEmptyNotifications() {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE63946).withValues(alpha:0.15),
+                      color: const Color(0xFFE63946).withValues(alpha: 0.15),
                       border: Border.all(
                         color: const Color(0xFFE63946),
                         width: 3,
@@ -2950,7 +3139,7 @@ Widget _buildEmptyNotifications() {
                             fontWeight: FontWeight.w900,
                             color: _blackColor,
                             letterSpacing: -0.3,
-                          ),
+                        ),
                         ),
                         const SizedBox(height: 12),
                         Text(
@@ -3054,7 +3243,7 @@ Widget _buildEmptyNotifications() {
                       margin: const EdgeInsets.only(top: 20),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF06D6A0).withValues(alpha:0.1),
+                        color: const Color(0xFF06D6A0).withValues(alpha: 0.1),
                         border: Border.all(
                             color: const Color(0xFF06D6A0), width: 3),
                         borderRadius: BorderRadius.circular(16),
