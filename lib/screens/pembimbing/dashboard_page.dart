@@ -626,7 +626,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
               const Text(
                 'Dashboard Pembimbing',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.w800,
                   color: _textPrimary,
                 ),

@@ -1941,7 +1941,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   'Apakah Anda yakin ingin menghapus kegiatan:',
                   textAlign: TextAlign.center,
                   style: TextStyle(

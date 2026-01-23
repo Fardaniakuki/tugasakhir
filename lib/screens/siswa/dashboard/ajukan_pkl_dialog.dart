@@ -106,7 +106,7 @@ class AjukanPKLDialog extends StatefulWidget {
     this.popupWidth,
     this.popupMaxHeight,
     this.horizontalOffset = 40.0,
-    this.verticalOffset = 0.0,
+    this.verticalOffset = 0.0, required Color primaryColor,
   });
 
   @override
@@ -114,25 +114,28 @@ class AjukanPKLDialog extends StatefulWidget {
 }
 
 class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
-  // Neo Brutalism Colors
-  final Color _primaryColor = const Color(0xFFE63946); // Merah cerah
-  final Color _secondaryColor = const Color(0xFFF1FAEE); // Putih krem
-  final Color _accentColor = const Color(0xFFA8DADC); // Biru muda
-  final Color _darkColor = const Color(0xFF1D3557); // Biru tua
-  final Color _yellowColor = const Color(0xFFFFB703); // Kuning cerah
-  final Color _blackColor = Colors.black;
+  // Warna serius - merah tua
+  final Color _primaryColor = const Color.fromARGB(255, 177, 22, 11); // Merah tua serius
+  final Color _secondaryColor = Colors.white; // Putih bersih
+  final Color _accentColor = const Color.fromARGB(255, 240, 240, 240); // Abu-abu sangat muda
+// Hitam gelap
+  final Color _borderColor = const Color.fromARGB(255, 150, 150, 150); // Abu-abu untuk border
+  final Color _textColor = const Color.fromARGB(255, 30, 30, 30); // Hitam untuk teks
+  final Color _hintColor = const Color.fromARGB(255, 120, 120, 120); // Abu-abu untuk hint
 
-  // Neo Brutalism Shadows
-  static const BoxShadow _heavyShadow = BoxShadow(
-    color: Colors.black,
-    offset: Offset(6, 6),
-    blurRadius: 0,
+  // Shadow yang lebih halus
+  final BoxShadow _softShadow = BoxShadow(
+    color: Colors.black.withValues(alpha:0.15),
+    offset: const Offset(0, 2),
+    blurRadius: 6,
+    spreadRadius: 0,
   );
 
-  final BoxShadow _lightShadow = BoxShadow(
-    color: Colors.black.withValues(alpha: 0.2),
-    offset: const Offset(4, 4),
-    blurRadius: 0,
+  final BoxShadow _mediumShadow = BoxShadow(
+    color: Colors.black.withValues(alpha:0.2),
+    offset: const Offset(0, 4),
+    blurRadius: 8,
+    spreadRadius: 0,
   );
 
   final _catatanController = TextEditingController();
@@ -405,7 +408,7 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: Container(color: Colors.transparent),
+                  child: Container(color: Colors.black.withValues(alpha:0.3)),
                 ),
                 Positioned(
                   left: popupPosition.dx,
@@ -419,9 +422,9 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                       ),
                       decoration: BoxDecoration(
                         color: _secondaryColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _blackColor, width: 3),
-                        boxShadow: const [_heavyShadow],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _borderColor, width: 1),
+                        boxShadow: [_mediumShadow],
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -435,9 +438,6 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                                 topLeft: Radius.circular(8),
                                 topRight: Radius.circular(8),
                               ),
-                              border: Border(
-                                bottom: BorderSide(color: _blackColor, width: 3),
-                              ),
                             ),
                             child: Row(
                               children: [
@@ -446,24 +446,23 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
                                       color: _secondaryColor,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: _blackColor, width: 2),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: _borderColor, width: 1),
                                     ),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.search, color: _darkColor, size: 20),
+                                        Icon(Icons.search, color: _hintColor, size: 20),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: TextField(
                                             controller: _searchController,
                                             focusNode: _searchFocusNode,
                                             decoration: InputDecoration(
-                                              hintText: 'CARI INDUSTRI...',
+                                              hintText: 'Cari industri...',
                                               hintStyle: TextStyle(
-                                                color: _darkColor.withValues(alpha: 0.7),
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: 12,
-                                                letterSpacing: -0.3,
+                                                color: _hintColor,
+                                                fontWeight: FontWeight.normal,
+                                                fontSize: 14,
                                               ),
                                               border: InputBorder.none,
                                               contentPadding: EdgeInsets.zero,
@@ -471,9 +470,8 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                                             ),
                                             style: TextStyle(
                                               fontSize: 14, 
-                                              color: _blackColor,
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: -0.3,
+                                              color: _textColor,
+                                              fontWeight: FontWeight.normal,
                                             ),
                                             cursorColor: _primaryColor,
                                           ),
@@ -481,7 +479,7 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                                         if (_searchController.text.isNotEmpty)
                                           GestureDetector(
                                             onTap: () => _searchController.clear(),
-                                            child: Icon(Icons.clear, size: 18, color: _darkColor),
+                                            child: Icon(Icons.clear, size: 18, color: _hintColor),
                                           ),
                                       ],
                                     ),
@@ -496,10 +494,10 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
                                       color: _secondaryColor,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: _blackColor, width: 2),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: _borderColor, width: 1),
                                     ),
-                                    child: Icon(Icons.close, size: 20, color: _darkColor),
+                                    child: Icon(Icons.close, size: 20, color: _primaryColor),
                                   ),
                                 ),
                               ],
@@ -537,35 +535,17 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: _yellowColor,
-                  border: Border.all(color: _blackColor, width: 3),
-                  shape: BoxShape.circle,
-                ),
-                child: const CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: Colors.white,
-                ),
+              CircularProgressIndicator(
+                strokeWidth: 3,
+                color: _primaryColor,
               ),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _primaryColor,
-                  border: Border.all(color: _blackColor, width: 2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'MEMUAT INDUSTRI...',
-                  style: TextStyle(
-                    color: _secondaryColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.3,
-                  ),
+              Text(
+                'Memuat data industri...',
+                style: TextStyle(
+                  color: _textColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
                 ),
               ),
             ],
@@ -583,45 +563,26 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: _accentColor,
-                  border: Border.all(color: _blackColor, width: 3),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.business_outlined, 
-                  size: 32,
-                  color: _darkColor,
-                ),
+              Icon(
+                Icons.business_outlined, 
+                size: 48,
+                color: _hintColor,
               ),
               const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _primaryColor,
-                  border: Border.all(color: _blackColor, width: 2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'TIDAK ADA INDUSTRI',
-                  style: TextStyle(
-                    color: _secondaryColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.3,
-                  ),
+              Text(
+                'Tidak ada industri',
+                style: TextStyle(
+                  color: _textColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Coba kata kunci lain',
                 style: TextStyle(
-                  color: _darkColor,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  color: _hintColor,
+                  fontSize: 12,
                 ),
               ),
             ],
@@ -639,7 +600,7 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
         final isSelected = _selectedIndustri?.id == industri.id;
         
         return Material(
-          color: isSelected ? _primaryColor.withValues(alpha: 0.2) : Colors.transparent,
+          color: isSelected ? _primaryColor.withValues(alpha:0.1) : Colors.transparent,
           child: InkWell(
             onTap: () {
               setState(() {
@@ -647,7 +608,8 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
               });
               _removeOverlay();
             },
-            splashColor: _primaryColor.withValues(alpha: 0.3),
+            splashColor: _primaryColor.withValues(alpha:0.2),
+            highlightColor: _primaryColor.withValues(alpha:0.1),
             child: Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -657,23 +619,23 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                 border: index == 0
                     ? null
                     : Border(
-                        top: BorderSide(color: _blackColor, width: 2),
+                        top: BorderSide(color: _borderColor.withValues(alpha:0.3), width: 1),
                       ),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: _accentColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: _borderColor, width: 1),
                     ),
                     child: Icon(
                       Icons.business,
-                      color: _darkColor,
-                      size: 22,
+                      color: _primaryColor,
+                      size: 20,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -682,12 +644,11 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          industri.nama.toUpperCase(),
+                          industri.nama,
                           style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 13,
-                            color: _blackColor,
-                            letterSpacing: -0.3,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: _textColor,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -696,17 +657,16 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: _yellowColor,
-                            border: Border.all(color: _blackColor, width: 1.5),
+                            color: _accentColor,
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: _borderColor, width: 1),
                           ),
                           child: Text(
                             industri.bidang,
                             style: TextStyle(
-                              fontSize: 10,
-                              color: _blackColor,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.2,
+                              fontSize: 11,
+                              color: _textColor,
+                              fontWeight: FontWeight.normal,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -716,9 +676,9 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                         Text(
                           industri.alamat,
                           style: TextStyle(
-                            fontSize: 11,
-                            color: _darkColor,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: _hintColor,
+                            fontWeight: FontWeight.normal,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -727,19 +687,10 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                     ),
                   ),
                   if (isSelected)
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: _primaryColor,
-                        border: Border.all(color: _blackColor, width: 2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.check,
-                        size: 16,
-                        color: _secondaryColor,
-                      ),
+                    Icon(
+                      Icons.check_circle,
+                      size: 20,
+                      color: _primaryColor,
                     ),
                 ],
               ),
@@ -770,21 +721,12 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       key: _industriFieldKey,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: _yellowColor,
-            border: Border.all(color: _blackColor, width: 2),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            'INDUSTRI',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              color: _blackColor,
-              letterSpacing: -0.2,
-            ),
+        Text(
+          'Industri',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _textColor,
           ),
         ),
         
@@ -802,103 +744,80 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: _secondaryColor,
-              border: Border.all(color: _blackColor, width: 3),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [_lightShadow],
+              border: Border.all(color: _borderColor, width: 1.5),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [_softShadow],
             ),
             child: Row(
               children: [
                 if (_isLoading && !_hasLoadedData)
                   Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: _primaryColor,
-                      border: Border.all(color: _blackColor, width: 2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const CircularProgressIndicator(
+                    width: 20,
+                    height: 20,
+                    margin: const EdgeInsets.only(right: 12),
+                    child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.white,
+                      color: _primaryColor,
                     ),
                   )
                 else
                   Container(
                     width: 32,
                     height: 32,
+                    margin: const EdgeInsets.only(right: 12),
                     decoration: BoxDecoration(
                       color: _accentColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: _borderColor, width: 1),
                     ),
                     child: Icon(
                       Icons.business_outlined,
-                      color: _darkColor,
+                      color: _primaryColor,
                       size: 18,
                     ),
                   ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: _selectedIndustri == null
                       ? Text(
                           _isLoading && !_hasLoadedData 
-                            ? 'MEMUAT DATA INDUSTRI...' 
-                            : 'PILIH INDUSTRI',
+                            ? 'Memuat data industri...' 
+                            : 'Pilih industri',
                           style: TextStyle(
-                            color: _darkColor.withValues(alpha: 0.7),
+                            color: _hintColor,
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.3,
+                            fontWeight: FontWeight.normal,
                           ),
                         )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _selectedIndustri!.nama.toUpperCase(),
+                              _selectedIndustri!.nama,
                               style: TextStyle(
                                 fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: _blackColor,
-                                letterSpacing: -0.3,
+                                fontWeight: FontWeight.w600,
+                                color: _textColor,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: _yellowColor,
-                                border: Border.all(color: _blackColor, width: 1.5),
-                                borderRadius: BorderRadius.circular(4),
+                            Text(
+                              _selectedIndustri!.bidang,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _hintColor,
+                                fontWeight: FontWeight.normal,
                               ),
-                              child: Text(
-                                _selectedIndustri!.bidang,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: _blackColor,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                 ),
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: _secondaryColor,
-                    border: Border.all(color: _blackColor, width: 3),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    _showIndustriPopup ? Icons.expand_less : Icons.expand_more,
-                    color: _darkColor,
-                  ),
+                Icon(
+                  _showIndustriPopup ? Icons.expand_less : Icons.expand_more,
+                  color: _primaryColor,
                 ),
               ],
             ),
@@ -914,34 +833,30 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Container(
         width: double.infinity,
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.65,
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
           maxWidth: 500,
         ),
         decoration: BoxDecoration(
           color: _secondaryColor,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: _blackColor, width: 4),
-          boxShadow: const [_heavyShadow],
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [_mediumShadow],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header dengan warna tema
+            // Header
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: _primaryColor,
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
-                border: Border(
-                  bottom: BorderSide(color: _blackColor, width: 4),
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
                 ),
               ),
               child: Row(
@@ -951,53 +866,32 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'AJUKAN PKL',
+                        'Pengajuan PKL',
                         style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
                           color: _secondaryColor,
-                          letterSpacing: -0.5,
                         ),
                       ),
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _yellowColor,
-                          border: Border.all(color: _blackColor, width: 2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'PILIH INDUSTRI & CATATAN',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: _blackColor,
-                            letterSpacing: -0.2,
-                          ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Pilih industri dan tulis catatan',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: _secondaryColor.withValues(alpha:0.9),
                         ),
                       ),
                     ],
                   ),
-                  GestureDetector(
-                    onTap: () {
+                  IconButton(
+                    onPressed: () {
                       _removeOverlay();
                       Navigator.of(context).pop();
                     },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: _secondaryColor,
-                        border: Border.all(color: _blackColor, width: 3),
-                        shape: BoxShape.circle,
-                        boxShadow: [_lightShadow],
-                      ),
-                      child: Icon(
-                        Icons.close,
-                        size: 22,
-                        color: _primaryColor,
-                      ),
+                    icon: Icon(
+                      Icons.close,
+                      color: _secondaryColor,
+                      size: 24,
                     ),
                   ),
                 ],
@@ -1010,8 +904,6 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                
-                    
                     _buildIndustriField(context),
                     
                     const SizedBox(height: 24),
@@ -1020,41 +912,12 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _primaryColor,
-                            border: Border.all(color: _blackColor, width: 2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: _secondaryColor,
-                                  border: Border.all(color: _blackColor, width: 2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.edit,
-                                  size: 10,
-                                  color: _primaryColor,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'CATATAN',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                  color: _secondaryColor,
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ],
+                        Text(
+                          'Catatan',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _textColor,
                           ),
                         ),
                         
@@ -1062,36 +925,33 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                         
                         Container(
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: _blackColor, width: 3),
-                            color: Colors.white,
-                            boxShadow: [_lightShadow],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _borderColor, width: 1.5),
+                            color: _secondaryColor,
+                            boxShadow: [_softShadow],
                           ),
                           child: TextFormField(
                             controller: _catatanController,
                             focusNode: _catatanFocusNode,
                             decoration: InputDecoration(
-                              hintText: 'TULIS CATATAN PENGAJUAN PKL...',
+                              hintText: 'Tulis catatan pengajuan PKL...',
                               hintStyle: TextStyle(
-                                color: _darkColor.withValues(alpha: 0.6),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.3,
+                                color: _hintColor,
+                                fontSize: 14,
                               ),
                               border: InputBorder.none,
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
-                                vertical: 12,
+                                vertical: 14,
                               ),
                               isDense: true,
                             ),
                             style: TextStyle(
                               fontSize: 14, 
-                              color: _blackColor,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.3,
+                              color: _textColor,
+                              fontWeight: FontWeight.normal,
                             ),
-                            maxLines: 3,
+                            maxLines: 4,
                             minLines: 3,
                             keyboardType: TextInputType.multiline,
                             textInputAction: TextInputAction.newline,
@@ -1106,53 +966,47 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                     Row(
                       children: [
                         Expanded(
-                          child: GestureDetector(
-                            onTap: () {
+                          child: OutlinedButton(
+                            onPressed: () {
                               _removeOverlay();
                               Navigator.of(context).pop();
                             },
-                            child: Container(
+                            style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              decoration: BoxDecoration(
-                                color: _accentColor,
-                                border: Border.all(color: _blackColor, width: 3),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [_lightShadow],
+                              side: BorderSide(color: _borderColor, width: 1.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Center(
-                                child: Text(
-                                  'BATAL',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: _blackColor,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
+                              backgroundColor: _secondaryColor,
+                            ),
+                            child: Text(
+                              'Batal',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _textColor,
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: GestureDetector(
-                            onTap: () {
+                          child: ElevatedButton(
+                            onPressed: () {
                               // Validasi harus memilih industri dan catatan harus diisi
                               if (_selectedIndustri == null) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: const Text(
-                                      'SILAKAN PILIH INDUSTRI TERLEBIH DAHULU',
+                                      'Silakan pilih industri terlebih dahulu',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.3,
+                                        fontWeight: FontWeight.normal,
                                       ),
                                     ),
                                     backgroundColor: _primaryColor,
                                     behavior: SnackBarBehavior.floating,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
-                                      side: BorderSide(color: _blackColor, width: 2),
                                     ),
                                   ),
                                 );
@@ -1163,17 +1017,15 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: const Text(
-                                      'CATATAN HARUS DIISI',
+                                      'Catatan harus diisi',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.3,
+                                        fontWeight: FontWeight.normal,
                                       ),
                                     ),
                                     backgroundColor: _primaryColor,
                                     behavior: SnackBarBehavior.floating,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
-                                      side: BorderSide(color: _blackColor, width: 2),
                                     ),
                                   ),
                                 );
@@ -1186,24 +1038,21 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
                                 'industri_id': _selectedIndustri!.id,
                               });
                             },
-                            child: Container(
+                            style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              decoration: BoxDecoration(
-                                color: _primaryColor,
-                                border: Border.all(color: _blackColor, width: 3),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: const [_heavyShadow],
+                              backgroundColor: _primaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Center(
-                                child: Text(
-                                  'AJUKAN PKL',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: _secondaryColor,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                            ),
+                            child: Text(
+                              'Ajukan PKL',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _secondaryColor,
                               ),
                             ),
                           ),

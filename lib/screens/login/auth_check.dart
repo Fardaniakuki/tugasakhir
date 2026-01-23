@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tes_flutter/screens/siswa/siswa_main.dart';
 
 import '../admin/admin_main.dart';
 import '../guru/guru_dashboard.dart';
-import '../siswa/dashboard/siswa_dashboard.dart';
 import '../koordinator/koordinator_main.dart';
 import 'login_screen.dart';
 
@@ -50,8 +50,7 @@ class _AuthCheckState extends State<AuthCheck> {
       Widget targetPage;
       switch (role) {
         case 'Siswa':
-          targetPage = const SiswaDashboard();
-          break;
+          targetPage = const SiswaMain();
         case 'Guru':
           targetPage = const GuruDashboard();
           break;

@@ -104,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
           targetPage = const GuruDashboard();
           break;
         case 'Pembimbing':
-          targetPage = const PembimbingMainScreen ();
+          targetPage = const PembimbingMainScreen();
           break;
         case 'Wali Kelas':
           targetPage = const WalikelasMainScreen();
@@ -147,6 +147,142 @@ class _LoginScreenState extends State<LoginScreen> {
   String capitalize(String s) =>
       s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '';
 
+  // Fungsi untuk mengambil data profil guru
+  Future<Map<String, dynamic>?> _fetchGuruProfile(
+      SharedPreferences prefs) async {
+    try {
+      final token = prefs.getString('access_token');
+      if (token == null) {
+        print('Token tidak ditemukan');
+        return null;
+      }
+
+      final userId = prefs.getInt('user_id');
+      final kodeGuru = prefs.getString('kode_guru');
+      final userName = prefs.getString('user_name');
+
+      print('=== FETCH GURU PROFILE ===');
+      print('User ID: $userId');
+      print('Kode Guru: $kodeGuru');
+      print('User Name: $userName');
+
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      String url;
+
+      // Coba dengan endpoint yang berbeda berdasarkan data yang tersedia
+      if (userId != null && userId > 0) {
+        // Coba endpoint profil berdasarkan user_id
+        url = '$baseUrl/api/guru/profile';
+      } else if (kodeGuru != null && kodeGuru.isNotEmpty) {
+        // Coba endpoint dengan kode_guru
+        url = '$baseUrl/api/guru?search=$kodeGuru&limit=1';
+      } else if (userName != null && userName.isNotEmpty) {
+        // Coba endpoint dengan nama
+        url = '$baseUrl/api/guru?search=$userName&limit=1';
+      } else {
+        print('Tidak ada data yang cukup untuk mengambil profil guru');
+        return null;
+      }
+
+      print('Request URL: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        if (data['success'] == true) {
+          if (data['data'] != null) {
+            // Handle berbagai struktur response
+            if (data['data'] is Map) {
+              // Single guru object
+              return data['data'];
+            } else if (data['data'] is List) {
+              // List of gurus
+              final guruList = data['data'] as List;
+              if (guruList.isNotEmpty) {
+                // Cari guru yang cocok dengan kode_guru atau nama
+                if (kodeGuru != null) {
+                  final matchingGuru = guruList.firstWhere(
+                    (guru) => guru['kode_guru'] == kodeGuru,
+                    orElse: () => guruList.first,
+                  );
+                  return matchingGuru;
+                }
+                return guruList.first;
+              }
+            }
+          } else if (data['guru'] != null) {
+            // Alternatif struktur
+            return data['guru'];
+          }
+        }
+      } else if (response.statusCode == 404) {
+        print('Endpoint tidak ditemukan, mencoba alternatif...');
+        // Coba alternatif endpoint
+        return await _tryAlternativeEndpoints(prefs);
+      }
+
+      return null;
+    } catch (e) {
+      print('Error fetching guru profile: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _tryAlternativeEndpoints(
+      SharedPreferences prefs) async {
+    final token = prefs.getString('access_token');
+    if (token == null) return null;
+
+    final baseUrl =
+        dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+    final userId = prefs.getInt('user_id');
+    final kodeGuru = prefs.getString('kode_guru');
+
+    // Coba endpoint alternatif
+    final endpoints = [
+      if (userId != null) '$baseUrl/api/users/$userId/profile',
+      if (kodeGuru != null) '$baseUrl/api/guru/by-kode/$kodeGuru',
+      '$baseUrl/api/guru/my-profile',
+      '$baseUrl/api/auth/profile',
+    ];
+
+    for (final endpoint in endpoints) {
+      try {
+        print('Mencoba endpoint: $endpoint');
+        final response = await http.get(
+          Uri.parse(endpoint),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['success'] == true && data['data'] != null) {
+            return data['data'];
+          }
+        }
+      } catch (e) {
+        print('Error endpoint $endpoint: $e');
+      }
+    }
+
+    return null;
+  }
+
   Future<void> _showRoleSelectionDialog(
     BuildContext context,
     Map<String, dynamic> userData,
@@ -155,39 +291,32 @@ class _LoginScreenState extends State<LoginScreen> {
   ) async {
     if (!mounted) return;
 
+    // Ambil data profil guru terlebih dahulu
+    final guruProfile = await _fetchGuruProfile(prefs);
+
+    // Gabungkan data dari login dengan data profil
+    final Map<String, dynamic> combinedData = {...userData};
+    if (guruProfile != null) {
+      combinedData.addAll(guruProfile);
+    }
+
     return showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) {
         return RoleSelectionDialog(
-          userData: userData,
+          userData: combinedData,
           userName: userName,
           onRoleSelected: (role) async {
             // Simpan role
             await prefs.setString('user_role', role);
 
-            // Simpan data user berdasarkan role
-            if (role == 'Kaprog' ||
-                role == 'Wali Kelas' ||
-                role == 'Pembimbing' ||
-                role == 'Koordinator') {
-              await prefs.setInt('user_id', userData['id'] ?? 0);
-              await prefs.setString('username', userData['username'] ?? '');
-              await prefs.setString('user_name', userData['nama'] ?? userName);
-              if (userData['nip'] != null) {
-                await prefs.setString('user_nip', userData['nip'].toString());
-              }
-              
-              // SIMPAN KODE GURU untuk role guru
-              if (userData['kode_guru'] != null) {
-                await prefs.setString('kode_guru', userData['kode_guru'].toString());
-              }
+            // Simpan semua data user
+            await _saveAllUserData(prefs, combinedData, role);
 
-              print('=== DATA DISIMPAN UNTUK ROLE: $role ===');
-              print('User ID: ${userData['id']}');
-              print('Username: ${userData['username']}');
-              print('Nama: ${userData['nama']}');
-              print('Kode Guru: ${userData['kode_guru']}');
+            // SIMPAN DATA GURU TAMBAHAN jika ada
+            if (guruProfile != null) {
+              await _saveGuruProfileData(prefs, guruProfile);
             }
 
             if (!mounted) return;
@@ -195,7 +324,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Widget targetPage;
             switch (role) {
               case 'Pembimbing':
-                targetPage = const PembimbingMainScreen ();
+                targetPage = const PembimbingMainScreen();
                 break;
               case 'Wali Kelas':
                 targetPage = const WalikelasMainScreen();
@@ -221,6 +350,84 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       },
     );
+  }
+
+  Future<void> _saveAllUserData(SharedPreferences prefs,
+      Map<String, dynamic> userData, String role) async {
+    try {
+      // Simpan data dasar
+      await prefs.setInt('user_id', userData['id'] ?? 0);
+      await prefs.setString('username', userData['username'] ?? '');
+      await prefs.setString(
+          'user_name', userData['nama'] ?? userData['name'] ?? 'User');
+
+      // Simpan data spesifik guru
+      if (userData['kode_guru'] != null) {
+        await prefs.setString('kode_guru', userData['kode_guru'].toString());
+      }
+
+      if (userData['nip'] != null) {
+        await prefs.setString('user_nip', userData['nip'].toString());
+      }
+
+      if (userData['no_telp'] != null) {
+        await prefs.setString('user_phone', userData['no_telp'].toString());
+      }
+
+      // Simpan status role dari data guru
+      if (userData['is_wali_kelas'] != null) {
+        await prefs.setBool('is_wali_kelas', userData['is_wali_kelas']);
+      }
+      if (userData['is_pembimbing'] != null) {
+        await prefs.setBool('is_pembimbing', userData['is_pembimbing']);
+      }
+      if (userData['is_kaprog'] != null) {
+        await prefs.setBool('is_kaprog', userData['is_kaprog']);
+      }
+      if (userData['is_koordinator'] != null) {
+        await prefs.setBool('is_koordinator', userData['is_koordinator']);
+      }
+
+      print('=== DATA DISIMPAN UNTUK ROLE: $role ===');
+      print('User ID: ${userData['id']}');
+      print('Username: ${userData['username']}');
+      print('Nama: ${userData['nama']}');
+      print('Kode Guru: ${userData['kode_guru']}');
+      print('NIP: ${userData['nip']}');
+      print('Telp: ${userData['no_telp']}');
+      print('Wali Kelas: ${userData['is_wali_kelas']}');
+      print('Pembimbing: ${userData['is_pembimbing']}');
+      print('Kaprog: ${userData['is_kaprog']}');
+      print('Koordinator: ${userData['is_koordinator']}');
+    } catch (e) {
+      print('Error saving user data: $e');
+    }
+  }
+
+  Future<void> _saveGuruProfileData(
+      SharedPreferences prefs, Map<String, dynamic> guruData) async {
+    try {
+      // Simpan semua field dari data guru
+      for (final key in guruData.keys) {
+        final value = guruData[key];
+        if (value is String) {
+          await prefs.setString('guru_$key', value);
+        } else if (value is int) {
+          await prefs.setInt('guru_$key', value);
+        } else if (value is bool) {
+          await prefs.setBool('guru_$key', value);
+        } else if (value is double) {
+          await prefs.setDouble('guru_$key', value);
+        } else if (value != null) {
+          await prefs.setString('guru_$key', value.toString());
+        }
+      }
+
+      print('=== GURU PROFILE DATA SAVED ===');
+      print('Total keys saved: ${guruData.keys.length}');
+    } catch (e) {
+      print('Error saving guru profile: $e');
+    }
   }
 
   String _getUserFriendlyError(
@@ -280,11 +487,16 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> loginToAPI(String endpoint, Map<String, dynamic> body) async {
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? '';
+    await dotenv.load(fileName: ".env"); // Load .env file
+
+    final baseUrl =
+        dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
     final url = Uri.parse('$baseUrl$endpoint');
 
     print('=== LOGIN REQUEST ===');
+    print('Base URL: $baseUrl');
     print('Endpoint: $endpoint');
+    print('Full URL: $url');
     print('Body: $body');
 
     try {
@@ -367,10 +579,18 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         if (endpoint == '/auth/guru/login' && !isAdminMode) {
+          // Ambil data profil guru sebelum menampilkan dialog
+          final guruProfile = await _fetchGuruProfile(prefs);
+          final combinedUser =
+              Map<String, dynamic>.from(user); // PERBAIKAN DI SINI
+          if (guruProfile != null) {
+            combinedUser.addAll(guruProfile);
+          }
+
           // Tampilkan dialog pemilihan role untuk guru
           await _showRoleSelectionDialog(
             context,
-            user,
+            combinedUser,
             prefs,
             capitalize(user['nama']),
           );
@@ -459,8 +679,10 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
       final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/$kelasId'),
+        Uri.parse('$baseUrl/api/kelas/$kelasId'),
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',

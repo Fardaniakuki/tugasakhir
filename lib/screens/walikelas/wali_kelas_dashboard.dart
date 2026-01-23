@@ -166,7 +166,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   static const Color _red = Color(0xFFF44336);
   static const Color _darkRed = Color(0xFFB71C1C);
 
-
   @override
   void initState() {
     super.initState();
@@ -309,7 +308,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -346,11 +345,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B1B1B).withValues(alpha:0.1),
+                        color: const Color(0xFF6B1B1B).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                             color:
-                                const Color(0xFF6B1B1B).withValues(alpha:0.3),
+                                const Color(0xFF6B1B1B).withValues(alpha: 0.3),
                             width: 1.5),
                       ),
                       child: const Icon(
@@ -389,7 +388,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -439,10 +438,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         decoration: BoxDecoration(
           color: _primaryRed,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _primaryRed.withValues(alpha:0.8), width: 1),
+          border:
+              Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
           boxShadow: [
             BoxShadow(
-              color: _primaryRed.withValues(alpha:0.3),
+              color: _primaryRed.withValues(alpha: 0.3),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -453,7 +453,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha:0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.healing, color: Colors.white, size: 28),
@@ -469,7 +469,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha:0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -525,16 +525,18 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _borderOrange.withValues(alpha:0.5), width: 1.5),
+          border: Border.all(
+              color: _borderOrange.withValues(alpha: 0.5), width: 1.5),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: color.withValues(alpha:0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: color.withValues(alpha:0.2), width: 1),
+                border:
+                    Border.all(color: color.withValues(alpha: 0.2), width: 1),
               ),
               child: Icon(icon, color: color, size: 20),
             ),
@@ -566,7 +568,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, -10),
           ),
@@ -607,9 +609,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: _primaryRed.withValues(alpha:0.1),
+              color: _primaryRed.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _primaryRed.withValues(alpha:0.2), width: 1),
+              border: Border.all(
+                  color: _primaryRed.withValues(alpha: 0.2), width: 1),
             ),
             child: Text(
               '$count total',
@@ -665,7 +668,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           border: Border.all(color: Colors.grey[200]!, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -683,10 +686,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: _primaryRed.withValues(alpha:0.1),
+                      color: _primaryRed.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: _primaryRed.withValues(alpha:0.3), width: 1.5),
+                          color: _primaryRed.withValues(alpha: 0.3),
+                          width: 1.5),
                     ),
                     child: Icon(
                       _getSIAIcon(jenis),
@@ -717,8 +721,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                             decoration: BoxDecoration(
                               color: Colors.grey[100],
                               borderRadius: BorderRadius.circular(6),
-                              border:
-                                  Border.all(color: Colors.grey[300]!, width: 1),
+                              border: Border.all(
+                                  color: Colors.grey[300]!, width: 1),
                             ),
                             child: Text(
                               kelas,
@@ -765,11 +769,13 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha:0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: statusColor.withValues(alpha:0.3), width: 1),
+                  border: Border.all(
+                      color: statusColor.withValues(alpha: 0.3), width: 1),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -886,7 +892,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           border: Border.all(color: Colors.grey[200]!, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -904,10 +910,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: _darkRed.withValues(alpha:0.1),
+                      color: _darkRed.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: _darkRed.withValues(alpha:0.3), width: 1.5),
+                          color: _darkRed.withValues(alpha: 0.3), width: 1.5),
                     ),
                     child: const Icon(
                       Icons.warning,
@@ -938,8 +944,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                             decoration: BoxDecoration(
                               color: Colors.grey[100],
                               borderRadius: BorderRadius.circular(6),
-                              border:
-                                  Border.all(color: Colors.grey[300]!, width: 1),
+                              border: Border.all(
+                                  color: Colors.grey[300]!, width: 1),
                             ),
                             child: Text(
                               kelas,
@@ -972,12 +978,13 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               ),
               const SizedBox(height: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _getTingkatColor(tingkat).withValues(alpha:0.1),
+                  color: _getTingkatColor(tingkat).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: _getTingkatColor(tingkat).withValues(alpha:0.3),
+                      color: _getTingkatColor(tingkat).withValues(alpha: 0.3),
                       width: 1),
                 ),
                 child: Text(
@@ -993,11 +1000,13 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha:0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: statusColor.withValues(alpha:0.3), width: 1),
+                  border: Border.all(
+                      color: statusColor.withValues(alpha: 0.3), width: 1),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1128,9 +1137,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: _primaryRed.withValues(alpha:0.05),
+                      color: _primaryRed.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _primaryRed.withValues(alpha:0.1)),
+                      border:
+                          Border.all(color: _primaryRed.withValues(alpha: 0.1)),
                     ),
                     child: Row(
                       children: [
@@ -1138,9 +1148,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: _primaryRed.withValues(alpha:0.1),
+                            color: _primaryRed.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: _primaryRed.withValues(alpha:0.3)),
+                            border: Border.all(
+                                color: _primaryRed.withValues(alpha: 0.3)),
                           ),
                           child: Icon(
                             _getSIAIcon(jenis),
@@ -1172,11 +1183,15 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: siaData['statusColor'].withValues(alpha:0.1),
+                            color:
+                                siaData['statusColor'].withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: siaData['statusColor'].withValues(alpha:0.3)),
+                            border: Border.all(
+                                color: siaData['statusColor']
+                                    .withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             status,
@@ -1246,13 +1261,17 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: _primaryRed.withValues(alpha:0.05),
+                                      color:
+                                          _primaryRed.withValues(alpha: 0.05),
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: _primaryRed.withValues(alpha:0.2)),
+                                      border: Border.all(
+                                          color: _primaryRed.withValues(
+                                              alpha: 0.2)),
                                     ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.attach_file, color: _primaryRed, size: 18),
+                                        const Icon(Icons.attach_file,
+                                            color: _primaryRed, size: 18),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
@@ -1264,7 +1283,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                                             ),
                                           ),
                                         ),
-                                        const Icon(Icons.download, color: _primaryRed, size: 18),
+                                        const Icon(Icons.download,
+                                            color: _primaryRed, size: 18),
                                       ],
                                     ),
                                   ),
@@ -1390,7 +1410,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     setState(() {
       data['status'] = 'Disetujui';
       data['statusColor'] = _green;
-      data['catatan'] = 'Disetujui oleh $_namaWaliKelas pada ${DateTime.now().toLocal().toString().split(' ')[0]}';
+      data['catatan'] =
+          'Disetujui oleh $_namaWaliKelas pada ${DateTime.now().toLocal().toString().split(' ')[0]}';
     });
     _showSnackBar('Pengajuan ${data['jenis']} disetujui');
     Navigator.pop(context);
@@ -1398,7 +1419,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
 
   void _rejectSIA(Map<String, dynamic> data) {
     final TextEditingController alasanController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -1423,7 +1444,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: _red.withValues(alpha:0.1),
+                          color: _red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Icon(
@@ -1458,9 +1479,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 24),
-
                   const Text(
                     'Alasan Penolakan',
                     style: TextStyle(
@@ -1490,9 +1509,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       style: const TextStyle(fontSize: 14),
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
                   Row(
                     children: [
                       Expanded(
@@ -1520,16 +1537,18 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                         child: ElevatedButton(
                           onPressed: () {
                             if (alasanController.text.trim().isEmpty) {
-                              _showSnackBar('Masukkan alasan penolakan', isError: true);
+                              _showSnackBar('Masukkan alasan penolakan',
+                                  isError: true);
                               return;
                             }
-                            
+
                             setState(() {
                               data['status'] = 'Ditolak';
                               data['statusColor'] = _red;
-                              data['catatan'] = 'Ditolak: ${alasanController.text.trim()}';
+                              data['catatan'] =
+                                  'Ditolak: ${alasanController.text.trim()}';
                             });
-                            
+
                             _showSnackBar('Pengajuan ditolak');
                             Navigator.pop(context);
                             Navigator.pop(context);
@@ -1599,7 +1618,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   Widget _permasalahanDetailBottomSheet(Map<String, dynamic> masalahData) {
     final siswaName = masalahData['nama'];
     final jenis = masalahData['jenis'];
-    const deskripsi = 'Siswa mengalami kesulitan dalam hal ini. Klik tombol di bawah untuk melihat detail lengkap.';
+    const deskripsi =
+        'Siswa mengalami kesulitan dalam hal ini. Klik tombol di bawah untuk melihat detail lengkap.';
     final status = masalahData['status'];
     final solusi = masalahData['solusi'] ?? 'Belum ada solusi';
     final kelas = masalahData['kelas'] ?? '';
@@ -1646,9 +1666,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: _darkRed.withValues(alpha:0.05),
+                      color: _darkRed.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: _darkRed.withValues(alpha:0.1)),
+                      border:
+                          Border.all(color: _darkRed.withValues(alpha: 0.1)),
                     ),
                     child: Row(
                       children: [
@@ -1656,9 +1677,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: _darkRed.withValues(alpha:0.1),
+                            color: _darkRed.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: _darkRed.withValues(alpha:0.3)),
+                            border: Border.all(
+                                color: _darkRed.withValues(alpha: 0.3)),
                           ),
                           child: const Icon(
                             Icons.warning,
@@ -1690,11 +1712,13 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha:0.1),
+                            color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: statusColor.withValues(alpha:0.3)),
+                            border: Border.all(
+                                color: statusColor.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             status,
@@ -1788,7 +1812,9 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
-                                  color: status == 'Terselesaikan' ? _green : _orange,
+                                  color: status == 'Terselesaikan'
+                                      ? _green
+                                      : _orange,
                                 ),
                               ),
                             ),
@@ -1861,7 +1887,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
 
   void _updatePermasalahanStatus(Map<String, dynamic> data, String newStatus) {
     final TextEditingController catatanController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) {
@@ -1886,7 +1912,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: _orange.withValues(alpha:0.1),
+                          color: _orange.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Icon(
@@ -1921,9 +1947,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 24),
-
                   const Text(
                     'Catatan Tindakan',
                     style: TextStyle(
@@ -1944,7 +1968,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       controller: catatanController,
                       maxLines: 4,
                       decoration: const InputDecoration.collapsed(
-                        hintText: 'Masukkan catatan tindakan yang akan dilakukan...',
+                        hintText:
+                            'Masukkan catatan tindakan yang akan dilakukan...',
                         hintStyle: TextStyle(
                           color: Colors.grey,
                           fontSize: 14,
@@ -1953,9 +1978,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       style: const TextStyle(fontSize: 14),
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
                   Row(
                     children: [
                       Expanded(
@@ -1983,17 +2006,19 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                         child: ElevatedButton(
                           onPressed: () {
                             if (catatanController.text.trim().isEmpty) {
-                              _showSnackBar('Masukkan catatan tindakan', isError: true);
+                              _showSnackBar('Masukkan catatan tindakan',
+                                  isError: true);
                               return;
                             }
-                            
+
                             setState(() {
                               data['solusi'] = catatanController.text.trim();
                               data['status'] = 'Ditindaklanjuti';
                               data['statusColor'] = _orange;
                             });
-                            
-                            _showSnackBar('Permasalahan sedang ditindaklanjuti');
+
+                            _showSnackBar(
+                                'Permasalahan sedang ditindaklanjuti');
                             Navigator.pop(context);
                             Navigator.pop(context);
                           },
@@ -2029,7 +2054,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     setState(() {
       data['status'] = 'Terselesaikan';
       data['statusColor'] = _green;
-      data['solusi'] = 'Terselesaikan oleh $_namaWaliKelas pada ${DateTime.now().toLocal().toString().split(' ')[0]}';
+      data['solusi'] =
+          'Terselesaikan oleh $_namaWaliKelas pada ${DateTime.now().toLocal().toString().split(' ')[0]}';
     });
     _showSnackBar('Permasalahan ditandai sebagai terselesaikan');
     Navigator.pop(context);
@@ -2054,7 +2080,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   border: Border.all(color: Colors.grey[200]!),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha:0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -2121,7 +2147,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   border: Border.all(color: Colors.grey[200]!),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha:0.08),
+                      color: Colors.black.withValues(alpha: 0.08),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -2138,7 +2164,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    
+
                     // Skeleton Mini Cards
                     Row(
                       children: [
@@ -2164,7 +2190,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    
+
                     // Skeleton Chips
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2216,7 +2242,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha:0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 20,
                       offset: const Offset(0, -10),
                     ),
@@ -2247,7 +2273,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Skeleton Horizontal List 1
                     SizedBox(
                       height: 210,
@@ -2269,7 +2295,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       ),
                     ),
                     const SizedBox(height: 40),
-                    
+
                     // Skeleton Section Title 2
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2293,7 +2319,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Skeleton Horizontal List 2
                     SizedBox(
                       height: 195,

@@ -1,124 +1,215 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  try {
-    await initializeDateFormatting('id_ID', null);
-  } catch (e) {
-    print('Failed to initialize Indonesian locale: $e');
-  }
-
-  runApp(const SiswaKalender());
-}
-
-class SiswaKalender extends StatelessWidget {
+class SiswaKalender extends StatefulWidget {
   const SiswaKalender({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Kalender PKL',
-      theme: ThemeData(
-        primarySwatch: Colors.indigo,
-        fontFamily: 'Arial',
-      ),
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('id', 'ID'),
-        Locale('en', 'US'),
-      ],
-      home: const CalendarHomePage(),
-    );
-  }
+  State<SiswaKalender> createState() => _SiswaKalenderState();
 }
 
-class CalendarHomePage extends StatefulWidget {
-  const CalendarHomePage({super.key});
-
-  @override
-  State<CalendarHomePage> createState() => _CalendarHomePageState();
-}
-
-class _CalendarHomePageState extends State<CalendarHomePage> {
+class _SiswaKalenderState extends State<SiswaKalender> {
   // ========== VARIABEL UTAMA ==========
   DateTime _currentDate = DateTime.now();
   DateTime? _selectedDate;
   late List<List<DateTime?>> _calendarDays;
   late String _currentMonth;
-  final DateTime _pklStartDate = DateTime.now().add(const Duration(days: 10));
-  final DateTime _pklEndDate = DateTime.now().add(const Duration(days: 90));
 
-  // ========== WARNA YANG DIPERBAIKI ==========
-  static const Color _primaryColor = Color(0xFF9f0712); // Merah PKL
-  static const Color _secondaryColor = Color(0xFFE6E3E3);
-  static const Color _accentColor = Color(0xFFA8DADC);
-  static const Color _darkColor = Color(0xFF641E20);
-  static const Color _yellowColor = Color(0xFFFFD166);
-  static const Color _greenColor = Color(0xFF06D6A0); // Hijau cerah
-  static const Color _redColor = Color(0xFF9f0712); // Merah sama dengan PKL
-  static const Color _blackColor = Colors.black;
-  static const Color _whiteColor = Colors.white;
-  static const Color _creamColor = Color(0xFFF5F5DC);
+  // ========== STATE MANAGEMENT ==========
+  bool _isLoading = true;
+  bool _isCheckingToken = true;
+  String _errorMessage = '';
+  List<KegiatanPkl> _allKegiatan = [];
+  final Map<DateTime, List<KegiatanPkl>> _events = {};
 
-  // ========== SHADOWS ==========
-  static const BoxShadow _heavyShadow = BoxShadow(
-    color: Colors.black,
-    offset: Offset(6, 6),
-    blurRadius: 0,
-  );
-
-  static const BoxShadow _mediumShadow = BoxShadow(
-    color: Colors.black,
-    offset: Offset(4, 4),
-    blurRadius: 0,
-  );
-
-
-  // ========== DATA JADWAL ==========
-  final Map<DateTime, List<Map<String, dynamic>>> _events = {};
+  // ========== WARNA SISWA ==========
+  static const Color _primaryColor = Color(0xFF9f0712); // Merah siswa
+  static const Color _yellowColor = Color(0xFFFFB703);
+  static const Color _greenColor = Color(0xFF4CAF50);
+  static const Color _redColor = Color(0xFFF44336);
+  static const Color _blueColor = Color(0xFF2196F3);
+  static const Color _purpleColor = Color(0xFF9C27B0);
+  static const Color _textSecondary = Color(0xFF666666);
+  static const Color _borderColor = Color(0xFFE0E0E0);
+  static const Color _pastDayColor = Color(0xFFF5F5F5);
+  static const Color _pastDayTextColor = Color(0xFF999999);
+  static const Color _textPrimary = Color(0xFF333333);
 
   @override
   void initState() {
     super.initState();
     _selectedDate = DateTime.now();
     _generateCalendar();
-    _initializeEvents();
+    _checkTokenAndLoadData();
+  }
+
+  // ========== CHECK TOKEN & LOAD DATA ==========
+  Future<void> _checkTokenAndLoadData() async {
+    final prefs = await SharedPreferences.getInstance();
+    prefs.getString('access_token');
+
+    // Untuk demo, kita anggap token selalu ada
+    // Jika ingin simulasi login, bisa uncomment kode berikut:
+    /*
+    if (token == null || token.isEmpty) {
+      _redirectToLogin();
+      return;
+    }
+    */
+
+    await Future.delayed(const Duration(milliseconds: 500)); // Simulasi loading
+    await _loadDummyData();
+  }
+
+
+  // ========== LOAD DATA DUMMY ==========
+  Future<void> _loadDummyData() async {
+    setState(() {
+      _isCheckingToken = false;
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      // Simulasi loading
+      await Future.delayed(const Duration(seconds: 1));
+
+      // Data dummy kegiatan PKL
+      final dummyKegiatan = [
+        KegiatanPkl(
+          id: 1,
+          deskripsi: 'Pembekalan awal PKL untuk semua siswa kelas XII. Materi meliputi tata tertib perusahaan, keselamatan kerja, dan etika kerja.',
+          jenisKegiatan: 'Pembekalan',
+          tahunAjaranId: 1,
+          tanggalMulai: DateTime.now().subtract(const Duration(days: 5)),
+          tanggalSelesai: DateTime.now().subtract(const Duration(days: 3)),
+          status: 'active',
+          createdBy: 1,
+          createdAt: DateTime.now().subtract(const Duration(days: 10)),
+          updatedAt: DateTime.now().subtract(const Duration(days: 10)),
+        ),
+        KegiatanPkl(
+          id: 2,
+          deskripsi: 'Monitoring pertama kemajuan siswa di tempat PKL. Pembimbing akan mengunjungi perusahaan mitra.',
+          jenisKegiatan: 'Monitoring1',
+          tahunAjaranId: 1,
+          tanggalMulai: DateTime.now().add(const Duration(days: 2)),
+          tanggalSelesai: DateTime.now().add(const Duration(days: 2)),
+          status: 'active',
+          createdBy: 1,
+          createdAt: DateTime.now().subtract(const Duration(days: 8)),
+          updatedAt: DateTime.now().subtract(const Duration(days: 8)),
+        ),
+        KegiatanPkl(
+          id: 3,
+          deskripsi: 'Kegiatan monitoring kedua untuk evaluasi perkembangan siswa. Fokus pada pencapaian kompetensi.',
+          jenisKegiatan: 'Monitoring2',
+          tahunAjaranId: 1,
+          tanggalMulai: DateTime.now().add(const Duration(days: 15)),
+          tanggalSelesai: DateTime.now().add(const Duration(days: 15)),
+          status: 'active',
+          createdBy: 1,
+          createdAt: DateTime.now().subtract(const Duration(days: 5)),
+          updatedAt: DateTime.now().subtract(const Duration(days: 5)),
+        ),
+        KegiatanPkl(
+          id: 4,
+          deskripsi: 'Penjemputan siswa dari tempat PKL dan pembekalan akhir sebelum presentasi.',
+          jenisKegiatan: 'Penjemputan',
+          tahunAjaranId: 1,
+          tanggalMulai: DateTime.now().add(const Duration(days: 30)),
+          tanggalSelesai: DateTime.now().add(const Duration(days: 30)),
+          status: 'active',
+          createdBy: 1,
+          createdAt: DateTime.now().subtract(const Duration(days: 3)),
+          updatedAt: DateTime.now().subtract(const Duration(days: 3)),
+        ),
+        KegiatanPkl(
+          id: 5,
+          deskripsi: 'Workshop pembuatan laporan PKL dan persiapan presentasi akhir.',
+          jenisKegiatan: 'Pembekalan',
+          tahunAjaranId: 1,
+          tanggalMulai: DateTime.now().add(const Duration(days: 25)),
+          tanggalSelesai: DateTime.now().add(const Duration(days: 26)),
+          status: 'active',
+          createdBy: 1,
+          createdAt: DateTime.now().subtract(const Duration(days: 2)),
+          updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+        ),
+        KegiatanPkl(
+          id: 6,
+          deskripsi: 'Presentasi hasil PKL di depan penguji dan pembimbing.',
+          jenisKegiatan: 'Monitoring2',
+          tahunAjaranId: 1,
+          tanggalMulai: DateTime.now().add(const Duration(days: 35)),
+          tanggalSelesai: DateTime.now().add(const Duration(days: 36)),
+          status: 'active',
+          createdBy: 1,
+          createdAt: DateTime.now().subtract(const Duration(days: 1)),
+          updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+        ),
+      ];
+
+      setState(() {
+        _allKegiatan = dummyKegiatan;
+        _initializeEvents();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error loading data: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _initializeEvents() {
+    _events.clear();
+
+    for (var kegiatan in _allKegiatan) {
+      // Tambahkan event untuk setiap hari dalam rentang tanggal
+      DateTime currentDate = kegiatan.tanggalMulai;
+      final endDate = kegiatan.tanggalSelesai;
+
+      while (!currentDate.isAfter(endDate)) {
+        final dateKey = DateTime(
+          currentDate.year,
+          currentDate.month,
+          currentDate.day,
+        );
+
+        if (_events.containsKey(dateKey)) {
+          _events[dateKey]!.add(kegiatan);
+        } else {
+          _events[dateKey] = [kegiatan];
+        }
+
+        currentDate = currentDate.add(const Duration(days: 1));
+      }
+    }
   }
 
   // ========== GENERATE KALENDER ==========
   void _generateCalendar() {
-    try {
-      _currentMonth = DateFormat('MMMM yyyy', 'id_ID').format(_currentDate);
-    } catch (e) {
-      _currentMonth = DateFormat('MMMM yyyy').format(_currentDate);
-    }
-
+    _currentMonth = DateFormat('MMMM yyyy').format(_currentDate);
     _calendarDays = [];
 
     final firstDayOfMonth = DateTime(_currentDate.year, _currentDate.month, 1);
-    final lastDayOfMonth =
-        DateTime(_currentDate.year, _currentDate.month + 1, 0);
-
+    final lastDayOfMonth = DateTime(_currentDate.year, _currentDate.month + 1, 0);
     final int startingWeekday = firstDayOfMonth.weekday % 7;
 
     final List<DateTime?> currentWeek = [];
 
-    // Tambahkan hari dari bulan sebelumnya (transparan)
+    // Tambahkan hari dari bulan sebelumnya
     if (startingWeekday > 0) {
-      final previousMonthLastDay =
-          DateTime(_currentDate.year, _currentDate.month, 0);
+      final previousMonthLastDay = DateTime(_currentDate.year, _currentDate.month, 0);
       for (int i = startingWeekday - 1; i >= 0; i--) {
-        final previousDate = DateTime(previousMonthLastDay.year,
-            previousMonthLastDay.month, previousMonthLastDay.day - i);
+        final previousDate = DateTime(
+          previousMonthLastDay.year,
+          previousMonthLastDay.month,
+          previousMonthLastDay.day - i,
+        );
         currentWeek.add(previousDate);
       }
     }
@@ -134,133 +225,16 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       }
     }
 
-    // Tambahkan hari dari bulan berikutnya (transparan)
+    // Tambahkan hari dari bulan berikutnya
     if (currentWeek.isNotEmpty) {
       int nextMonthDay = 1;
       while (currentWeek.length < 7) {
-        final nextDate =
-            DateTime(_currentDate.year, _currentDate.month + 1, nextMonthDay);
+        final nextDate = DateTime(_currentDate.year, _currentDate.month + 1, nextMonthDay);
         currentWeek.add(nextDate);
         nextMonthDay++;
       }
       _calendarDays.add(currentWeek);
     }
-  }
-
-  // ========== INISIALISASI EVENT ==========
-  void _initializeEvents() {
-    final now = DateTime.now();
-
-    // Event hari ini (hijau)
-    final today = DateTime(now.year, now.month, now.day);
-    _events[today] = [
-      {
-        'deskripsi':
-            'Pembekalan awal untuk siswa PKL mengenai tata tertib dan prosedur keselamatan kerja di lingkungan perusahaan.',
-        'jenis_kegiatan': 'PEMBEKALAN AWAL',
-        'tanggal_mulai': today,
-        'tanggal_selesai': today,
-        'color': _greenColor,
-        'icon': Icons.school,
-        'lokasi': 'AULA UTAMA LT. 3',
-        'waktu': '08:00 - 12:00',
-      }
-    ];
-
-    // Event besok (hijau)
-    final tomorrow = today.add(const Duration(days: 1));
-    _events[tomorrow] = [
-      {
-        'deskripsi':
-            'Pengenalan lengkap mengenai struktur organisasi perusahaan dan pembagian tugas proyek untuk siswa PKL.',
-        'jenis_kegiatan': 'ORIENTASI PERUSAHAAN',
-        'tanggal_mulai': tomorrow,
-        'tanggal_selesai': tomorrow,
-        'color': _greenColor,
-        'icon': Icons.business,
-        'lokasi': 'KANTOR PUSAT',
-        'waktu': '09:00 - 16:00',
-      }
-    ];
-
-    // Event untuk 3 hari lagi (merah)
-    final day3 = today.add(const Duration(days: 3));
-    _events[day3] = [
-      {
-        'deskripsi':
-            'Presentasi progress mingguan proyek PKL dihadapan pembimbing dan tim. Sesi konsultasi teknis.',
-        'jenis_kegiatan': 'PRESENTASI PROGRESS',
-        'tanggal_mulai': day3,
-        'tanggal_selesai': day3,
-        'color': _redColor,
-        'icon': Icons.present_to_all,
-        'lokasi': 'RUANG MEETING 301',
-        'waktu': '13:00 - 15:00',
-      }
-    ];
-
-    // Event untuk 5 hari lagi (hijau)
-    final day5 = today.add(const Duration(days: 5));
-    _events[day5] = [
-      {
-        'deskripsi':
-            'Evaluasi menyeluruh terhadap kinerja individu dan pencapaian target bulanan.',
-        'jenis_kegiatan': 'EVALUASI KINERJA',
-        'tanggal_mulai': day5,
-        'tanggal_selesai': day5,
-        'color': _greenColor,
-        'icon': Icons.assessment,
-        'lokasi': 'RUANG HRD',
-        'waktu': '10:00 - 12:00',
-      }
-    ];
-
-    // Event untuk 7 hari lagi (merah)
-    final day7 = today.add(const Duration(days: 7));
-    _events[day7] = [
-      {
-        'deskripsi':
-            'Pelatihan intensif penggunaan software internal perusahaan termasuk sistem ERP dan tools monitoring.',
-        'jenis_kegiatan': 'PELATIHAN SOFTWARE',
-        'tanggal_mulai': day7,
-        'tanggal_selesai': day7,
-        'color': _redColor,
-        'icon': Icons.computer,
-        'lokasi': 'LAB KOMPUTER',
-        'waktu': '09:00 - 17:00',
-      }
-    ];
-
-    // Event hari terakhir PKL (merah)
-    _events[_pklEndDate] = [
-      {
-        'deskripsi':
-            'Acara penutupan dan presentasi final hasil PKL. Penyerahan sertifikat kelulusan.',
-        'jenis_kegiatan': 'PENUTUPAN PKL',
-        'tanggal_mulai': _pklEndDate,
-        'tanggal_selesai': _pklEndDate,
-        'color': _redColor,
-        'icon': Icons.celebration,
-        'lokasi': 'AUDITORIUM UTAMA',
-        'waktu': '09:00 - 16:00',
-      }
-    ];
-
-    // Event dengan multiple jadwal di hari yang sama
-    final multiDay = today.add(const Duration(days: 2));
-    _events[multiDay] = [
-      {
-        'deskripsi':
-            'Meeting koordinasi tim proyek untuk membahas rencana kerja minggu ini.',
-        'jenis_kegiatan': 'MEETING TIM',
-        'tanggal_mulai': multiDay,
-        'tanggal_selesai': multiDay,
-        'color': _greenColor,
-        'icon': Icons.group,
-        'lokasi': 'MEETING ROOM A',
-        'waktu': '10:00 - 11:30',
-      },
-    ];
   }
 
   // ========== FUNGSI NAVIGASI ==========
@@ -278,7 +252,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     });
   }
 
-  // ========== FUNGSI HELPER ==========
+  // ========== HELPER FUNCTIONS ==========
   bool _isToday(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year &&
@@ -293,11 +267,6 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
         _selectedDate!.day == date.day;
   }
 
-  bool _isPKLPeriod(DateTime date) {
-    return (date.isAfter(_pklStartDate.subtract(const Duration(days: 1))) &&
-        date.isBefore(_pklEndDate.add(const Duration(days: 1))));
-  }
-
   bool _isCurrentMonth(DateTime date) {
     return date.year == _currentDate.year && date.month == _currentDate.month;
   }
@@ -306,855 +275,992 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     return _events.containsKey(DateTime(date.year, date.month, date.day));
   }
 
-  Color _getEventColor(DateTime date) {
-    final events = _events[DateTime(date.year, date.month, date.day)];
-    if (events != null && events.isNotEmpty) {
-      return events.first['color'] as Color;
+  bool _isPastDay(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final checkDate = DateTime(date.year, date.month, date.day);
+    return checkDate.isBefore(today);
+  }
+
+  Color _getJenisColor(String jenis) {
+    switch (jenis) {
+      case 'Pembekalan':
+        return _primaryColor;
+      case 'Monitoring1':
+        return _greenColor;
+      case 'Monitoring2':
+        return _blueColor;
+      case 'Penjemputan':
+        return _purpleColor;
+      default:
+        return _primaryColor;
     }
-    return _redColor;
   }
 
-  String _getDayName(int weekday) {
-    const days = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
-    return days[weekday % 7];
-  }
-
-
-  String _getMonthAbbreviation(int month) {
-    const months = [
-      'JAN',
-      'FEB',
-      'MAR',
-      'APR',
-      'MEI',
-      'JUN',
-      'JUL',
-      'AGU',
-      'SEP',
-      'OKT',
-      'NOV',
-      'DES'
-    ];
-    return months[month - 1];
+  String _getJenisIcon(String jenis) {
+    switch (jenis) {
+      case 'Pembekalan':
+        return '📚';
+      case 'Monitoring1':
+        return '📋';
+      case 'Monitoring2':
+        return '📊';
+      case 'Penjemputan':
+        return '🚌';
+      default:
+        return '📅';
+    }
   }
 
   String _formatDateForDisplay(DateTime date) {
-    try {
-      return DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(date);
-    } catch (e) {
-      return DateFormat('EEEE, dd MMMM yyyy').format(date);
+    return DateFormat('EEEE, dd MMMM yyyy').format(date);
+  }
+
+  String _formatDateShort(DateTime date) {
+    return DateFormat('dd MMM').format(date);
+  }
+
+  List<KegiatanPkl> _getKegiatanForDay(DateTime day) {
+    final dateKey = DateTime(day.year, day.month, day.day);
+    return _events[dateKey] ?? [];
+  }
+
+  // Fungsi untuk mendapatkan jadwal yang akan datang
+  List<KegiatanPkl> _getUpcomingKegiatan() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    // Filter kegiatan yang tanggal selesai >= hari ini
+    final List<KegiatanPkl> upcomingKegiatan = _allKegiatan
+        .where((kegiatan) => !kegiatan.tanggalSelesai.isBefore(today))
+        .toList();
+
+    // Sort by tanggal mulai (ascending)
+    upcomingKegiatan.sort((a, b) => a.tanggalMulai.compareTo(b.tanggalMulai));
+
+    return upcomingKegiatan;
+  }
+
+  // Fungsi untuk mendapatkan kegiatan pada hari terpilih atau jadwal terdekat
+  List<KegiatanPkl> _getDisplayedKegiatan() {
+    final dayKegiatan = _getKegiatanForDay(_selectedDate ?? DateTime.now());
+
+    // Jika ada kegiatan pada hari terpilih, tampilkan
+    if (dayKegiatan.isNotEmpty) {
+      return dayKegiatan;
     }
+
+    // Jika tidak ada, tampilkan jadwal yang akan datang
+    return _getUpcomingKegiatan();
   }
 
-  // ========== FUNGSI UNTUK WARNA BERDASARKAN JADWAL ==========
-  Color _getDateBackgroundColor(DateTime date) {
-    if (_isSelected(date)) return _primaryColor;
-    if (_isToday(date)) return _yellowColor;
-    if (_isPKLPeriod(date)) return _creamColor;
-    return _whiteColor;
-  }
-
-  Color _getDateTextColor(DateTime date) {
-    if (_isSelected(date)) return _whiteColor;
-    if (_isToday(date)) return _blackColor;
-    if (!_isCurrentMonth(date)) return Colors.black.withValues(alpha:0.3);
-    return _blackColor;
-  }
-
-  // ========== SHOW MONTH PICKER ==========
-  void _showMonthPicker() {
-    final months = List.generate(12, (index) => index + 1);
-    final currentYear = _currentDate.year;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.7,
-          decoration: BoxDecoration(
-            color: _secondaryColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-            border: Border.all(color: _blackColor, width: 4),
-            boxShadow: const [_heavyShadow],
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  color: _primaryColor,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(26)),
-                  border: Border(
-                      bottom: BorderSide(color: Colors.black, width: 4)),
+  // ========== BUILD WIDGET ==========
+  @override
+  Widget build(BuildContext context) {
+    if (_isCheckingToken) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _primaryColor, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _currentDate = DateTime(
-                              _currentDate.year - 1, _currentDate.month, 1);
-                          _generateCalendar();
-                        });
-                      },
-                      icon: Container(
-                        decoration: BoxDecoration(
-                          color: _accentColor,
-                          border: Border.all(color: _blackColor, width: 2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.keyboard_arrow_left, size: 30),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 30, vertical: 15),
-                      decoration: BoxDecoration(
-                        color: _yellowColor,
-                        border: Border.all(color: _blackColor, width: 3),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        currentYear.toString(),
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: _blackColor,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _currentDate = DateTime(
-                              _currentDate.year + 1, _currentDate.month, 1);
-                          _generateCalendar();
-                        });
-                      },
-                      icon: Container(
-                        decoration: BoxDecoration(
-                          color: _accentColor,
-                          border: Border.all(color: _blackColor, width: 2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.keyboard_arrow_right, size: 30),
-                      ),
-                    ),
-                  ],
+              ],
+            ),
+            child: const CircularProgressIndicator(
+              color: _primaryColor,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                color: _primaryColor,
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Memuat jadwal...',
+                style: TextStyle(
+                  color: _primaryColor,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: GridView.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 15,
-                      mainAxisSpacing: 15,
-                      childAspectRatio: 1.5,
-                    ),
-                    itemCount: months.length,
-                    itemBuilder: (context, index) {
-                      final month = months[index];
-                      final isCurrentMonth = month == _currentDate.month;
+            ],
+          ),
+        ),
+      );
+    }
 
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _currentDate = DateTime(currentYear, month, 1);
-                            _generateCalendar();
-                            Navigator.pop(context);
-                          });
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color:
-                                isCurrentMonth ? _primaryColor : _accentColor,
-                            border: Border.all(
-                              color: _blackColor,
-                              width: isCurrentMonth ? 4 : 3,
+    if (_errorMessage.isNotEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: _redColor, size: 64),
+              const SizedBox(height: 16),
+              const Text(
+                'Terjadi kesalahan',
+                style: TextStyle(
+                  color: _redColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: _textSecondary),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadDummyData,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text('Coba Lagi'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _loadDummyData,
+          backgroundColor: Colors.white,
+          color: _primaryColor,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+
+                // HEADER
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha:0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Kalender PKL',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF9f0712),
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Jadwal Kegiatan Siswa',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                    
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
                             ),
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: const [_mediumShadow],
+                            decoration: BoxDecoration(
+                              color: _primaryColor.withValues(alpha:0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _primaryColor.withValues(alpha:0.2),
+                              ),
+                            ),
+                            child: Text(
+                              '${_allKegiatan.length} Total Kegiatan',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _primaryColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _greenColor.withValues(alpha:0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _greenColor.withValues(alpha:0.2),
+                              ),
+                            ),
+                            child: Text(
+                              '${_getUpcomingKegiatan().length} Akan Datang',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _greenColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // KONTROL BULAN
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha:0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildNavButton(
+                        icon: Icons.chevron_left,
+                        onPressed: _goToPreviousMonth,
+                      ),
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                _primaryColor.withValues(alpha:0.05),
+                                _primaryColor.withValues(alpha:0.05),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: _primaryColor.withValues(alpha:0.2),
+                            ),
                           ),
                           child: Center(
                             child: Text(
-                              _getMonthAbbreviation(month),
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color:
-                                    isCurrentMonth ? _whiteColor : _blackColor,
+                              _currentMonth.toUpperCase(),
+                              style: const TextStyle(
+                                color: Color(0xFF9f0712),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
                                 letterSpacing: 1.2,
                               ),
                             ),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                      _buildNavButton(
+                        icon: Icons.chevron_right,
+                        onPressed: _goToNextMonth,
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Container(
-                  width: double.infinity,
+                const SizedBox(height: 10),
+
+                // KALENDER
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: _primaryColor,
-                    border: Border.all(color: _blackColor, width: 3),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: const [_mediumShadow],
-                  ),
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      'TUTUP',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: _whiteColor,
-                        letterSpacing: 1.5,
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha:0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
                       ),
-                    ),
+                    ],
                   ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final columnWidth = (screenWidth - 56) / 7;
-
-    return Scaffold(
-      backgroundColor: _darkColor,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // HEADER SIMPLE TANPA CONTAINER PUTIH
-            Container(
-              margin: const EdgeInsets.only(top: 40, left: 16, right: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              decoration: BoxDecoration(
-                color: _primaryColor,
-                border: Border.all(color: _blackColor, width: 3),
-                boxShadow: const [_heavyShadow],
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Center(
-                child: Text(
-                  'KALENDER PKL',
-                  style: TextStyle(
-                    color: _whiteColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ========== KONTROL BULAN ==========
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: _whiteColor,
-                border: Border.all(color: _blackColor, width: 4),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [_heavyShadow],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // TOMBOL PREVIOUS
-                  _buildNavButton(
-                    icon: Icons.chevron_left,
-                    onPressed: _goToPreviousMonth,
-                    color: const Color.fromARGB(255, 255, 255, 255),
-                  ),
-
-                  const SizedBox(width: 20),
-
-                  // BULAN DAN TAHUN
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _showMonthPicker,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: _darkColor,
-                          border: Border.all(color: _blackColor, width: 3),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Center(
-                          child: Text(
-                            _currentMonth.toUpperCase(),
-                            style: const TextStyle(
-                              color: _whiteColor,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                              letterSpacing: 1.2,
+                  child: Column(
+                    children: [
+                      // HEADER HARI
+                      Row(
+                        children: ['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day) {
+                          return Expanded(
+                            child: Center(
+                              child: Text(
+                                day,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF666666),
+                                  fontSize: 14,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        }).toList(),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+
+                      // HARI-HARI
+                      Column(
+                        children: _calendarDays.map((week) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: week.map((date) {
+                                if (date == null) {
+                                  return Expanded(
+                                    child: Container(
+                                      margin: const EdgeInsets.all(4),
+                                      height: 50,
+                                    ),
+                                  );
+                                }
+
+                                final isCurrentMonth = _isCurrentMonth(date);
+                                final hasEvent = _hasEvent(date);
+                                final isToday = _isToday(date);
+                                final isSelected = _isSelected(date);
+                                final isPastDay = _isPastDay(date);
+
+                                return Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedDate = date;
+                                        if (!isCurrentMonth) {
+                                          _currentDate = DateTime(
+                                            date.year,
+                                            date.month,
+                                            1,
+                                          );
+                                          _generateCalendar();
+                                        }
+                                      });
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.all(4),
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: isPastDay
+                                            ? _pastDayColor
+                                            : isSelected
+                                                ? _primaryColor
+                                                : isToday
+                                                    ? _yellowColor.withValues(alpha:0.15)
+                                                    : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: isPastDay
+                                              ? Colors.grey[200]!
+                                              : isSelected
+                                                  ? _primaryColor
+                                                  : isToday
+                                                      ? _yellowColor
+                                                      : Colors.grey[200]!,
+                                          width: isPastDay
+                                              ? 1
+                                              : isSelected
+                                                  ? 2
+                                                  : (isToday ? 1.5 : 1),
+                                        ),
+                                        boxShadow: isSelected
+                                            ? [
+                                                BoxShadow(
+                                                  color: _primaryColor.withValues(alpha:0.3),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 3),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          // ANGKA TANGGAL
+                                          Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                date.day.toString(),
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: isSelected
+                                                      ? FontWeight.w800
+                                                      : FontWeight.w600,
+                                                  color: isPastDay
+                                                      ? _pastDayTextColor
+                                                      : isSelected
+                                                          ? Colors.white
+                                                          : isCurrentMonth
+                                                              ? Colors.black
+                                                              : Colors.grey[400],
+                                                ),
+                                              ),
+                                              if (hasEvent && isPastDay)
+                                                Container(
+                                                  margin: const EdgeInsets.only(top: 2),
+                                                  width: 6,
+                                                  height: 6,
+                                                  decoration: const BoxDecoration(
+                                                    color: _pastDayTextColor,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                              if (hasEvent && !isPastDay)
+                                                Container(
+                                                  margin: const EdgeInsets.only(top: 2),
+                                                  width: 6,
+                                                  height: 6,
+                                                  decoration: BoxDecoration(
+                                                    color: isSelected
+                                                        ? Colors.white
+                                                        : _primaryColor,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                   ),
+                ),
 
-                  const SizedBox(width: 20),
+                const SizedBox(height: 20),
 
-                  // TOMBOL NEXT
-                  _buildNavButton(
-                    icon: Icons.chevron_right,
-                    onPressed: _goToNextMonth,
-                    color: const Color.fromARGB(255, 255, 255, 255),
+
+                // DETAIL HARI TERPILIH
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha:0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // ========== KALENDER ==========
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: _whiteColor,
-                border: Border.all(color: _blackColor, width: 4),
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: const [_heavyShadow],
-              ),
-              child: Column(
-                children: [
-                  // HEADER HARI
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _darkColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Row(
-                      children: List.generate(7, (index) {
-                        return Expanded(
-                          child: Center(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _selectedDate != null
+                                    ? _formatDateForDisplay(_selectedDate!)
+                                    : 'Pilih Tanggal',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _getKegiatanForDay(_selectedDate ?? DateTime.now()).isEmpty
+                                    ? 'Menampilkan jadwal yang akan datang'
+                                    : '${_getKegiatanForDay(_selectedDate ?? DateTime.now()).length} kegiatan pada hari ini',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _getDisplayedKegiatan().isEmpty
+                                  ? Colors.grey.withValues(alpha:0.1)
+                                  : _greenColor.withValues(alpha:0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _getDisplayedKegiatan().isEmpty
+                                    ? Colors.grey.withValues(alpha:0.3)
+                                    : _greenColor.withValues(alpha:0.3),
+                              ),
+                            ),
                             child: Text(
-                              _getDayName(index),
-                              style: const TextStyle(
-                                color: _whiteColor,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 16,
-                                letterSpacing: 1,
+                              '${_getDisplayedKegiatan().length} Kegiatan',
+                              style: TextStyle(
+                                color: _getDisplayedKegiatan().isEmpty
+                                    ? Colors.grey
+                                    : _greenColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
-                        );
-                      }),
-                    ),
-                  ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
 
-                  const SizedBox(height: 10),
-
-                  // HARI-HARI
-                  Column(
-                    children: _calendarDays.map((week) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          children: week.map((date) {
-                            if (date == null) {
-                              return Expanded(
-                                child: Container(
-                                  margin: const EdgeInsets.all(2),
-                                  height: columnWidth,
+                      // LIST KEGIATAN
+                      if (_getDisplayedKegiatan().isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(40),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _borderColor),
+                          ),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.event_available,
+                                size: 48,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Tidak ada jadwal kegiatan',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
                                 ),
-                              );
-                            }
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Belum ada jadwal kegiatan untuk ditampilkan',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Column(
+                          children: _getDisplayedKegiatan().map((kegiatan) {
+                            final isTodayEvent = _isToday(kegiatan.tanggalMulai);
+                            final isPastEvent = _isPastDay(kegiatan.tanggalMulai);
 
-                            final isCurrentMonth = _isCurrentMonth(date);
-                            final hasEvent = _hasEvent(date);
-
-                            return Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedDate = date;
-                                    // Jika tanggal yang dipilih bukan dari bulan saat ini,
-                                    // pindah ke bulan tersebut
-                                    if (!isCurrentMonth) {
-                                      _currentDate =
-                                          DateTime(date.year, date.month, 1);
-                                      _generateCalendar();
-                                    }
-                                  });
-                                },
-                                child: Container(
-                                  margin: const EdgeInsets.all(2),
-                                  height: columnWidth,
-                                  decoration: BoxDecoration(
-                                    color: _getDateBackgroundColor(date),
-                                    border: Border.all(
-                                      color: _blackColor,
-                                      width: _isSelected(date) ? 3 : 2,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                    boxShadow: _isSelected(date)
-                                        ? const [_mediumShadow]
-                                        : null,
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isPastEvent
+                                      ? Colors.grey[300]!
+                                      : isTodayEvent
+                                          ? _primaryColor.withValues(alpha:0.5)
+                                          : _getJenisColor(kegiatan.jenisKegiatan)
+                                              .withValues(alpha:0.3),
+                                  width: isPastEvent ? 1 : 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha:0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
                                   ),
-                                  child: Stack(
-                                    children: [
-                                      // ANGKA TANGGAL
-                                      Opacity(
-                                        opacity: isCurrentMonth ? 1.0 : 0.4,
-                                        child: Center(
+                                ],
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // HEADER KEGIATAN
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: _getJenisColor(kegiatan.jenisKegiatan)
+                                                .withValues(alpha:isPastEvent ? 0.05 : 0.1),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: _getJenisColor(kegiatan.jenisKegiatan)
+                                                  .withValues(alpha:isPastEvent ? 0.1 : 0.3),
+                                            ),
+                                          ),
                                           child: Text(
-                                            date.day.toString(),
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w900,
-                                              color: _getDateTextColor(date),
-                                            ),
+                                            _getJenisIcon(kegiatan.jenisKegiatan),
+                                            style: const TextStyle(fontSize: 16),
                                           ),
                                         ),
-                                      ),
-
-                                      // TITIK MERAH JIKA ADA JADWAL
-                                      if (hasEvent)
-                                        Positioned(
-                                          top: 4,
-                                          right: 4,
-                                          child: Container(
-                                            width: 8,
-                                            height: 8,
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                kegiatan.jenisKegiatan,
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: isPastEvent
+                                                      ? Colors.grey[600]
+                                                      : _getJenisColor(kegiatan.jenisKegiatan),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.calendar_today,
+                                                    size: 12,
+                                                    color: isPastEvent
+                                                        ? Colors.grey[500]
+                                                        : _textSecondary,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    _formatDateShort(kegiatan.tanggalMulai),
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: isPastEvent
+                                                          ? Colors.grey[600]
+                                                          : _textSecondary,
+                                                    ),
+                                                  ),
+                                                  if (kegiatan.tanggalSelesai !=
+                                                      kegiatan.tanggalMulai)
+                                                    Row(
+                                                      children: [
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          '- ${_formatDateShort(kegiatan.tanggalSelesai)}',
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            color: isPastEvent
+                                                                ? Colors.grey[600]
+                                                                : _textSecondary,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (isTodayEvent)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: _isSelected(date)
-                                                  ? _whiteColor
-                                                  : _getEventColor(date),
-                                              shape: BoxShape.circle,
+                                              color: _primaryColor.withValues(alpha:0.1),
+                                              borderRadius: BorderRadius.circular(6),
                                               border: Border.all(
-                                                  color: _blackColor, width: 1),
+                                                color: _primaryColor.withValues(alpha:0.3),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'HARI INI',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF9f0712),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                    ],
-                                  ),
+                                        if (isPastEvent)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[200],
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'LEWAT',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // DESKRIPSI
+                                    Text(
+                                      kegiatan.deskripsi,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: isPastEvent
+                                            ? Colors.grey[700]
+                                            : _textPrimary,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // DETAIL WAKTU
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[50],
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.grey[200]!),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text(
+                                                'MULAI',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: _textSecondary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                DateFormat('dd MMM yyyy')
+                                                    .format(kegiatan.tanggalMulai),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isPastEvent
+                                                      ? Colors.grey[600]
+                                                      : _textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Container(
+                                            height: 30,
+                                            width: 1,
+                                            color: Colors.grey[300],
+                                          ),
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              const Text(
+                                                'SELESAI',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: _textSecondary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                DateFormat('dd MMM yyyy')
+                                                    .format(kegiatan.tanggalSelesai),
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isPastEvent
+                                                      ? Colors.grey[600]
+                                                      : _textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Container(
+                                            height: 30,
+                                            width: 1,
+                                            color: Colors.grey[300],
+                                          ),
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            children: [
+                                              const Text(
+                                                'STATUS',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: _textSecondary,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                kegiatan.status == 'active'
+                                                    ? 'AKTIF'
+                                                    : 'SELESAI',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: kegiatan.status == 'active'
+                                                      ? _greenColor
+                                                      : Colors.grey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );
                           }).toList(),
                         ),
-                      );
-                    }).toList(),
+                    ],
                   ),
-                ],
-              ),
+                ),
+
+                const SizedBox(height: 40),
+              ],
             ),
-
-            const SizedBox(height: 25),
-
-            // ========== HEADER JADWAL ==========
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              decoration: BoxDecoration(
-                color: _primaryColor,
-                border: Border.all(color: _blackColor, width: 4),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [_heavyShadow],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      _selectedDate != null &&
-                              _events.containsKey(DateTime(_selectedDate!.year,
-                                  _selectedDate!.month, _selectedDate!.day))
-                          ? '${_events[DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day)]!.length} JADWAL'
-                          : 'JADWAL HARIAN',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 18,
-                        color: Colors.white,
-                        letterSpacing: 1.2,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _yellowColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: const [_mediumShadow],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today,
-                            size: 16, color: _blackColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          _selectedDate != null
-                              ? '${_selectedDate!.day} ${_getMonthAbbreviation(_selectedDate!.month)}'
-                              : _getFormattedDateShort(DateTime.now()),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 14,
-                            color: _blackColor,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ========== DAFTAR JADWAL ==========
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: _selectedDate != null &&
-                      _events.containsKey(DateTime(_selectedDate!.year,
-                          _selectedDate!.month, _selectedDate!.day))
-                  ? Column(
-                      children: _events[DateTime(_selectedDate!.year,
-                              _selectedDate!.month, _selectedDate!.day)]!
-                          .map((event) => _buildEventCard(event))
-                          .toList(),
-                    )
-                  : _buildNoEvents(),
-            ),
-
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // ========== WIDGET BUILDER ==========
-  Widget _buildNavButton(
-      {required IconData icon, required VoidCallback onPressed, Color? color}) {
+  Widget _buildNavButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return GestureDetector(
       onTap: onPressed,
       child: Container(
-        width: 50,
-        height: 50,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
-          color: color ?? _accentColor,
-          border: Border.all(color: _blackColor, width: 3),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: const [_mediumShadow],
-        ),
-        child: Center(
-          child: Icon(icon, color: _blackColor, size: 24),
-        ),
-      ),
-    );
-  }
-Widget _buildEventCard(Map<String, dynamic> event) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: _whiteColor,
-        border: Border.all(color: _blackColor, width: 4),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [_heavyShadow],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // HEADER
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: event['color'] as Color,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-              border: const Border(
-                  bottom: BorderSide(color: Colors.black, width: 3)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _whiteColor,
-                    border: Border.all(color: _blackColor, width: 3),
-                    shape: BoxShape.circle,
-                    boxShadow: const [BoxShadow(
-                      color: Colors.black,
-                      offset: Offset(3, 3),
-                      blurRadius: 0,
-                    )],
-                  ),
-                  child: Icon(
-                    event['icon'] as IconData,
-                    color: event['color'] as Color,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event['jenis_kegiatan'] as String,
-                        style: const TextStyle(
-                          color: _whiteColor,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _whiteColor,
-                          border: Border.all(color: _blackColor, width: 2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _formatDateForDisplay(event['tanggal_mulai'] as DateTime),
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: event['color'] as Color,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // DETAIL - SINGLE COLOR CONTAINER
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: event['color'] as Color,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // DESKRIPSI
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: _whiteColor,
-                    border: Border.all(color: _blackColor, width: 2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'DESKRIPSI',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: event['color'] as Color,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        event['deskripsi'] as String,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: _blackColor,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // WAKTU
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: _whiteColor,
-                    border: Border.all(color: _blackColor, width: 2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'WAKTU',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: event['color'] as Color,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        event['waktu'] as String,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: _blackColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // PERIODE
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _whiteColor,
-                    border: Border.all(color: _blackColor, width: 2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'PERIODE',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: event['color'] as Color,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        DateFormat('dd MMM yyyy').format(event['tanggal_mulai'] as DateTime),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: _blackColor,
-                        ),
-                      ),
-                      if (event['tanggal_mulai'] != event['tanggal_selesai'])
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            's/d ${DateFormat('dd MMM yyyy').format(event['tanggal_selesai'] as DateTime)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: _darkColor,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  // HELPER UNTUK INFO SECTION
-
-  // HELPER UNTUK INFO ROW
-
-  Widget _buildNoEvents() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 20),
-      decoration: BoxDecoration(
-        color: _whiteColor,
-        border: Border.all(color: _blackColor, width: 4),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [_heavyShadow],
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: _secondaryColor,
-                border: Border.all(color: _blackColor, width: 4),
-                shape: BoxShape.circle,
-                boxShadow: const [_heavyShadow],
-              ),
-              child: const Icon(
-                Icons.event_note,
-                size: 40,
-                color: _darkColor,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: _yellowColor,
-                border: Border.all(color: _blackColor, width: 3),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: const Text(
-                'TIDAK ADA JADWAL',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: _blackColor,
-                  letterSpacing: 1.0,
-                ),
-              ),
+          border: Border.all(color: _borderColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha:0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
+        child: Center(
+          child: Icon(icon, color: _primaryColor, size: 22),
+        ),
       ),
     );
   }
+}
 
-  // ========== HELPER FUNCTIONS ==========
-  String _getFormattedDateShort(DateTime date) {
-    try {
-      return DateFormat('dd MMM', 'id_ID').format(date);
-    } catch (e) {
-      return DateFormat('dd MMM').format(date);
-    }
-  }
+// ========== MODEL KEGIATAN PKL ==========
+class KegiatanPkl {
+  final int id;
+  final String deskripsi;
+  final String jenisKegiatan;
+  final int tahunAjaranId;
+  final DateTime tanggalMulai;
+  final DateTime tanggalSelesai;
+  final String status;
+  final int createdBy;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  KegiatanPkl({
+    required this.id,
+    required this.deskripsi,
+    required this.jenisKegiatan,
+    required this.tahunAjaranId,
+    required this.tanggalMulai,
+    required this.tanggalSelesai,
+    required this.status,
+    required this.createdBy,
+    required this.createdAt,
+    required this.updatedAt,
+  });
 }

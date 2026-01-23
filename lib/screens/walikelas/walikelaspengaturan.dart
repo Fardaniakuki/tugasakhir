@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../login/login_screen.dart';
 
 class WaliKelasProfilePage extends StatefulWidget {
-  const WaliKelasProfilePage({super.key, required String kelasWali, required String namaWaliKelas});
+  const WaliKelasProfilePage({super.key, required String namaWaliKelas, required String kelasWali});
 
   @override
   State<WaliKelasProfilePage> createState() => _WaliKelasProfilePageState();
@@ -19,10 +19,14 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
   static const Color _borderColor = Color(0xFFE0E0E0); // Border abu-abu muda
 
   Map<String, String> _profileData = {
-    'nama': 'WALI KELAS',
-    'nip': '-',
+    'nama': 'FARDAN', // Nama default
+    'nip': '199001012024001', // NIP default
   };
+  
   bool _isLoading = true;
+  bool _isEditing = false;
+  final TextEditingController _nameController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -36,19 +40,23 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
       
       print('📥 Loading profile data for Wali Kelas...');
       
-      // SEDERHANA: Ambil dari SharedPreferences saja
+      // Ambil dari SharedPreferences atau gunakan data dummy
       final String? userName = prefs.getString('user_name');
       final String? nama = prefs.getString('nama');
       final String? nip = prefs.getString('nip');
       
-      print('   user_name: $userName');
-      print('   nama: $nama');
-      print('   nip: $nip');
+      // Jika ada data di SharedPreferences, gunakan itu
+      // Jika tidak, gunakan data dummy
+      final String finalNama = (userName ?? nama ?? 'FARDAN').toUpperCase();
+      final String finalNip = nip ?? '199001012024001';
+      
+      print('   Loaded name: $finalNama');
+      print('   Loaded NIP: $finalNip');
       
       setState(() {
         _profileData = {
-          'nama': (userName ?? nama ?? 'WALI KELAS').toUpperCase(),
-          'nip': nip ?? '-',
+          'nama': finalNama,
+          'nip': finalNip,
         };
         _isLoading = false;
       });
@@ -58,13 +66,54 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
     } catch (e) {
       print('❌ Error loading profile: $e');
       
+      // Fallback ke data dummy
       setState(() {
         _profileData = {
-          'nama': 'WALI KELAS',
-          'nip': '-',
+          'nama': 'FARDAN',
+          'nip': '199001012024001',
         };
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _saveProfileData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Simpan data ke SharedPreferences
+      await prefs.setString('nama', _profileData['nama']!);
+      await prefs.setString('user_name', _profileData['nama']!);
+      await prefs.setString('nip', _profileData['nip']!);
+      
+      print('💾 Profile saved: ${_profileData['nama']}');
+      
+    } catch (e) {
+      print('❌ Error saving profile: $e');
+    }
+  }
+
+  void _startEditing() {
+    setState(() {
+      _isEditing = true;
+      _nameController.text = _profileData['nama']!;
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _isEditing = false;
+      _nameController.clear();
+    });
+  }
+
+  void _saveEditing() {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _profileData['nama'] = _nameController.text.toUpperCase();
+        _isEditing = false;
+      });
+      _saveProfileData(); // Simpan ke SharedPreferences
     }
   }
 
@@ -75,14 +124,14 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
       body: SafeArea(
         child: Column(
           children: [
-            // App Bar - SAMA DENGAN KAPROG
+            // App Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.1),
+                    color: Colors.grey.withOpacity(0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -116,70 +165,176 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
                   children: [
-                    // Profile Section - SAMA DENGAN KAPROG
+                    // Profile Section dengan Edit Button
                     Container(
                       margin: const EdgeInsets.only(bottom: 24),
                       child: Column(
                         children: [
-                          Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _primaryColor,
-                              border: Border.all(
-                                color: _borderColor,
-                                width: 1,
+                          Stack(
+                            children: [
+                              Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _primaryColor,
+                                  border: Border.all(
+                                    color: _borderColor,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 50,
+                                  color: Colors.white,
+                                ),
                               ),
-                            ),
-                            child: const Icon(
-                              Icons.person,
-                              size: 50,
-                              color: Colors.white,
-                            ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: GestureDetector(
+                                  onTap: _startEditing,
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: _accentColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.edit,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 16),
                           
-                          _isLoading
-                              ? _buildProfileSkeleton()
-                              : Column(
-                                  children: [
-                                    Text(
-                                      _profileData['nama']!,
+                          if (_isEditing)
+                            // Form Edit Nama
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: TextFormField(
+                                      controller: _nameController,
                                       style: const TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w700,
                                         color: _textColor,
                                       ),
                                       textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: _primaryColor.withValues(alpha: 0.1),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: _primaryColor.withValues(alpha: 0.3),
+                                      decoration: InputDecoration(
+                                        hintText: 'Masukkan nama',
+                                        hintStyle: TextStyle(
+                                          color: Colors.grey[400],
+                                        ),
+                                        border: UnderlineInputBorder(
+                                          borderSide: BorderSide(
+                                            color: _primaryColor,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        focusedBorder: UnderlineInputBorder(
+                                          borderSide: BorderSide(
+                                            color: _primaryColor,
+                                            width: 2,
+                                          ),
                                         ),
                                       ),
-                                      child: const Text(
-                                        'WALI KELAS',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: _primaryColor,
+                                      validator: (value) {
+                                        if (value == null || value.trim().isEmpty) {
+                                          return 'Nama tidak boleh kosong';
+                                        }
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: _saveEditing,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _primaryColor,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 20,
+                                            vertical: 8,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(20),
+                                          ),
+                                        ),
+                                        child: const Text('Simpan'),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      TextButton(
+                                        onPressed: _cancelEditing,
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.grey,
+                                        ),
+                                        child: const Text('Batal'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            // Tampilan Normal
+                            _isLoading
+                                ? _buildProfileSkeleton()
+                                : Column(
+                                    children: [
+                                      Text(
+                                        _profileData['nama']!,
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w700,
+                                          color: _textColor,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: _primaryColor.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: _primaryColor.withOpacity(0.3),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'WALI KELAS',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: _primaryColor,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                   
+                                    ],
                                 ),
                         ],
                       ),
                     ),
 
-                    // Informasi Pribadi Card - SAMA DENGAN KAPROG
+                    // Informasi Pribadi Card
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -193,7 +348,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha: 0.05),
+                            color: Colors.grey.withOpacity(0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -224,21 +379,29 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                           const Divider(color: _borderColor),
                           const SizedBox(height: 16),
 
-                          // NIP - SAMA DENGAN KAPROG
+                          // NIP
                           _buildInfoItem(
                             icon: Icons.badge_outlined,
                             label: 'NIP',
                             value: _isLoading 
                                 ? 'Memuat...'
-                                : (_profileData['nip']!.isNotEmpty && _profileData['nip']! != '-' 
+                                : (_profileData['nip']!.isNotEmpty 
                                     ? _profileData['nip']! 
                                     : 'NIP tidak ditemukan'),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Keterangan Data Dummy
+                          _buildInfoItem(
+                            icon: Icons.info_outline,
+                            label: 'Kelas',
+                            value: 'XII RPL 1',
                           ),
                         ],
                       ),
                     ),
 
-                    // Menu Section - SAMA DENGAN KAPROG
+                    // Menu Section
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -252,7 +415,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha: 0.05),
+                            color: Colors.grey.withOpacity(0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -292,7 +455,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                       ),
                     ),
 
-                    // Logout Button - SAMA DENGAN KAPROG
+                    // Logout Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -397,7 +560,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha: 0.1),
+                  color: _primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -561,6 +724,24 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                 color: Colors.grey[700],
               ),
             ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _primaryColor.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _primaryColor.withOpacity(0.1),
+                ),
+              ),
+              child: const Text(
+                '⚠️ Mode Data Dummy: Data nama dapat diedit dan akan tersimpan di perangkat Anda',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -678,11 +859,9 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
   Future<void> _processLogout() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Hapus data login
+    // Hapus data login (kecuali data dummy jika ingin dipertahankan)
     await prefs.remove('access_token');
     await prefs.remove('user_name');
-    await prefs.remove('nip');
-    await prefs.remove('nip');
-    await prefs.remove('nama');
+    // Tidak menghapus 'nama' dan 'nip' agar data dummy tetap ada saat login lagi
   }
 }

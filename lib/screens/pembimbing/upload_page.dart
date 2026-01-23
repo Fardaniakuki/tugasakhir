@@ -5,8 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:photo_view/photo_view.dart';
+import 'package:intl/intl.dart';
 
 class UploadPage extends StatefulWidget {
   final Color primaryColor;
@@ -45,6 +45,12 @@ class _UploadPageState extends State<UploadPage> {
   List<dynamic> _riwayatRealisasi = [];
   final Map<DateTime, List<dynamic>> _events = {};
 
+  // ========== DATA JADWAL ==========
+  List<KegiatanPkl> _allKegiatan = [];
+  List<KegiatanPkl> _activeKegiatan = [];
+  final Map<DateTime, List<KegiatanPkl>> _jadwalEvents = {};
+  // =================================
+
   // State management
   bool _isLoading = true;
   bool _isLoadingRiwayat = false;
@@ -60,28 +66,95 @@ class _UploadPageState extends State<UploadPage> {
   final TextEditingController _catatanController = TextEditingController();
 
   // Kalender
-  CalendarFormat _calendarFormat = CalendarFormat.month;
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
-  String _selectedFilter = 'Semua';
+  DateTime _currentDate = DateTime.now();
+  DateTime? _selectedDate;
+  late List<List<DateTime?>> _calendarDays;
+  late String _currentMonth;
 
   // Statistik
-  int _totalIndustri = 0;
-  int _totalTasks = 0;
-  int _completedTasks = 0;
-  int _pendingTasks = 0;
 
   @override
   void initState() {
     super.initState();
-    _selectedDay = DateTime.now();
+    _selectedDate = DateTime.now();
+    _generateCalendar();
     _loadTokenAndData();
+    _fetchKegiatanPkl(); // Load data jadwal
+  }
+
+  // ========== GENERATE KALENDER ==========
+  void _generateCalendar() {
+    _currentMonth = DateFormat('MMMM yyyy').format(_currentDate);
+    _calendarDays = [];
+
+    final firstDayOfMonth = DateTime(_currentDate.year, _currentDate.month, 1);
+    final lastDayOfMonth = DateTime(_currentDate.year, _currentDate.month + 1, 0);
+    final int startingWeekday = firstDayOfMonth.weekday % 7;
+
+    final List<DateTime?> currentWeek = [];
+
+    // Tambahkan hari dari bulan sebelumnya
+    if (startingWeekday > 0) {
+      final previousMonthLastDay = DateTime(_currentDate.year, _currentDate.month, 0);
+      for (int i = startingWeekday - 1; i >= 0; i--) {
+        final previousDate = DateTime(
+          previousMonthLastDay.year,
+          previousMonthLastDay.month,
+          previousMonthLastDay.day - i,
+        );
+        currentWeek.add(previousDate);
+      }
+    }
+
+    // Tambahkan hari dari bulan ini
+    for (int day = 1; day <= lastDayOfMonth.day; day++) {
+      final date = DateTime(_currentDate.year, _currentDate.month, day);
+      currentWeek.add(date);
+
+      if (currentWeek.length == 7) {
+        _calendarDays.add(List.from(currentWeek));
+        currentWeek.clear();
+      }
+    }
+
+    // Tambahkan hari dari bulan berikutnya
+    if (currentWeek.isNotEmpty) {
+      int nextMonthDay = 1;
+      while (currentWeek.length < 7) {
+        final nextDate = DateTime(_currentDate.year, _currentDate.month + 1, nextMonthDay);
+        currentWeek.add(nextDate);
+        nextMonthDay++;
+      }
+      _calendarDays.add(currentWeek);
+    }
+  }
+
+  void _goToPreviousMonth() {
+    setState(() {
+      _currentDate = DateTime(_currentDate.year, _currentDate.month - 1, 1);
+      _generateCalendar();
+    });
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      _currentDate = DateTime(_currentDate.year, _currentDate.month + 1, 1);
+      _generateCalendar();
+    });
+  }
+
+  void _goToToday() {
+    final now = DateTime.now();
+    setState(() {
+      _currentDate = now;
+      _selectedDate = now;
+      _generateCalendar();
+    });
   }
 
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
-
 
   Future<void> _loadTokenAndData() async {
     try {
@@ -122,7 +195,6 @@ class _UploadPageState extends State<UploadPage> {
       ]);
 
       _generateCalendarEvents();
-      _updateUploadedFilesFromRiwayat(); // Update uploaded files dari riwayat
 
       setState(() {
         _isLoading = false;
@@ -136,33 +208,65 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // Update uploaded files dari riwayat realisasi
-  void _updateUploadedFilesFromRiwayat() {
-    _uploadedFiles.clear(); // Clear dulu
-    
-    for (var riwayat in _riwayatRealisasi) {
-      try {
-        final taskKey = '${riwayat['industri_id']}_${riwayat['kegiatan_id']}';
-        
-        List<String> imageUrls = [];
-        if (riwayat['bukti_foto_urls'] is List) {
-          imageUrls = List<String>.from(riwayat['bukti_foto_urls']);
-        } else if (riwayat['bukti_foto'] is String) {
-          imageUrls = [riwayat['bukti_foto']];
-        } else if (riwayat['bukti_foto'] is List) {
-          imageUrls = List<String>.from(riwayat['bukti_foto']);
-        }
-        
-        if (imageUrls.isNotEmpty) {
-          _uploadedFiles[taskKey] = imageUrls;
-        }
-      } catch (e) {
-        print('Error updating uploaded files: $e');
+  // ========== LOAD DATA JADWAL AKTIF ==========
+  Future<void> _fetchKegiatanPkl() async {
+    setState(() {
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      if (token == null) {
+        return;
       }
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/kegiatan-pkl/active'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> responseData = json.decode(response.body);
+        final List<KegiatanPkl> kegiatanList =
+            responseData.map((item) => KegiatanPkl.fromJson(item)).toList();
+
+        setState(() {
+          _allKegiatan = kegiatanList;
+          _activeKegiatan = kegiatanList.where((k) => k.status == 'active').toList();
+          _initializeJadwalEvents();
+        });
+      } else {
+        throw Exception('Failed to load kegiatan PKL: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+      });
     }
   }
 
-  // Load data industri dengan tasks
+  void _initializeJadwalEvents() {
+    _jadwalEvents.clear();
+
+    for (var kegiatan in _allKegiatan) {
+      final dateKey = DateTime(
+        kegiatan.tanggalMulai.year,
+        kegiatan.tanggalMulai.month,
+        kegiatan.tanggalMulai.day,
+      );
+
+      if (_jadwalEvents.containsKey(dateKey)) {
+        _jadwalEvents[dateKey]!.add(kegiatan);
+      } else {
+        _jadwalEvents[dateKey] = [kegiatan];
+      }
+    }
+  }
+  // ============================================
+
   Future<void> _loadIndustriData() async {
     try {
       final response = await http.get(
@@ -179,42 +283,24 @@ class _UploadPageState extends State<UploadPage> {
         if (data['data'] != null) {
           setState(() {
             _industriList = data['data'] ?? [];
-            _totalIndustri = data['summary']['total_industri'] ?? 0;
-            _totalTasks = data['summary']['total_tasks'] ?? 0;
-            _completedTasks = data['summary']['completed_tasks'] ?? 0;
-            _pendingTasks = data['summary']['pending_tasks'] ?? 0;
           });
         } else {
-          // Jika tidak ada data
           setState(() {
             _industriList = [];
-            _totalIndustri = 0;
-            _totalTasks = 0;
-            _completedTasks = 0;
-            _pendingTasks = 0;
           });
         }
       } else if (response.statusCode == 404) {
-        // Endpoint tidak ditemukan, coba endpoint alternatif
         await _loadIndustriDataAlternative();
       } else {
         print('Error load industri: ${response.statusCode}');
         setState(() {
           _industriList = [];
-          _totalIndustri = 0;
-          _totalTasks = 0;
-          _completedTasks = 0;
-          _pendingTasks = 0;
         });
       }
     } catch (e) {
       print('Error load industri: $e');
       setState(() {
         _industriList = [];
-        _totalIndustri = 0;
-        _totalTasks = 0;
-        _completedTasks = 0;
-        _pendingTasks = 0;
       });
     }
   }
@@ -235,29 +321,17 @@ class _UploadPageState extends State<UploadPage> {
         if (responseData is Map<String, dynamic> && responseData.containsKey('data')) {
           setState(() {
             _industriList = responseData['data'] ?? [];
-            _totalIndustri = _industriList.length;
-            _totalTasks = _industriList.length; // Asumsi 1 task per industri
-            _completedTasks = 0;
-            _pendingTasks = _totalTasks;
           });
         }
       } else {
         setState(() {
           _industriList = [];
-          _totalIndustri = 0;
-          _totalTasks = 0;
-          _completedTasks = 0;
-          _pendingTasks = 0;
         });
       }
     } catch (e) {
       print('Error load industri alternative: $e');
       setState(() {
         _industriList = [];
-        _totalIndustri = 0;
-        _totalTasks = 0;
-        _completedTasks = 0;
-        _pendingTasks = 0;
       });
     }
   }
@@ -325,8 +399,37 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
+  // Fungsi untuk mengecek apakah ada event di hari tertentu (JADWAL + RIWAYAT)
+  List<dynamic> _getEventsForDay(DateTime day) {
+    final List<dynamic> events = [];
+    
+    // Cek jadwal kegiatan
+    final jadwalDateKey = DateTime(day.year, day.month, day.day);
+    if (_jadwalEvents.containsKey(jadwalDateKey)) {
+      events.addAll(_jadwalEvents[jadwalDateKey]!.map((kegiatan) => {
+        'type': 'jadwal',
+        'data': kegiatan,
+      }));
+    }
+    
+    // Cek riwayat upload
+    if (_events.containsKey(jadwalDateKey)) {
+      events.addAll(_events[jadwalDateKey]!.map((riwayat) => {
+        'type': 'riwayat',
+        'data': riwayat,
+      }));
+    }
+    
+    return events;
+  }
+
+  bool _hasEvent(DateTime date) {
+    final hasJadwal = _jadwalEvents.containsKey(DateTime(date.year, date.month, date.day));
+    final hasRiwayat = _events.containsKey(DateTime(date.year, date.month, date.day));
+    return hasJadwal || hasRiwayat;
+  }
+
   // ==================== FUNGSI UPLOAD SEDERHANA ====================
-  // 1. Tombol upload ditekan -> Pilih gambar
   Future<void> _startUploadProcess({
     required int industriId,
     required int kegiatanId,
@@ -350,23 +453,19 @@ class _UploadPageState extends State<UploadPage> {
     await _showImageSourceDialog(industriId, kegiatanId, kegiatan);
   }
 
-  // Fungsi untuk mengecek apakah task sudah diupload
   bool _isTaskAlreadyUploaded(int industriId, int kegiatanId) {
     final taskKey = '${industriId}_$kegiatanId';
     
-    // Cek di _uploadedFiles
     if (_uploadedFiles.containsKey(taskKey) && _uploadedFiles[taskKey]!.isNotEmpty) {
       return true;
     }
     
-    // Cek di _riwayatRealisasi
     return _riwayatRealisasi.any((riwayat) {
       return riwayat['industri_id'] == industriId && 
              riwayat['kegiatan_id'] == kegiatanId;
     });
   }
 
-  // Dialog jika sudah pernah upload
   Future<void> _showAlreadyUploadedDialog(int industriId, int kegiatanId) async {
     final taskKey = '${industriId}_$kegiatanId';
     final imageUrls = _uploadedFiles[taskKey] ?? [];
@@ -442,7 +541,6 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
-  // Dialog untuk memilih sumber gambar
   Future<void> _showImageSourceDialog(
     int industriId, 
     int kegiatanId, 
@@ -487,9 +585,7 @@ class _UploadPageState extends State<UploadPage> {
         );
 
         if (pickedFile != null) {
-          _selectedImages = [pickedFile]; // Simpan gambar
-          
-          // Tampilkan preview dan input catatan
+          _selectedImages = [pickedFile];
           await _showPreviewAndCatatanDialog(industriId, kegiatanId, kegiatan);
         }
       } catch (e) {
@@ -500,7 +596,6 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // Dialog untuk preview dan input catatan
   Future<void> _showPreviewAndCatatanDialog(
     int industriId, 
     int kegiatanId, 
@@ -617,7 +712,6 @@ class _UploadPageState extends State<UploadPage> {
                     });
 
                     try {
-                      // Upload gambar
                       final url = await _uploadSingleImage(_selectedImages.first);
                       
                       if (url != null && url.isNotEmpty) {
@@ -625,7 +719,6 @@ class _UploadPageState extends State<UploadPage> {
                           status = 'Menyimpan data realisasi...';
                         });
 
-                        // Submit data
                         final success = await _submitRealisasiData(
                           industriId: industriId,
                           kegiatanId: kegiatanId,
@@ -639,7 +732,6 @@ class _UploadPageState extends State<UploadPage> {
                             status = '✅ Upload berhasil!';
                           });
 
-                          // Update state
                           if (mounted) {
                             setState(() {
                               if (_uploadedFiles[taskKey] == null) {
@@ -650,19 +742,13 @@ class _UploadPageState extends State<UploadPage> {
                             });
                           }
 
-                          // Tunggu 2 detik lalu close
                           await Future.delayed(const Duration(seconds: 2));
                           
                           if (mounted) {
                             Navigator.pop(context);
                             _showSnackBar('✅ Bukti berhasil diunggah!');
-                            
-                            // Refresh data
                             await _loadRiwayatRealisasi();
                             _generateCalendarEvents();
-                            _updateUploadedFilesFromRiwayat();
-                            
-                            // Update UI
                             setState(() {});
                           }
                         } else {
@@ -718,7 +804,6 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
-  // Upload gambar ke server - SESUAI DOKUMENTASI API
   Future<String?> _uploadSingleImage(XFile imageFile) async {
     try {
       if (_accessToken == null) {
@@ -732,15 +817,12 @@ class _UploadPageState extends State<UploadPage> {
         return null;
       }
 
-      // Baca file sebagai bytes
       final bytes = await imageFile.readAsBytes();
       
-      // Debug: print file size
       print('🟡 Uploading file: ${imageFile.name}');
       print('🟡 File size: ${bytes.length} bytes');
       print('🟡 Access token: ${_accessToken!.substring(0, 20)}...');
       
-      // Cek file size (5MB limit sesuai dokumentasi)
       if (bytes.length > 5 * 1024 * 1024) {
         print('❌ File terlalu besar (${bytes.length} bytes > 5MB)');
         if (mounted) {
@@ -749,7 +831,6 @@ class _UploadPageState extends State<UploadPage> {
         return null;
       }
 
-      // Dapatkan MIME type dari file
       String mimeType = 'image/jpeg';
       if (imageFile.name.toLowerCase().endsWith('.png')) {
         mimeType = 'image/png';
@@ -759,7 +840,6 @@ class _UploadPageState extends State<UploadPage> {
 
       print('🟡 Content-Type: $mimeType');
 
-      // Buat request POST dengan raw binary data (sesuai dokumentasi)
       final uploadUrl = Uri.parse('$baseUrl/api/upload/image');
       
       print('🟡 Upload URL: $uploadUrl');
@@ -771,11 +851,10 @@ class _UploadPageState extends State<UploadPage> {
           'Content-Type': mimeType,
           'Accept': 'application/json',
         },
-        body: bytes, // Langsung kirim binary data
+        body: bytes,
       );
 
       print('🟡 Upload response status: ${response.statusCode}');
-      print('🟡 Upload response headers: ${response.headers}');
       print('🟡 Upload response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -783,16 +862,13 @@ class _UploadPageState extends State<UploadPage> {
           final data = jsonDecode(response.body);
           print('✅ Upload success data: $data');
           
-          // Cari URL di response
           if (data is Map<String, dynamic>) {
-            // Coba berbagai kemungkinan key untuk URL
             if (data.containsKey('url') && data['url'] is String) {
               return data['url'] as String;
             } else if (data.containsKey('data') && data['data'] is String) {
               return data['data'] as String;
             } else if (data.containsKey('path') && data['path'] is String) {
               final path = data['path'] as String;
-              // Jika path relative, gabungkan dengan base URL
               if (!path.startsWith('http')) {
                 final String cleanBaseUrl = baseUrl.endsWith('/') 
                     ? baseUrl.substring(0, baseUrl.length - 1) 
@@ -805,7 +881,6 @@ class _UploadPageState extends State<UploadPage> {
               return data['image_url'] as String;
             }
             
-            // Cari key yang mengandung 'url'
             for (var key in data.keys) {
               if (key.toString().toLowerCase().contains('url') &&
                   data[key] is String &&
@@ -815,7 +890,6 @@ class _UploadPageState extends State<UploadPage> {
             }
           }
           
-          // Jika response langsung URL string
           if (response.body.startsWith('http://') || response.body.startsWith('https://')) {
             return response.body;
           }
@@ -851,7 +925,6 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // Submit data ke API
   Future<bool> _submitRealisasiData({
     required int industriId,
     required int kegiatanId,
@@ -873,7 +946,6 @@ class _UploadPageState extends State<UploadPage> {
 
       final submitUrl = Uri.parse('$baseUrl/api/realisasi-kegiatan/submit');
 
-      // Buat body dengan format yang benar
       final body = {
         'bukti_foto_urls': imageUrls,
         'catatan': catatan,
@@ -908,9 +980,6 @@ class _UploadPageState extends State<UploadPage> {
             final errorData = jsonDecode(response.body);
             final errorMsg = errorData['message'] ?? errorData['error'] ?? 'Submit gagal: ${response.statusCode}';
             _showSnackBar(errorMsg, isError: true);
-            
-            // Debug: print error details
-            print('❌ Error details: $errorData');
           } catch (e) {
             _showSnackBar('Submit gagal: ${response.statusCode}', isError: true);
           }
@@ -1002,7 +1071,7 @@ class _UploadPageState extends State<UploadPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       body: _isLoading
           ? _buildLoadingState()
           : _errorMessage.isNotEmpty
@@ -1012,35 +1081,47 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(widget.primaryColor),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: widget.primaryColor, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          const Text('Memuat data...'),
-        ],
+          child: CircularProgressIndicator(
+            color: widget.primaryColor,
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildErrorState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error, size: 60, color: Colors.red),
+            const Icon(Icons.error_outline, color: Colors.red, size: 64),
             const SizedBox(height: 16),
             Text(
               _errorMessage,
-              style: const TextStyle(fontSize: 16, color: Colors.grey),
+              style: const TextStyle(color: Colors.red),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadTokenAndData,
               style: ElevatedButton.styleFrom(
@@ -1055,448 +1136,845 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   Widget _buildContentState() {
-    return Column(
-      children: [
-        // App Bar Custom
-        Container(
-          padding: const EdgeInsets.only(top: 40, bottom: 20, left: 20, right: 20),
-          decoration: BoxDecoration(
-            color: widget.primaryColor,
-            boxShadow: [widget.heavyShadow],
-          ),
-          child: Row(
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: () async {
+          await Future.wait([
+            _loadTokenAndData(),
+            _fetchKegiatanPkl(),
+          ]);
+        },
+        backgroundColor: Colors.white,
+        color: widget.primaryColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          controller: widget.scrollController,
+          child: Column(
             children: [
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Kalender & Unggah Bukti',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+              // HEADER
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFE0E0E0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        ),
-
-        Expanded(
-          child: SingleChildScrollView(
-            controller: widget.scrollController,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Kalender
-                Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: Color(0xFFE5E5E5)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Kalender Kegiatan',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1A1A),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TableCalendar(
-                          firstDay: DateTime.now().subtract(const Duration(days: 365)),
-                          lastDay: DateTime.now().add(const Duration(days: 365)),
-                          focusedDay: _focusedDay,
-                          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                          onDaySelected: (selectedDay, focusedDay) {
-                            setState(() {
-                              _selectedDay = selectedDay;
-                              _focusedDay = focusedDay;
-                            });
-                          },
-                          onPageChanged: (focusedDay) {
-                            _focusedDay = focusedDay;
-                          },
-                          calendarFormat: _calendarFormat,
-                          onFormatChanged: (format) {
-                            setState(() {
-                              _calendarFormat = format;
-                            });
-                          },
-                          eventLoader: (day) {
-                            return _events[day] ?? [];
-                          },
-                          calendarStyle: CalendarStyle(
-                            selectedDecoration: BoxDecoration(
-                              color: widget.primaryColor,
-                              shape: BoxShape.circle,
-                            ),
-                            todayDecoration: BoxDecoration(
-                              color: widget.primaryColor.withValues(alpha: 0.3),
-                              shape: BoxShape.circle,
-                            ),
-                            markerDecoration: BoxDecoration(
-                              color: widget.accentColor,
-                              shape: BoxShape.circle,
-                            ),
-                            markersMaxCount: 3,
-                          ),
-                          headerStyle: HeaderStyle(
-                            formatButtonVisible: false,
-                            titleCentered: true,
-                            titleTextStyle: TextStyle(
-                              color: widget.primaryColor,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _legendItem(widget.primaryColor, 'Hari Ini'),
-                            _legendItem(widget.accentColor, 'Ada Bukti'),
-                            _legendItem(widget.primaryColor.withValues(alpha: 0.3), 'Terpilih'),
+                            Text(
+                              'Kalender Kegiatan',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF641E20),
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Unggah Bukti Monitoring',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: _goToToday,
+                              icon: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: widget.primaryColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: widget.primaryColor.withValues(alpha: 0.3)),
+                                ),
+                                child: Icon(Icons.today,
+                                    color: widget.primaryColor, size: 20),
+                              ),
+                            ),
                           ],
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: widget.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: widget.primaryColor.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            '${_activeKegiatan.length} Jadwal Aktif',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: widget.primaryColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: Colors.green.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            '${_industriList.length} Industri',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: Colors.blue.withValues(alpha: 0.2)),
+                          ),
+                          child: Text(
+                            '${_allKegiatan.length} Total',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 24),
+              ),
 
-                // Statistik Cards
-                SizedBox(
-                  height: 115,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          'Total Industri',
-                          '$_totalIndustri',
-                          Icons.apartment,
-                          widget.primaryColor,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          'Total Tugas',
-                          '$_totalTasks',
-                          Icons.assignment,
-                          Colors.blue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 115,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          'Tugas Selesai',
-                          '$_completedTasks',
-                          Icons.check_circle,
-                          Colors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          'Tugas Tertunda',
-                          '$_pendingTasks',
-                          Icons.pending,
-                          Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-                // Search and Filter
+              // KONTROL BULAN
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFE0E0E0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildNavButton(
+                      icon: Icons.chevron_left,
+                      onPressed: _goToPreviousMonth,
+                    ),
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              widget.primaryColor.withValues(alpha: 0.05),
+                              widget.primaryColor.withValues(alpha: 0.05)
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: widget.primaryColor.withValues(alpha: 0.2)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _currentMonth.toUpperCase(),
+                            style: TextStyle(
+                              color: widget.primaryColor,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 18,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    _buildNavButton(
+                      icon: Icons.chevron_right,
+                      onPressed: _goToNextMonth,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // KALENDER
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0xFFE0E0E0)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.08),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // HEADER HARI
+                    Row(
+                      children: ['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day) {
+                        return Expanded(
+                          child: Center(
+                            child: Text(
+                              day,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF666666),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // HARI-HARI
+                    Column(
+                      children: _calendarDays.map((week) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: week.map((date) {
+                              if (date == null) {
+                                return Expanded(
+                                  child: Container(
+                                    margin: const EdgeInsets.all(4),
+                                    height: 50,
+                                  ),
+                                );
+                              }
+
+                              final isCurrentMonth = _isCurrentMonth(date);
+                              final hasEvent = _hasEvent(date);
+                              final isToday = _isToday(date);
+                              final isSelected = _isSelected(date);
+                              final isPastDay = _isPastDay(date);
+
+                              return Expanded(
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedDate = date;
+                                      if (!isCurrentMonth) {
+                                        _currentDate = DateTime(
+                                            date.year, date.month, 1);
+                                        _generateCalendar();
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    margin: const EdgeInsets.all(4),
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: isPastDay
+                                          ? const Color(0xFFF5F5F5)
+                                          : isSelected
+                                              ? widget.primaryColor
+                                              : isToday
+                                                  ? widget.yellowColor.withValues(
+                                                      alpha: 0.15)
+                                                  : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isPastDay
+                                            ? Colors.grey[200]!
+                                            : isSelected
+                                                ? widget.primaryColor
+                                                : isToday
+                                                    ? widget.yellowColor
+                                                    : Colors.grey[200]!,
+                                        width: isPastDay
+                                            ? 1
+                                            : isSelected
+                                                ? 2
+                                                : (isToday ? 1.5 : 1),
+                                      ),
+                                      boxShadow: isSelected
+                                          ? [
+                                              BoxShadow(
+                                                color: widget.primaryColor
+                                                    .withValues(alpha: 0.3),
+                                                blurRadius: 6,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ]
+                                          : null,
+                                    ),
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        // ANGKA TANGGAL
+                                        Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              date.day.toString(),
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: isSelected
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w600,
+                                                color: isPastDay
+                                                    ? const Color(0xFF999999)
+                                                    : isSelected
+                                                        ? Colors.white
+                                                        : isCurrentMonth
+                                                            ? Colors.black
+                                                            : Colors.grey[400],
+                                              ),
+                                            ),
+                                            // Tanda event untuk hari lewat
+                                            if (hasEvent && isPastDay)
+                                              Container(
+                                                margin: const EdgeInsets.only(
+                                                    top: 2),
+                                                width: 6,
+                                                height: 6,
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFF999999),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                            // Tanda event untuk hari yang belum lewat
+                                            if (hasEvent && !isPastDay)
+                                              Container(
+                                                margin: const EdgeInsets.only(
+                                                    top: 2),
+                                                width: 6,
+                                                height: 6,
+                                                decoration: BoxDecoration(
+                                                  color: isSelected
+                                                      ? Colors.white
+                                                      : widget.primaryColor,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // DETAIL HARI TERPILIH DENGAN JADWAL
+              if (_selectedDate != null) ...[
                 Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    border: Border.all(color: Colors.grey[300]!, width: 1.5),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [widget.lightShadow],
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFE0E0E0)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        height: 44,
-                        child: Container(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                DateFormat('EEEE, dd MMMM yyyy').format(_selectedDate!),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${_getEventsForDay(_selectedDate!).where((e) => e['type'] == 'jadwal').length} Jadwal, ${_getEventsForDay(_selectedDate!).where((e) => e['type'] == 'riwayat').length} Upload',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF666666),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _getEventsForDay(_selectedDate!).isEmpty
+                                  ? Colors.grey.withValues(alpha: 0.1)
+                                  : Colors.green.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: _getEventsForDay(_selectedDate!).isEmpty
+                                    ? Colors.grey.withValues(alpha: 0.3)
+                                    : Colors.green.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              '${_getEventsForDay(_selectedDate!).length} Kegiatan',
+                              style: TextStyle(
+                                color: _getEventsForDay(_selectedDate!).isEmpty
+                                    ? Colors.grey
+                                    : Colors.green,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // LIST JADWAL PADA HARI INI
+                      if (_getEventsForDay(_selectedDate!).isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(40),
                           decoration: BoxDecoration(
                             color: Colors.grey[50],
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: Colors.grey[300]!),
                           ),
-                          child: Row(
+                          child: Column(
                             children: [
-                              const SizedBox(width: 12),
-                              Icon(Icons.search, color: Colors.grey[600], size: 20),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchController,
-                                  decoration: const InputDecoration.collapsed(
-                                    hintText: 'Cari industri atau lokasi...',
-                                    hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
-                                  ),
-                                  style: const TextStyle(fontSize: 14),
+                              Icon(
+                                Icons.event_available,
+                                size: 48,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Tidak ada jadwal hari ini',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              if (_searchController.text.isNotEmpty)
-                                IconButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _searchController.clear();
-                                    });
-                                  },
-                                  icon: const Icon(Icons.clear, color: Colors.grey, size: 18),
-                                ),
                             ],
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: 40,
-                        child: Row(
-                          children: [
-                            const Text(
-                              'Filter',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
+                        )
+                      else
+                        ..._getEventsForDay(_selectedDate!).map((event) {
+                          if (event['type'] == 'jadwal') {
+                            final kegiatan = event['data'] as KegiatanPkl;
+                            final isPastEvent = kegiatan.tanggalMulai.isBefore(DateTime.now());
+                            final jenisColor = _getJenisColor(kegiatan.jenisKegiatan);
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isPastEvent
+                                      ? Colors.grey[300]!
+                                      : jenisColor.withValues(alpha: 0.3),
+                                  width: isPastEvent ? 1 : 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: ['Semua', 'Aktif', 'Menunggu', 'Selesai'].map((filter) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            _selectedFilter = filter;
-                                          });
-                                        },
-                                        child: Container(
-                                          height: 36,
-                                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                                          alignment: Alignment.center,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
                                           decoration: BoxDecoration(
-                                            color: _selectedFilter == filter
-                                                ? widget.primaryColor
-                                                : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(20),
-                                            border: Border.all(color: widget.primaryColor),
+                                            color: jenisColor.withValues(
+                                                alpha: isPastEvent ? 0.05 : 0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: jenisColor.withValues(
+                                                  alpha: isPastEvent ? 0.1 : 0.3),
+                                            ),
                                           ),
                                           child: Text(
-                                            filter,
+                                            kegiatan.jenisKegiatan,
                                             style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                              color: _selectedFilter == filter
-                                                  ? Colors.white
-                                                  : widget.primaryColor,
+                                              color: isPastEvent
+                                                  ? Colors.grey[600]
+                                                  : jenisColor,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                         ),
+                                        const Spacer(),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: _getStatusColor(kegiatan.status)
+                                                .withValues(alpha: isPastEvent ? 0.05 : 0.1),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: _getStatusColor(kegiatan.status)
+                                                  .withValues(alpha: isPastEvent ? 0.1 : 0.3),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            kegiatan.status == 'active' ? 'Aktif' : 'Selesai',
+                                            style: TextStyle(
+                                              color: isPastEvent
+                                                  ? Colors.grey[600]
+                                                  : _getStatusColor(kegiatan.status),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      kegiatan.deskripsi,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: isPastEvent
+                                            ? Colors.grey[700]
+                                            : Colors.black,
                                       ),
-                                    );
-                                  }).toList(),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.calendar_today,
+                                            size: 16,
+                                            color: isPastEvent
+                                                ? Colors.grey[500]
+                                                : const Color(0xFF666666)),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          DateFormat('dd MMM yyyy')
+                                              .format(kegiatan.tanggalMulai),
+                                          style: TextStyle(
+                                            color: isPastEvent
+                                                ? Colors.grey[600]
+                                                : const Color(0xFF666666),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        if (kegiatan.tanggalSelesai != kegiatan.tanggalMulai)
+                                          Row(
+                                            children: [
+                                              const SizedBox(width: 8),
+                                              Text('-',
+                                                  style: TextStyle(
+                                                      color: isPastEvent
+                                                          ? Colors.grey[500]
+                                                          : const Color(0xFF666666))),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                DateFormat('dd MMM yyyy')
+                                                    .format(kegiatan.tanggalSelesai),
+                                                style: TextStyle(
+                                                  color: isPastEvent
+                                                      ? Colors.grey[600]
+                                                      : const Color(0xFF666666),
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        if (isPastEvent)
+                                          Container(
+                                            margin: const EdgeInsets.only(left: 8),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[200],
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: const Text(
+                                              'Lewat',
+                                              style: TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
+                            );
+                          } else {
+                            // Tampilkan riwayat upload
+                            return _riwayatCard(event['data']);
+                          }
+                        }),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
+              ],
 
-                // Daftar Industri dengan Tasks
-                if (_industriList.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(40),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey[300]!, width: 1.5),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(Icons.assignment, size: 60, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Belum ada tugas monitoring',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  ..._industriList.map((industriData) => _buildIndustriCard(industriData)),
-
-                const SizedBox(height: 32),
-
-                // RIWAYAT REALISASI
-                Row(
+              // Daftar Industri dengan Tasks
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
                   children: [
-                    Text(
-                      'Riwayat Realisasi',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: widget.primaryColor,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (_isLoadingRiwayat)
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(widget.primaryColor),
+                    if (_industriList.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(40),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey[300]!, width: 1.5),
                         ),
-                      ),
+                        child: Column(
+                          children: [
+                            Icon(Icons.assignment, size: 60, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Belum ada tugas monitoring',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._industriList.map((industriData) => _buildIndustriCard(industriData)),
                   ],
                 ),
-                const SizedBox(height: 16),
+              ),
 
-                if (_riwayatRealisasi.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE5E5E5)),
-                    ),
-                    child: Column(
+              const SizedBox(height: 32),
+
+              // RIWAYAT REALISASI
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Icon(Icons.history, size: 48, color: Colors.grey[400]),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Belum ada riwayat realisasi',
+                        Text(
+                          'Riwayat Realisasi',
                           style: TextStyle(
-                            color: Color(0xFF666666),
-                            fontSize: 16,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: widget.primaryColor,
                           ),
                         ),
+                        const Spacer(),
+                        if (_isLoadingRiwayat)
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(widget.primaryColor),
+                            ),
+                          ),
                       ],
                     ),
-                  )
-                else
-                  ..._riwayatRealisasi.map((riwayat) {
-                    return _riwayatCard(riwayat);
-                  }),
+                    const SizedBox(height: 16),
 
-                const SizedBox(height: 40),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+                    if (_riwayatRealisasi.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE5E5E5)),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(Icons.history, size: 48, color: Colors.grey[400]),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Belum ada riwayat realisasi',
+                              style: TextStyle(
+                                color: Color(0xFF666666),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._riwayatRealisasi.map((riwayat) {
+                        return _riwayatCard(riwayat);
+                      }),
 
-  Widget _legendItem(Color color, String label) {
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF666666),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey[200]!, width: 1.5),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [widget.lightShadow],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: color.withValues(alpha: 0.3)),
-            ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
+                    const SizedBox(height: 40),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: widget.blackColor,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+
+  // Helper functions
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+  }
+
+  bool _isSelected(DateTime date) {
+    return _selectedDate != null &&
+        _selectedDate!.year == date.year &&
+        _selectedDate!.month == date.month &&
+        _selectedDate!.day == date.day;
+  }
+
+  bool _isCurrentMonth(DateTime date) {
+    return date.year == _currentDate.year && date.month == _currentDate.month;
+  }
+
+  bool _isPastDay(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final checkDate = DateTime(date.year, date.month, date.day);
+    return checkDate.isBefore(today);
+  }
+
+  Color _getJenisColor(String jenis) {
+    switch (jenis) {
+      case 'Pembekalan':
+        return const Color(0xFF641E20);
+      case 'Monitoring1':
+        return Colors.green;
+      case 'Monitoring2':
+        return Colors.blue;
+      case 'Penjemputan':
+        return Colors.purple;
+      default:
+        return const Color(0xFF641E20);
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'active':
+        return Colors.green;
+      case 'completed':
+        return Colors.blue;
+      default:
+        return const Color(0xFF641E20);
+    }
+  }
+
+  Widget _buildNavButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE0E0E0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Icon(icon, color: widget.primaryColor, size: 22),
+        ),
+      ),
+    );
+  }
+
 
   Widget _buildIndustriCard(Map<String, dynamic> industriData) {
     final industri = industriData['industri'] ?? {};
@@ -1509,7 +1987,13 @@ class _UploadPageState extends State<UploadPage> {
         color: Colors.white,
         border: Border.all(color: Colors.grey[200]!, width: 1.5),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [widget.lightShadow],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1865,7 +2349,6 @@ class _UploadPageState extends State<UploadPage> {
   }
 
   Widget _riwayatCard(Map<String, dynamic> riwayat) {
-    // Cari data industri dan kegiatan
     String industriNama = 'Industri';
     String kegiatanNama = 'Kegiatan';
     
@@ -2088,5 +2571,62 @@ class _UploadPageState extends State<UploadPage> {
     _searchController.dispose();
     _catatanController.dispose();
     super.dispose();
+  }
+}
+
+// ========== MODEL KEGIATAN PKL ==========
+class KegiatanPkl {
+  final int id;
+  final String deskripsi;
+  final String jenisKegiatan;
+  final int tahunAjaranId;
+  final DateTime tanggalMulai;
+  final DateTime tanggalSelesai;
+  final String status;
+  final int createdBy;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  KegiatanPkl({
+    required this.id,
+    required this.deskripsi,
+    required this.jenisKegiatan,
+    required this.tahunAjaranId,
+    required this.tanggalMulai,
+    required this.tanggalSelesai,
+    required this.status,
+    required this.createdBy,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory KegiatanPkl.fromJson(Map<String, dynamic> json) {
+    return KegiatanPkl(
+      id: json['id'],
+      deskripsi: json['deskripsi'],
+      jenisKegiatan: json['jenis_kegiatan'],
+      tahunAjaranId: json['tahun_ajaran_id'],
+      tanggalMulai: DateTime.parse(json['tanggal_mulai']),
+      tanggalSelesai: DateTime.parse(json['tanggal_selesai']),
+      status: json['status'],
+      createdBy: json['created_by'],
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'deskripsi': deskripsi,
+      'jenis_kegiatan': jenisKegiatan,
+      'tahun_ajaran_id': tahunAjaranId,
+      'tanggal_mulai': tanggalMulai.toIso8601String(),
+      'tanggal_selesai': tanggalSelesai.toIso8601String(),
+      'status': status,
+      'created_by': createdBy,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
   }
 }

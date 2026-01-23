@@ -1,87 +1,105 @@
 import 'package:flutter/material.dart';
 
 class NotificationPopup {
-  // Popup untuk approval PKL
+  // Popup untuk approval PKL - gaya serius
   static void showApprovalPopup(
     BuildContext context, {
     required String industriNama,
     String? catatan,
     VoidCallback? onViewPressed,
   }) {
+// Merah tua serius
+    const Color backgroundColor = Colors.white;
+    const Color textColor = Color.fromARGB(255, 50, 50, 50);
+    const Color hintColor = Color.fromARGB(255, 120, 120, 120);
+    const Color successColor = Color.fromARGB(255, 0, 150, 0); // Hijau untuk approval
+    const Color borderColor = Color.fromARGB(255, 220, 220, 220);
+
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) {
         return Dialog(
+          insetPadding: const EdgeInsets.all(20),
           backgroundColor: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.green,
-              border: Border.all(color: Colors.black, width: 4),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: const [
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.black,
-                  offset: Offset(6, 6),
-                  blurRadius: 0,
+                  color: Colors.black.withValues(alpha: 0.15),
+                  offset: const Offset(0, 4),
+                  blurRadius: 12,
+                  spreadRadius: 0,
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header dengan icon
+                // Header
                 Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.green[700],
-                    border: const Border(
-                      bottom: BorderSide(color: Colors.black, width: 4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
+                  padding: const EdgeInsets.all(20),
+                  decoration: const BoxDecoration(
+                    color: successColor,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
                     ),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 60,
-                        height: 60,
+                        width: 50,
+                        height: 50,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          border: Border.all(color: Colors.black, width: 3),
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha:0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: const Icon(
                           Icons.check_circle,
-                          size: 36,
-                          color: Colors.green,
+                          size: 30,
+                          color: successColor,
                         ),
                       ),
-                      const SizedBox(width: 20),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'PKL DISETUJUI! 🎉',
+                              'Pengajuan PKL Disetujui',
                               style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
                                 color: Colors.white,
-                                letterSpacing: -0.5,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Selamat! Pengajuan Anda diterima',
+                              'Selamat! Pengajuan Anda telah diterima',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: Colors.white.withValues(alpha:0.9),
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 24,
                         ),
                       ),
                     ],
@@ -90,46 +108,50 @@ class NotificationPopup {
                 
                 // Content
                 Container(
-                  padding: const EdgeInsets.all(24),
-                  color: Colors.white,
+                  padding: const EdgeInsets.all(20),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Informasi industri
                       Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha:0.1),
-                          border: Border.all(color: Colors.green, width: 3),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
-                              Icons.factory,
-                              size: 32,
-                              color: Colors.green,
+                            const Text(
+                              'Lokasi PKL',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: hintColor,
+                              ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: successColor.withValues(alpha:0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: successColor.withValues(alpha:0.3),
+                                ),
+                              ),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    'LOKASI PKL',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.green[800],
-                                      letterSpacing: 1,
-                                    ),
+                                  const Icon(
+                                    Icons.business,
+                                    size: 20,
+                                    color: successColor,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    industriNama,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.black,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      industriNama,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: textColor,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -139,50 +161,43 @@ class NotificationPopup {
                         ),
                       ),
                       
-                      const SizedBox(height: 20),
-                      
                       // Catatan jika ada
                       if (catatan != null && catatan.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withValues(alpha:0.1),
-                            border: Border.all(color: Colors.blue, width: 2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                          margin: const EdgeInsets.only(bottom: 20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.note,
-                                    size: 20,
-                                    color: Colors.blue,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'CATATAN:',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.blue[800],
-                                    ),
-                                  ),
-                                ],
+                              const Text(
+                                'Catatan',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: hintColor,
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              Text(
-                                catatan,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black87,
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color.fromARGB(255, 240, 240, 240),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: borderColor),
+                                ),
+                                child: Text(
+                                  catatan,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: textColor,
+                                    height: 1.5,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
                       
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 8),
                       
                       // Tombol
                       Row(
@@ -196,20 +211,19 @@ class NotificationPopup {
                                 }
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
+                                backgroundColor: successColor,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: const BorderSide(color: Colors.black, width: 3),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 elevation: 0,
                               ),
                               child: const Text(
-                                'LIHAT DETAIL',
+                                'Lihat Detail',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 16,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -227,87 +241,105 @@ class NotificationPopup {
     );
   }
 
-  // Popup untuk rejection PKL
+  // Popup untuk rejection PKL - gaya serius
   static void showRejectionPopup(
     BuildContext context, {
     required String industriNama,
     required String catatan,
     VoidCallback? onReapplyPressed,
   }) {
+    const Color primaryColor = Color.fromARGB(255, 180, 16, 4); // Merah tua serius
+    const Color backgroundColor = Colors.white;
+    const Color textColor = Color.fromARGB(255, 50, 50, 50);
+    const Color hintColor = Color.fromARGB(255, 120, 120, 120);
+    const Color errorColor = primaryColor; // Menggunakan merah tua untuk penolakan
+    const Color borderColor = Color.fromARGB(255, 220, 220, 220);
+
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) {
         return Dialog(
+          insetPadding: const EdgeInsets.all(20),
           backgroundColor: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.red,
-              border: Border.all(color: Colors.black, width: 4),
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: const [
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.black,
-                  offset: Offset(6, 6),
-                  blurRadius: 0,
+                  color: Colors.black.withValues(alpha:0.15),
+                  offset: const Offset(0, 4),
+                  blurRadius: 12,
+                  spreadRadius: 0,
                 ),
               ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header dengan icon
+                // Header
                 Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.red[700],
-                    border: const Border(
-                      bottom: BorderSide(color: Colors.black, width: 4),
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(20),
-                      topRight: Radius.circular(20),
+                  padding: const EdgeInsets.all(20),
+                  decoration: const BoxDecoration(
+                    color: errorColor,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
                     ),
                   ),
                   child: Row(
                     children: [
                       Container(
-                        width: 60,
-                        height: 60,
+                        width: 50,
+                        height: 50,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          border: Border.all(color: Colors.black, width: 3),
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(25),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha:0.1),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: const Icon(
                           Icons.error,
-                          size: 36,
-                          color: Colors.red,
+                          size: 30,
+                          color: errorColor,
                         ),
                       ),
-                      const SizedBox(width: 20),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'PKL DITOLAK',
+                              'Pengajuan PKL Ditolak',
                               style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
                                 color: Colors.white,
-                                letterSpacing: -0.5,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Pengajuan Anda tidak disetujui',
+                              'Pengajuan Anda tidak dapat diproses',
                               style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 color: Colors.white.withValues(alpha:0.9),
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                          size: 24,
                         ),
                       ),
                     ],
@@ -316,46 +348,50 @@ class NotificationPopup {
                 
                 // Content
                 Container(
-                  padding: const EdgeInsets.all(24),
-                  color: Colors.white,
+                  padding: const EdgeInsets.all(20),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Informasi industri
                       Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha:0.1),
-                          border: Border.all(color: Colors.red, width: 3),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
-                              Icons.block,
-                              size: 32,
-                              color: Colors.red,
+                            const Text(
+                              'Lokasi yang Diajukan',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: hintColor,
+                              ),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: errorColor.withValues(alpha:0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: errorColor.withValues(alpha:0.3),
+                                ),
+                              ),
+                              child: Row(
                                 children: [
-                                  Text(
-                                    'LOKASI YANG DIAJUKAN',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.red[800],
-                                      letterSpacing: 1,
-                                    ),
+                                  const Icon(
+                                    Icons.business,
+                                    size: 20,
+                                    color: errorColor,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    industriNama,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.black,
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      industriNama,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: textColor,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -365,51 +401,34 @@ class NotificationPopup {
                         ),
                       ),
                       
-                      const SizedBox(height: 20),
-                      
                       // Alasan penolakan
                       Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha:0.1),
-                          border: Border.all(color: Colors.orange, width: 3),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        margin: const EdgeInsets.only(bottom: 24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.warning,
-                                  size: 24,
-                                  color: Colors.orange[800],
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'ALASAN PENOLAKAN:',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.orange[800],
-                                  ),
-                                ),
-                              ],
+                            const Text(
+                              'Alasan Penolakan',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: hintColor,
+                              ),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.white,
-                                border: Border.all(color: Colors.black, width: 2),
+                                color: const Color.fromARGB(255, 255, 240, 240),
                                 borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: errorColor.withValues(alpha:0.3)),
                               ),
                               child: Text(
                                 catatan,
                                 style: const TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.black87,
-                                  height: 1.4,
+                                  fontSize: 14,
+                                  color: textColor,
+                                  height: 1.5,
                                 ),
                               ),
                             ),
@@ -417,11 +436,30 @@ class NotificationPopup {
                         ),
                       ),
                       
-                      const SizedBox(height: 24),
-                      
                       // Tombol
                       Row(
                         children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                side: const BorderSide(color: borderColor),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'Tutup',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: textColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
@@ -431,43 +469,19 @@ class NotificationPopup {
                                 }
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.yellow,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                backgroundColor: errorColor,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: const BorderSide(color: Colors.black, width: 3),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 elevation: 0,
                               ),
                               child: const Text(
-                                'AJUKAN ULANG',
+                                'Ajukan Ulang',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[300],
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  side: const BorderSide(color: Colors.black, width: 3),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: const Text(
-                                'NANTI SAJA',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 14,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),

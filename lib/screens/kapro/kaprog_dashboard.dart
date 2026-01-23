@@ -2345,7 +2345,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     }
 
     return SizedBox(
-      height: 180,
+      height: 190,
       child: Column(
         children: [
           Expanded(

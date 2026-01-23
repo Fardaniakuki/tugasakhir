@@ -8,11 +8,12 @@ import 'ajukan_pkl_dialog.dart';
 import '../../login/login_screen.dart';
 import 'detail_popup.dart';
 import 'industri_list_page.dart';
-import 'websocket_manager.dart'; // Tambahkan ini
-import 'notification_popup.dart'; // File baru untuk popup notifikasi
+import 'websocket_manager.dart';
+import 'notification_popup.dart';
 
 class SiswaDashboard extends StatefulWidget {
-  const SiswaDashboard({super.key});
+  const SiswaDashboard(
+      {super.key, required void Function() onAjukanPklPressed});
 
   @override
   State<SiswaDashboard> createState() => _SiswaDashboardState();
@@ -32,66 +33,35 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   Map<String, dynamic>? _processedByData;
 
   // Cache variables
-  Map<String, dynamic>? _cachedPklData;
-  List<dynamic>? _cachedPklApplications;
-  Map<String, dynamic>? _cachedIndustriData;
-  Map<String, dynamic>? _cachedPembimbingData;
-  Map<String, dynamic>? _cachedProcessedByData;
-  bool _isCached = false;
-  String? _cachedNamaSiswa;
-  String? _cachedKelasSiswa;
-  int? _cachedKelasId;
-
-  // User tracking
-  String? _currentUsername;
-  StreamSubscription? _prefsSubscription;
+  static Map<String, dynamic>? _cachedPklData;
+  static List<dynamic>? _cachedPklApplications;
+  static Map<String, dynamic>? _cachedIndustriData;
+  static Map<String, dynamic>? _cachedPembimbingData;
+  static Map<String, dynamic>? _cachedProcessedByData;
+  static bool _isCached = false;
+  static String? _cachedNamaSiswa;
+  static String? _cachedKelasSiswa;
+  static int? _cachedKelasId;
 
   // ========== WEBSOCKET MANAGER ==========
   late WebSocketManager _webSocketManager;
   final List<Map<String, dynamic>> _notifications = [];
   int _unreadNotificationCount = 0;
-  final Color _notificationColor = const Color(0xFF9f0712);
   // =======================================
 
-  // Neo Brutalism Colors 641E20
-  final Color _primaryColor = const Color(0xFF9f0712);
-  final Color _secondaryColor = const Color(0xFFE6E3E3);
-  final Color _accentColor = const Color(0xFFA8DADC);
-  final Color _darkColor = const Color(0xFF641E20);
-  final Color _yellowColor = const Color(0xFFFFB703);
-  final Color _blackColor = Colors.black;
-
-  // Neo Brutalism Shadows
-  static const BoxShadow _heavyShadow = BoxShadow(
-    color: Colors.black,
-    offset: Offset(6, 6),
-    blurRadius: 0,
-  );
-
-  final BoxShadow _lightShadow = BoxShadow(
-    color: Colors.black.withValues(alpha: 0.2),
-    offset: const Offset(4, 4),
-    blurRadius: 0,
-  );
-  
   @override
   void initState() {
     super.initState();
 
-    print('🚀 SiswaDashboard State dibuat');
-
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // ========== CEK ACCESS TOKEN PERTAMA ==========
       final tokenValid = await _checkTokenOnStartup();
-      
+
       if (!tokenValid) {
-        print('❌ Token tidak valid, redirect ke login');
         _redirectToLogin();
         return;
       }
-      
-      print('✅ Token valid, melanjutkan inisialisasi...');
-      
+
       // ========== INISIALISASI WEBSOCKET ==========
       _webSocketManager = WebSocketManager();
       _setupWebSocketListeners();
@@ -99,7 +69,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       // ========== LOAD DATA ==========
       await _checkAuthAndLoadData();
       await _loadNotificationsFromPrefs();
-      print('📋 Loaded notifications AFTER auth check');
 
       // ========== CONNECT WEBSOCKET ==========
       Future.delayed(const Duration(seconds: 3), () {
@@ -108,14 +77,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         }
       });
     });
-
-    _startPrefsListener();
   }
 
   @override
   void dispose() {
     _webSocketManager.dispose();
-    _prefsSubscription?.cancel();
     super.dispose();
   }
 
@@ -124,17 +90,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
-      print('🔐 Token check on startup:');
-      print('   - Token exists: ${token != null}');
-      print('   - Token length: ${token?.length ?? 0}');
-      
+
       if (token == null || token.isEmpty) {
-        print('❌ Token tidak ditemukan di SharedPreferences');
         return false;
       }
-      
-      // Cek validitas token dengan API endpoint yang sederhana
+
       try {
         final response = await http.get(
           Uri.parse('${dotenv.env['API_BASE_URL']}/api/auth/me'),
@@ -143,36 +103,26 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
             'Accept': 'application/json',
           },
         ).timeout(const Duration(seconds: 10));
-        
-        print('🔍 Token validation response: ${response.statusCode}');
-        
+
         if (response.statusCode == 401 || response.statusCode == 403) {
-          print('❌ Token expired/invalid (HTTP ${response.statusCode})');
           return false;
         }
-        
+
         if (response.statusCode == 200) {
-          print('✅ Token valid dan terverifikasi');
           setState(() {
             _hasToken = true;
           });
           return true;
         }
-        
-        print('⚠️  Token validation response unexpected: ${response.statusCode}');
-        return true; // Tetap lanjut jika bukan 401/403
-        
+
+        return true;
       } catch (e) {
-        print('⚠️  Token validation skipped (network error): $e');
-        // Asumsikan token masih valid jika ada jaringan error
         setState(() {
           _hasToken = true;
         });
         return true;
       }
-      
     } catch (e) {
-      print('❌ Error checking token: $e');
       return false;
     }
   }
@@ -181,7 +131,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
+
       return token != null && token.isNotEmpty;
     } catch (e) {
       return false;
@@ -189,8 +139,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   void _redirectToLogin() {
-    print('🔄 Redirecting to login screen...');
-    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -211,8 +159,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   void _handleWebSocketMessage(dynamic message) {
-    print('📨 WebSocket message received');
-
     try {
       final Map<String, dynamic> data;
 
@@ -221,19 +167,12 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       } else if (message is Map) {
         data = Map<String, dynamic>.from(message);
       } else {
-        print('❌ Unknown message type');
         return;
       }
 
-      final type = data['type']?.toString() ?? 'unknown';
-
-      print('📊 Message type: $type');
-
-      // Process notification
       _processNotification(data);
-    } catch (e) {
-      print('❌ Error processing WebSocket message: $e');
-    }
+    // ignore: empty_catches
+    } catch (e) {}
   }
 
   Future<void> _processNotification(Map<String, dynamic> data) async {
@@ -243,16 +182,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     final siswaUsername = notificationData['siswa_username']?.toString();
     final siswaId = notificationData['siswa_id']?.toString();
 
-    // Get current user info
     final prefs = await SharedPreferences.getInstance();
     final currentUsername = prefs.getString('user_name');
     final currentUserId = prefs.getString('user_id');
 
-    print('👤 Notification check:');
-    print('   - For siswa: $siswaUsername (ID: $siswaId)');
-    print('   - Current user: $currentUsername (ID: $currentUserId)');
-
-    // Check if notification is for current user
     bool isForCurrentUser = false;
 
     if (siswaUsername != null && currentUsername != null) {
@@ -262,13 +195,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     }
 
     if (!isForCurrentUser) {
-      print('⚠️  Notification not for current user');
       return;
     }
 
-    print('✅ Notification IS for current user!');
-
-    // Process based on type
     final String type = data['type'] ?? 'unknown';
 
     switch (type) {
@@ -279,107 +208,63 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         await _handlePKLRejected(data);
         break;
       default:
-        print('⚠️ Unknown message type: $type');
     }
   }
 
   Future<void> _saveNotificationsToPrefs() async {
-    print('💾 Attempting to save notifications...');
-    print('   - Current username: $_currentUsername');
-    print('   - Notification count: ${_notifications.length}');
-
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (_currentUsername != null && mounted) {
+      final userName = prefs.getString('user_name');
+      if (userName != null && mounted) {
         final notificationsJson = jsonEncode(_notifications);
-        await prefs.setString(
-            'notifications_$_currentUsername', notificationsJson);
-
-        // Verify it was saved
-        final saved = prefs.getString('notifications_$_currentUsername');
-        print('✅ Notifications saved successfully!');
-        print('   - Unread count: $_unreadNotificationCount');
-        print('   - Saved JSON length: ${saved?.length ?? 0} characters');
-      } else {
-        print('❌ Cannot save: username is null or widget not mounted');
-        print('   - _currentUsername: $_currentUsername');
-        print('   - mounted: $mounted');
+        await prefs.setString('notifications_$userName', notificationsJson);
       }
-    } catch (e) {
-      print('❌ Error saving notifications: $e');
-      print('   - Error type: ${e.runtimeType}');
-    }
+    // ignore: empty_catches
+    } catch (e) {}
   }
 
   Future<void> _loadNotificationsOnLogin() async {
-    print('🔔 Loading notifications on login...');
-
-    // Tunggu sebentar untuk memastikan username tersedia
     await Future.delayed(const Duration(milliseconds: 500));
 
     final prefs = await SharedPreferences.getInstance();
     final userName = prefs.getString('user_name');
 
     if (userName != null && userName.isNotEmpty) {
-      _currentUsername = userName;
-      print('👤 Loading notifications for user: $userName');
       await _loadNotificationsFromPrefs();
-    } else {
-      print('⚠️  Username not available for loading notifications');
     }
   }
 
   Future<void> _loadNotificationsFromPrefs() async {
-    print('📂 ========== LOADING NOTIFICATIONS ==========');
-    print('   - Current username: $_currentUsername');
-    print('   - Widget mounted: $mounted');
+    final prefs = await SharedPreferences.getInstance();
+    final userName = prefs.getString('user_name');
 
-    // Jika username belum tersedia, coba ambil dari prefs
-    if (_currentUsername == null) {
-      final prefs = await SharedPreferences.getInstance();
-      _currentUsername = prefs.getString('user_name');
-      print('   - Got username from prefs: $_currentUsername');
-    }
-
-    if (_currentUsername == null) {
-      print('❌ Cannot load: username is null');
+    if (userName == null) {
       return;
     }
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = 'notifications_$_currentUsername';
+      final key = 'notifications_$userName';
       final notificationsJson = prefs.getString(key);
 
-      print('   - Checking key: $key');
-      print('   - Data exists: ${notificationsJson != null}');
-
       if (notificationsJson != null && notificationsJson.isNotEmpty) {
-        print('   - JSON length: ${notificationsJson.length}');
-
         try {
           final List<dynamic> loadedNotifications =
               jsonDecode(notificationsJson);
-          print(
-              '   - Successfully parsed ${loadedNotifications.length} notifications');
-
-          // ... rest of the loading code ...
-        } catch (e) {
-          print('❌ Parse error: $e');
-        }
-      } else {
-        print('📭 No notifications found for user $_currentUsername');
+          setState(() {
+            _notifications.clear();
+            _notifications.addAll(
+                loadedNotifications.map((n) => Map<String, dynamic>.from(n)));
+            _unreadNotificationCount =
+                _notifications.where((n) => !(n['read'] ?? false)).length;
+          });
+        // ignore: empty_catches
+        } catch (e) {}
       }
-    } catch (e) {
-      print('❌ Load error: $e');
-    }
-
-    print('📂 ========== END LOADING ==========');
+    // ignore: empty_catches
+    } catch (e) {}
   }
 
   Future<void> _handlePKLApproved(Map<String, dynamic> data) async {
-    print('✅ PKL Approved received via WebSocket');
-
     final notificationData = data['data'];
     if (notificationData == null) return;
 
@@ -388,11 +273,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     final applicationId = notificationData['application_id'];
     final notificationId = 'pkl_approved_$applicationId';
 
-    // ========== CEK DI SHARED PREFERENCES ==========
     final prefs = await SharedPreferences.getInstance();
     final alreadyNotifiedKey = 'pkl_notified_$applicationId';
     final alreadyNotified = prefs.getBool(alreadyNotifiedKey) ?? false;
-    // ================================================
 
     if (!alreadyNotified) {
       final notification = {
@@ -411,18 +294,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         _unreadNotificationCount++;
       });
 
-      // ========== SIMPAN FLAG ==========
       await prefs.setBool(alreadyNotifiedKey, true);
-      // ================================
-
-      // Save to SharedPreferences
       await _saveNotificationsToPrefs();
 
-      print('📝 Saved approval notification to SharedPreferences');
-      print('   - Application ID: $applicationId');
-      print('   - Unread count: $_unreadNotificationCount');
-
-      // Show popup notification
       if (mounted) {
         NotificationPopup.showApprovalPopup(
           context,
@@ -433,18 +307,13 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           },
         );
       }
-    } else {
-      print('📌 PKL $applicationId sudah pernah di-notifikasi (WebSocket)');
     }
 
-    // Refresh data
     await Future.delayed(const Duration(seconds: 2));
     await _loadAllData();
   }
 
   Future<void> _handlePKLRejected(Map<String, dynamic> data) async {
-    print('❌ PKL Rejected received via WebSocket');
-
     final notificationData = data['data'];
     if (notificationData == null) return;
 
@@ -453,11 +322,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     final applicationId = notificationData['application_id'];
     final notificationId = 'pkl_rejected_$applicationId';
 
-    // ========== CEK DI SHARED PREFERENCES ==========
     final prefs = await SharedPreferences.getInstance();
     final alreadyNotifiedKey = 'pkl_notified_$applicationId';
     final alreadyNotified = prefs.getBool(alreadyNotifiedKey) ?? false;
-    // ================================================
 
     if (!alreadyNotified) {
       final notification = {
@@ -476,18 +343,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         _unreadNotificationCount++;
       });
 
-      // ========== SIMPAN FLAG ==========
       await prefs.setBool(alreadyNotifiedKey, true);
-      // ================================
-
-      // Save to SharedPreferences
       await _saveNotificationsToPrefs();
 
-      print('📝 Saved rejection notification to SharedPreferences');
-      print('   - Application ID: $applicationId');
-      print('   - Unread count: $_unreadNotificationCount');
-
-      // Show popup notification
       if (mounted) {
         NotificationPopup.showRejectionPopup(
           context,
@@ -498,107 +356,24 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           },
         );
       }
-    } else {
-      print('📌 PKL $applicationId sudah pernah di-notifikasi (WebSocket)');
     }
 
-    // Refresh data
     await Future.delayed(const Duration(seconds: 2));
     await _loadAllData();
   }
 
-  // Panggil fungsi ini saat berhasil mengajukan PKL
   Future<void> _resetNotificationFlags() async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Hapus semua flag pkl_notified_*
     final keys = prefs.getKeys();
     for (var key in keys) {
       if (key.startsWith('pkl_notified_')) {
         await prefs.remove(key);
-        print('🗑️  Removed notification flag: $key');
       }
     }
   }
 
-  // Update fungsi _ajukanPKL():
-  Future<void> _ajukanPKL() async {
-    // Cek token terlebih dahulu
-    if (!await _isTokenValid()) {
-      _redirectToLogin();
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-
-    if (token == null || token.isEmpty) {
-      _redirectToLogin();
-      return;
-    }
-
-    try {
-      if (_kelasId == null) {
-        await _loadProfileData();
-      }
-
-      final result = await showDialog<Map<String, dynamic>>(
-        context: context,
-        builder: (context) => AjukanPKLDialog(
-          token: token,
-          kelasId: _kelasId,
-        ),
-      );
-
-      if (result != null) {
-        final response = await http.post(
-          Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/applications'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'catatan': result['catatan'],
-            'industri_id': result['industri_id'],
-          }),
-        );
-
-        if (response.statusCode == 201) {
-          // ========== RESET NOTIFICATION FLAGS ==========
-          await _resetNotificationFlags();
-          // =============================================
-
-          _clearCache();
-          await _loadAllData();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Pengajuan PKL berhasil dikirim')),
-            );
-          }
-        } else if (response.statusCode == 401) {
-          _redirectToLogin();
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Gagal mengajukan PKL: ${response.body}')),
-            );
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Terjadi kesalahan saat mengajukan PKL')),
-        );
-      }
-    }
-  }
-
+  // ========== NOTIFICATION PANEL ==========
   void _showNotificationsPanel() {
-    print('🔔 Opening notifications panel...');
-    print('   - Current unread: $_unreadNotificationCount');
-
     showDialog(
       context: context,
       builder: (context) {
@@ -613,76 +388,76 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   maxHeight: MediaQuery.of(context).size.height * 0.85,
                 ),
                 decoration: BoxDecoration(
-                  color: _secondaryColor,
-                  border: Border.all(color: _blackColor, width: 4),
+                  color: Colors.white,
+                  border: Border.all(color: Colors.grey[300]!, width: 1),
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      color: Colors.black,
-                      offset: Offset(6, 6),
-                      blurRadius: 0,
+                      color: Colors.black.withValues(alpha:0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // === HEADER - CLEAN & BOLD ===
+                    // Header
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: _primaryColor,
+                        color: const Color.fromARGB(255, 180, 16, 4),
                         border: Border(
-                          bottom: BorderSide(color: _blackColor, width: 4),
+                          bottom:
+                              BorderSide(color: Colors.grey[300]!, width: 1),
                         ),
                         borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          topRight: Radius.circular(16),
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
                         ),
                       ),
                       child: Row(
                         children: [
-                          // Clean icon
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: Border.all(color: _blackColor, width: 3),
-                              shape: BoxShape.circle,
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black,
-                                  offset: Offset(3, 3),
-                                  blurRadius: 0,
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.notifications,
-                              color: _primaryColor,
-                              size: 24,
-                            ),
+                          const Icon(
+                            Icons.notifications,
+                            color: Colors.white,
+                            size: 24,
                           ),
                           const SizedBox(width: 16),
-
-                          // Title only
                           const Expanded(
                             child: Text(
-                              'NOTIFIKASI PKL',
+                              'NOTIFIKASI',
                               style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
                                 color: Colors.white,
-                                letterSpacing: 1.0,
                               ),
                             ),
                           ),
+                          if (_unreadNotificationCount > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$_unreadNotificationCount',
+                                style: const TextStyle(
+                                  color: Color.fromARGB(255, 180, 16, 4),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
 
-                    // === NOTIFICATIONS CONTENT ===
+                    // Content
                     Expanded(
                       child: _notifications.isEmpty
                           ? _buildEmptyNotifications()
@@ -710,103 +485,60 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                             ),
                     ),
 
-                    // === ACTION BUTTONS - SIMPLE ===
+                    // Footer
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: _secondaryColor,
+                        color: Colors.white,
                         border: Border(
-                          top: BorderSide(color: _blackColor, width: 4),
+                          top: BorderSide(color: Colors.grey[300]!, width: 1),
                         ),
                         borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(16),
+                          bottomLeft: Radius.circular(20),
+                          bottomRight: Radius.circular(20),
                         ),
                       ),
                       child: Row(
                         children: [
-                          // Close button
                           Expanded(
-                            child: Container(
-                              height: 52,
-                              decoration: BoxDecoration(
-                                color: _yellowColor,
-                                border:
-                                    Border.all(color: _blackColor, width: 3),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Colors.black,
-                                    offset: Offset(3, 3),
-                                    blurRadius: 0,
-                                  ),
-                                ],
-                              ),
-                              child: TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: _blackColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(9),
-                                  ),
-                                ),
-                                child: const Text(
-                                  'TUTUP',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 0.5,
-                                  ),
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey[100],
+                                foregroundColor: Colors.black,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
                               ),
+                              child: const Text('Tutup'),
                             ),
                           ),
-
                           const SizedBox(width: 12),
-
-                          // Mark all button (only if has unread)
                           if (_unreadNotificationCount > 0)
                             Expanded(
-                              child: Container(
-                                height: 52,
-                                decoration: BoxDecoration(
-                                  color: _primaryColor,
-                                  border:
-                                      Border.all(color: _blackColor, width: 3),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black,
-                                      offset: Offset(3, 3),
-                                      blurRadius: 0,
-                                    ),
-                                  ],
-                                ),
-                                child: TextButton(
-                                  onPressed: () async {
-                                    for (var notification in _notifications) {
-                                      notification['read'] = true;
-                                    }
-                                    setState(() {
-                                      _unreadNotificationCount = 0;
-                                    });
-                                    await _saveNotificationsToPrefs();
-                                  },
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(9),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'TANDAI SEMUA',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 0.5,
-                                    ),
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  for (var notification in _notifications) {
+                                    notification['read'] = true;
+                                  }
+                                  setState(() {
+                                    _unreadNotificationCount = 0;
+                                  });
+                                  await _saveNotificationsToPrefs();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      const Color.fromARGB(255, 180, 16, 4),
+                                  foregroundColor: Colors.white,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
+                                child: const Text('Tandai Semua Dibaca'),
                               ),
                             ),
                         ],
@@ -826,8 +558,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     });
   }
 
-  // ========== NOTIFICATION CARD - ENHANCED CONTENT ==========
-
   Widget _buildNotificationCard(
     Map<String, dynamic> notification,
     bool isRead,
@@ -838,7 +568,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   ) {
     final timestamp = DateTime.parse(notification['timestamp']);
     final timeAgo = _formatTimeAgo(timestamp);
-    final industriNama = notification['data']?['industri_nama'] ?? 'Perusahaan';
     final catatan = notification['catatan'] ?? '';
 
     return GestureDetector(
@@ -852,400 +581,117 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         }
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isRead ? _secondaryColor : Colors.white,
+          color: isRead ? Colors.grey[50] : Colors.white,
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _blackColor,
-            width: isRead ? 2 : 3,
+            color: isRead
+                ? Colors.grey[200]!
+                : const Color.fromARGB(255, 180, 16, 4),
+            width: 1,
           ),
-          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isRead ? 0.1 : 0.2),
-              offset: const Offset(4, 4),
-              blurRadius: 0,
+              color: Colors.black.withValues(alpha:0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // === STATUS BANNER ===
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-              decoration: BoxDecoration(
-                color: isRejected
-                    ? const Color(0xFFE63946)
-                    : (isApproved
-                        ? const Color(0xFF06D6A0)
-                        : const Color(0xFFFFB703)),
-                border: Border(
-                  bottom: BorderSide(color: _blackColor, width: 2),
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: isRejected
+                        ? Colors.red
+                        : (isApproved ? Colors.green : Colors.orange),
+                    shape: BoxShape.circle,
+                  ),
                 ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(14),
-                  topRight: Radius.circular(14),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    notification['title'],
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  // Status indicator
+                if (!isRead)
                   Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: _blackColor, width: 2),
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      isRejected ? Icons.close : Icons.check,
-                      size: 18,
-                      color: isRejected
-                          ? const Color(0xFFE63946)
-                          : const Color(0xFF06D6A0),
-                    ),
                   ),
-                  const SizedBox(width: 12),
-
-                  // Status text
-                  Expanded(
-                    child: Text(
-                      isRejected ? 'STATUS: DITOLAK' : 'STATUS: DISETUJUI',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-
-                  // Unread indicator
-                  if (!isRead)
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              notification['message'],
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
               ),
             ),
-
-            // === CONTENT - ENHANCED ===
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // === PERUSAHAAN INFO ===
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _accentColor,
-                      border: Border.all(color: _blackColor, width: 2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: _primaryColor,
-                            border: Border.all(color: _blackColor, width: 2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.business,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'LOKASI PKL',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: _darkColor,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                              Text(
-                                industriNama,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: _blackColor,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+            if (catatan.isNotEmpty && catatan != 'Tidak ada alasan diberikan')
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  catatan,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                    fontStyle: FontStyle.italic,
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // === DETAIL STATUS ===
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isRejected
-                          ? const Color(0xFFE63946).withValues(alpha: 0.1)
-                          : const Color(0xFF06D6A0).withValues(alpha: 0.1),
-                      border: Border.all(
-                        color: isRejected
-                            ? const Color(0xFFE63946)
-                            : const Color(0xFF06D6A0),
-                        width: 2,
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              isRejected ? Icons.warning : Icons.verified,
-                              size: 16,
-                              color: isRejected
-                                  ? const Color(0xFFE63946)
-                                  : const Color(0xFF06D6A0),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              isRejected ? 'PENOLAKAN' : 'PERSETUJUAN',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                color: _blackColor,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (isRejected)
-                          Text(
-                            'Pengajuan PKL Anda ditolak. Perbaiki pengajuan berdasarkan catatan di bawah, lalu ajukan kembali.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: _darkColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          )
-                        else
-                          Text(
-                            'Pengajuan PKL Anda telah disetujui. Siapkan diri untuk memulai kegiatan praktik kerja lapangan.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: _darkColor,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // === CATATAN DETAIL ===
-                  if (catatan.isNotEmpty &&
-                      catatan != 'Tidak ada alasan diberikan')
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(color: _blackColor, width: 2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 24,
-                                height: 24,
-                                decoration: BoxDecoration(
-                                  color: _primaryColor,
-                                  border:
-                                      Border.all(color: _blackColor, width: 1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.description,
-                                  size: 12,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'CATATAN',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                  color: _darkColor,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            catatan,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: _darkColor,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 16),
-
-                  // === ACTION BUTTON ===
-                  if (isRejected)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _yellowColor,
-                        border: Border.all(color: _blackColor, width: 3),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: TextButton(
-                        onPressed: _ajukanPKL,
-                        style: TextButton.styleFrom(
-                          foregroundColor: _blackColor,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(7),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.refresh, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              'AJUKAN ULANG PKL',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else if (isApproved)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF06D6A0),
-                        border: Border.all(color: _blackColor, width: 3),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: TextButton(
-                        onPressed: () {
-                          Navigator.pop(context); // Close panel
-                          _loadAllData(); // Refresh dashboard
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(7),
-                          ),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.visibility, size: 18),
-                            SizedBox(width: 8),
-                            Text(
-                              'LIHAT DETAIL PKL',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(height: 12),
-
-                  // === FOOTER ===
-                  Container(
-                    padding: const EdgeInsets.only(top: 12),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                            color: _blackColor.withValues(alpha: 0.3),
-                            width: 1),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _secondaryColor,
-                            border: Border.all(color: _blackColor, width: 1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_today,
-                                size: 10,
-                                color: _darkColor,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                timeAgo.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  color: _darkColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                ),
               ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  timeAgo,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                  ),
+                ),
+                if (isRejected)
+                  TextButton(
+                    onPressed: _ajukanPKL,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      minimumSize: Size.zero,
+                    ),
+                    child: const Text(
+                      'Ajukan Ulang',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color.fromARGB(255, 180, 16, 4),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
       ),
     );
   }
-
-  // ========== EMPTY STATE - CLEAN ==========
 
   Widget _buildEmptyNotifications() {
     return Center(
@@ -1254,56 +700,27 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: _secondaryColor,
-                border: Border.all(color: _blackColor, width: 4),
-                shape: BoxShape.circle,
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black,
-                    offset: Offset(4, 4),
-                    blurRadius: 0,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.inbox,
-                size: 40,
-                color: _darkColor,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: _yellowColor,
-                border: Border.all(color: _blackColor, width: 3),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'BELUM ADA NOTIFIKASI',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: _blackColor,
-                  letterSpacing: 1.0,
-                ),
-              ),
+            Icon(
+              Icons.notifications_none,
+              size: 64,
+              color: Colors.grey[300],
             ),
             const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Semua update status pengajuan PKL akan muncul di sini',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: _darkColor,
-                  fontWeight: FontWeight.w600,
-                ),
+            Text(
+              'Tidak ada notifikasi',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Semua update status pengajuan PKL akan muncul di sini',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
               ),
             ),
           ],
@@ -1333,76 +750,28 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     }
   }
 
-  void _startPrefsListener() async {
-    print('🔧 Starting prefs listener (read-only mode)');
-
-    final prefs = await SharedPreferences.getInstance();
-
-    _prefsSubscription = Stream.periodic(const Duration(seconds: 5))
-        .asyncMap((_) async {
-          return {
-            'token': prefs.getString('access_token'),
-            'shouldClear': prefs.getBool('should_clear_cache') ?? false,
-          };
-        })
-        .distinct()
-        .listen((Map<String, dynamic> data) {
-          final token = data['token'] as String?;
-
-          // HANYA handle jika token hilang (logout)
-          if (token == null || token.isEmpty) {
-            print('🔑 Token missing, redirecting to login');
-            _redirectToLogin();
-          }
-
-          // JANGAN handle shouldClear atau username change
-          // Biarkan dashboard tetap utuh
-        });
-  }
-
+  // ========== DATA LOADING FUNCTIONS ==========
   Future<void> _checkAuthAndLoadData() async {
-    // Cek token terlebih dahulu
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
-    final userName = prefs.getString('user_name');
+    final token = prefs.getString('access_token');
 
-    print('🔄 _checkAuthAndLoadData dipanggil');
-    print('   - Username baru: $userName');
-    print('   - Username sebelumnya: $_currentUsername');
-
-    // ========== PERBAIKAN: SET USERNAME DULU ==========
-    if (userName != null) {
-      _currentUsername = userName;
-      print('👤 Username set to: $_currentUsername');
-    }
-    // =================================================
-
-    // Clear cache jika perlu
-    final shouldClear = prefs.getBool('should_clear_cache') ?? false;
-    if (shouldClear) {
-      await prefs.remove('should_clear_cache');
-      _clearCache();
-      await _loadAllData();
+    if (token == null || token.isEmpty) {
+      _redirectToLogin();
       return;
     }
 
-    // Jika ada cache, load dari cache
-    if (_isCached &&
-        _currentUsername != null &&
-        userName != null &&
-        _currentUsername == userName &&
-        _cachedNamaSiswa != null &&
-        _cachedNamaSiswa == userName) {
+    // Gunakan data cache jika tersedia
+    if (_isCached) {
       _loadFromCache();
       setState(() {
         _isLoading = false;
       });
     } else {
-      // Load semua data dari API
       await _loadAllData();
     }
   }
@@ -1423,8 +792,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   void _saveToCache() {
-    if (_currentUsername == null) return;
-
     _cachedPklData = _pklData;
     _cachedPklApplications = _pklApplications;
     _cachedIndustriData = _industriData;
@@ -1436,204 +803,12 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     _isCached = true;
   }
 
-  void _clearCache() {
-    print('🧹 _clearCache() dipanggil - RESET TOTAL');
-
-    // Reset semua cache variables TAPI JANGAN NOTIFIKASI
-    _isCached = false;
-
-    _cachedPklData = null;
-    _cachedPklApplications = null;
-    _cachedIndustriData = null;
-    _cachedPembimbingData = null;
-    _cachedProcessedByData = null;
-    _cachedNamaSiswa = null;
-    _cachedKelasSiswa = null;
-    _cachedKelasId = null;
-
-    // ========== JANGAN CLEAR NOTIFIKASI! ==========
-    // Biarkan notifikasi tetap ada sebagai history
-    // _notifications.clear(); // ← JANGAN PAKAI INI
-    // _unreadNotificationCount = 0; // ← JANGAN PAKAI INI
-    // ==============================================
-
-    // Reset state data lainnya
-    if (mounted) {
-      setState(() {
-        _pklData = null;
-        _pklApplications = [];
-        _industriData = null;
-        _pembimbingData = null;
-        _processedByData = null;
-        _namaSiswa = 'Loading...';
-        _kelasSiswa = 'Loading...';
-        _kelasId = null;
-        _isLoading = true;
-      });
-    }
-
-    print('✅ Semua cache telah di-reset (notifikasi TETAP ADA)');
-    print('   - Notifications count: ${_notifications.length}');
-    print('   - Unread notifications: $_unreadNotificationCount');
-  }
-
-  Future<void> _checkLatestPKLStatus() async {
-    print('🔍 Checking latest PKL status...');
-
-    try {
-      await _loadPklApplications();
-
-      if (_pklApplications.isNotEmpty) {
-        final latestPKL = _pklApplications.first;
-        final status = latestPKL['status'].toString().toLowerCase();
-        final applicationId = latestPKL['id'];
-
-        // ========== CEK DI SHARED PREFERENCES ==========
-        final prefs = await SharedPreferences.getInstance();
-        final alreadyNotifiedKey = 'pkl_notified_$applicationId';
-        final alreadyNotified = prefs.getBool(alreadyNotifiedKey) ?? false;
-        // ================================================
-
-        if (!alreadyNotified && (status == 'rejected' || status == 'ditolak')) {
-          final industriId = latestPKL['industri_id'];
-          String industriNama = 'Perusahaan';
-
-          if (industriId != null) {
-            await _loadIndustriData(industriId);
-            industriNama = _industriData?['nama'] ?? 'Perusahaan';
-          }
-
-          final catatan =
-              latestPKL['kaprog_note'] ?? 'Tidak ada alasan diberikan';
-          final notificationId = 'pkl_rejected_$applicationId';
-
-          // Cek apakah sudah ada notifikasi di list
-          final hasNotificationInList =
-              _notifications.any((n) => n['id'] == notificationId);
-
-          if (!hasNotificationInList) {
-            print('🎯 Found NEW rejected PKL - creating notification');
-
-            final notification = {
-              'id': notificationId,
-              'title': 'PKL DITOLAK ❌',
-              'message': 'Pengajuan PKL ke $industriNama ditolak',
-              'catatan': catatan,
-              'timestamp': DateTime.now().toIso8601String(),
-              'read': false,
-              'type': 'rejected',
-              'data': {
-                'type': 'pkl_rejected',
-                'data': {
-                  'application_id': applicationId,
-                  'industri_nama': industriNama,
-                  'catatan': catatan,
-                }
-              },
-            };
-
-            setState(() {
-              _notifications.insert(0, notification);
-              _unreadNotificationCount++;
-            });
-
-            // ========== SIMPAN FLAG ==========
-            await prefs.setBool(alreadyNotifiedKey, true);
-            // ================================
-
-            // Save notifications
-            await _saveNotificationsToPrefs();
-
-            // Show popup hanya jika belum dibaca
-            if (mounted) {
-              NotificationPopup.showRejectionPopup(
-                context,
-                industriNama: industriNama,
-                catatan: catatan,
-                onReapplyPressed: () {
-                  _ajukanPKL();
-                },
-              );
-            }
-          }
-        } else if (!alreadyNotified &&
-            (status == 'approved' || status == 'disetujui')) {
-          final industriId = latestPKL['industri_id'];
-          String industriNama = 'Perusahaan';
-
-          if (industriId != null) {
-            await _loadIndustriData(industriId);
-            industriNama = _industriData?['nama'] ?? 'Perusahaan';
-          }
-
-          final catatan = latestPKL['kaprog_note'];
-          final notificationId = 'pkl_approved_$applicationId';
-
-          final hasNotificationInList =
-              _notifications.any((n) => n['id'] == notificationId);
-
-          if (!hasNotificationInList) {
-            print('🎯 Found NEW approved PKL - creating notification');
-
-            final notification = {
-              'id': notificationId,
-              'title': 'PKL DISETUJUI! 🎉',
-              'message': 'Pengajuan PKL ke $industriNama telah disetujui',
-              'catatan': catatan,
-              'timestamp': DateTime.now().toIso8601String(),
-              'read': false,
-              'type': 'approved',
-              'data': {
-                'type': 'pkl_approved',
-                'data': {
-                  'application_id': applicationId,
-                  'industri_nama': industriNama,
-                  'catatan': catatan,
-                }
-              },
-            };
-
-            setState(() {
-              _notifications.insert(0, notification);
-              _unreadNotificationCount++;
-            });
-
-            // ========== SIMPAN FLAG ==========
-            await prefs.setBool(alreadyNotifiedKey, true);
-            // ================================
-
-            // Save notifications
-            await _saveNotificationsToPrefs();
-
-            // Show popup hanya jika belum dibaca
-            if (mounted) {
-              NotificationPopup.showApprovalPopup(
-                context,
-                industriNama: industriNama,
-                catatan: catatan,
-                onViewPressed: () {
-                  _loadAllData();
-                },
-              );
-            }
-          }
-        } else if (alreadyNotified) {
-          print('📌 PKL $applicationId sudah pernah di-notifikasi');
-        }
-      }
-    } catch (e) {
-      print('❌ Error checking PKL status: $e');
-    }
-  }
-
-  // Di _loadAllData():
   Future<void> _loadAllData() async {
-    // Cek token terlebih dahulu
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -1649,16 +824,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     try {
       await _loadProfileData();
       await _loadPklApplications();
-
-      // ========== TAMBAHKAN INI ==========
-      // Load notifications setelah semua data selesai
       await _loadNotificationsOnLogin();
-      // ===================================
-
-      _checkLatestPKLStatus();
       _saveToCache();
     } catch (e) {
-      print('❌ Error in _loadAllData: $e');
       if (e.toString().contains('401') ||
           e.toString().contains('Unauthorized')) {
         _redirectToLogin();
@@ -1672,12 +840,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   Future<void> _loadProfileData() async {
-    // Cek token terlebih dahulu
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     final userName = prefs.getString('user_name');
@@ -1732,9 +899,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                       kelasData['data']['nama'] ?? 'Kelas Tidak Tersedia';
                 }
               }
-            } catch (e) {
-              print('❌ Error mengambil data kelas: $e');
-            }
+            // ignore: empty_catches
+            } catch (e) {}
           }
 
           final userId = matchedSiswa['id']?.toString();
@@ -1760,9 +926,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         _redirectToLogin();
         return;
       }
-    } catch (e) {
-      print('❌ Error loading profile from API: $e');
-    }
+    // ignore: empty_catches
+    } catch (e) {}
 
     if (mounted) {
       final kelasIdFromPrefs =
@@ -1780,12 +945,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   Future<void> _loadPklApplications() async {
-    // Cek token terlebih dahulu
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -1867,12 +1031,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   Future<void> _loadIndustriData(int industriId) async {
-    // Cek token terlebih dahulu
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -1903,8 +1066,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
   Future<void> _loadPembimbingData(int? guruId) async {
     if (guruId == null) return;
-    
-    // Cek token terlebih dahulu
+
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
@@ -1940,8 +1102,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
   Future<void> _loadProcessedByData(int? guruId) async {
     if (guruId == null) return;
-    
-    // Cek token terlebih dahulu
+
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
@@ -1975,13 +1136,102 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     } catch (_) {}
   }
 
-  Future<void> _bukaIndustri() async {
-    // Cek token terlebih dahulu
+  Future<void> _ajukanPKL() async {
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
     }
-    
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    if (token == null || token.isEmpty) {
+      _redirectToLogin();
+      return;
+    }
+
+    try {
+      if (_kelasId == null) {
+        await _loadProfileData();
+      }
+
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => AjukanPKLDialog(
+          token: token,
+          kelasId: _kelasId,
+          primaryColor: const Color(0xFF9f0712), // Ganti null dengan warna yang valid
+        ),
+      );
+
+      if (result != null) {
+        final response = await http.post(
+          Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/applications'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'catatan': result['catatan'],
+            'industri_id': result['industri_id'],
+          }),
+        );
+
+        if (response.statusCode == 201) {
+          await _resetNotificationFlags();
+          _clearCache();
+          await _loadAllData();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Pengajuan PKL berhasil dikirim'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else if (response.statusCode == 401) {
+          _redirectToLogin();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Gagal mengajukan PKL: ${response.body}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Terjadi kesalahan saat mengajukan PKL'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _clearCache() {
+    _isCached = false;
+    _cachedPklData = null;
+    _cachedPklApplications = null;
+    _cachedIndustriData = null;
+    _cachedPembimbingData = null;
+    _cachedProcessedByData = null;
+    _cachedNamaSiswa = null;
+    _cachedKelasSiswa = null;
+    _cachedKelasId = null;
+  }
+
+  Future<void> _bukaIndustri() async {
+    if (!await _isTokenValid()) {
+      _redirectToLogin();
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -2000,12 +1250,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   Future<void> _bukaRiwayat() async {
-    // Cek token terlebih dahulu
     if (!await _isTokenValid()) {
       _redirectToLogin();
       return;
     }
-    
+
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
 
@@ -2030,9 +1279,28 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal memuat riwayat')),
+          const SnackBar(
+            content: Text('Gagal memuat riwayat'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'disetujui':
+      case 'approved':
+        return const Color.fromARGB(255, 46, 125, 50);
+      case 'ditolak':
+      case 'rejected':
+        return Colors.red;
+      case 'menunggu':
+      case 'pending':
+        return Colors.orange;
+      default:
+        return Colors.orange;
     }
   }
 
@@ -2093,9 +1361,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       case 'completed':
       case 'selesai':
         return 'Selesai PKL';
-      case 'rejected':
-      case 'ditolak':
-        return 'Pengajuan Ditolak';
       default:
         return 'Mengajukan';
     }
@@ -2118,32 +1383,18 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     // Jika tidak ada token, tampilkan loading screen yang akan redirect
     if (!_hasToken && _isLoading) {
       return Scaffold(
-        backgroundColor: _darkColor,
+        backgroundColor: const Color.fromARGB(255, 180, 16, 4),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: _primaryColor,
-                  border: Border.all(color: _blackColor, width: 2),
-                  shape: BoxShape.circle,
-                  boxShadow: const [_heavyShadow],
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 40,
-                ),
-              ),
+              const CircularProgressIndicator(color: Colors.white),
               const SizedBox(height: 20),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
-                  color: _yellowColor,
-                  border: Border.all(color: _blackColor, width: 3),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
@@ -2151,12 +1402,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: Colors.black,
+                    color: Color.fromARGB(255, 180, 16, 4),
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-           
             ],
           ),
         ),
@@ -2164,105 +1413,61 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     }
 
     return Scaffold(
-      backgroundColor: _darkColor,
+      backgroundColor: const Color.fromARGB(255, 180, 16, 4),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Header dengan WebSocket status
-              Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _primaryColor,
-                  border: Border.all(color: _blackColor, width: 3),
-                  boxShadow: const [_heavyShadow],
-                  borderRadius: BorderRadius.circular(16),
-                ),
+              // Header dengan notifikasi badge
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Halo, $_namaSiswa!',
-                            style: const TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                            ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Halo, $_namaSiswa!',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Kelas $_kelasSiswa',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: _secondaryColor,
-                              letterSpacing: -0.3,
-                            ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Selamat datang di dashboard PKL',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withValues(alpha:0.8),
                           ),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _yellowColor,
-                              border: Border.all(color: _blackColor, width: 2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Dashboard PKL',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: _blackColor,
-                                  ),
-                                ),
-                                // WebSocket status indicator
-                                Container(
-                                  margin: const EdgeInsets.only(left: 8),
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: _webSocketManager.isConnected
-                                        ? Colors.green
-                                        : Colors.red,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: _blackColor, width: 1),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    // Notification icon with badge
                     Stack(
                       children: [
-                        GestureDetector(
-                          onTap: _showNotificationsPanel,
-                          child: Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: _yellowColor,
-                              border: Border.all(color: _blackColor, width: 3),
-                              boxShadow: [_lightShadow],
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(22),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha:0.1),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            onPressed: _showNotificationsPanel,
+                            icon: const Icon(
                               Icons.notifications,
-                              size: 28,
-                              color: _blackColor,
+                              size: 24,
+                              color: Color.fromARGB(255, 180, 16, 4),
                             ),
                           ),
                         ),
@@ -2271,25 +1476,25 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                             right: 0,
                             top: 0,
                             child: Container(
-                              padding: const EdgeInsets.all(4),
+                              width: 20,
+                              height: 20,
                               decoration: BoxDecoration(
-                                color: _notificationColor,
+                                color: Colors.red,
                                 shape: BoxShape.circle,
                                 border:
-                                    Border.all(color: _blackColor, width: 2),
+                                    Border.all(color: Colors.white, width: 2),
                               ),
-                              constraints: const BoxConstraints(
-                                minWidth: 20,
-                                minHeight: 20,
-                              ),
-                              child: Text(
-                                '${_unreadNotificationCount > 9 ? '9+' : _unreadNotificationCount}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                              child: Center(
+                                child: Text(
+                                  _unreadNotificationCount > 9
+                                      ? '9+'
+                                      : '$_unreadNotificationCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                                textAlign: TextAlign.center,
                               ),
                             ),
                           ),
@@ -2299,15 +1504,21 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                 ),
               ),
 
-              // Container waktu PKL
+              // Container waktu PKL dengan progress bar
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.only(top: 10, left: 20, right: 20),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                 decoration: BoxDecoration(
-                  color: _secondaryColor,
-                  border: Border.all(color: _blackColor, width: 3),
-                  boxShadow: const [_heavyShadow],
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha:0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: _isLoading
                     ? _buildTimeSectionSkeleton()
@@ -2323,9 +1534,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                           _pklData!['tanggal_mulai'])
                                       : '-'),
                               Container(
-                                width: 4,
-                                height: 50,
-                                color: _blackColor,
+                                width: 2,
+                                height: 40,
+                                color: Colors.grey[300],
                               ),
                               _buildTimeItem(
                                   'Selesai',
@@ -2335,34 +1546,34 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                       : '-'),
                             ],
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const SizedBox(height: 8),
                               Container(
                                 width: double.infinity,
-                                height: 40,
+                                height: 27,
                                 decoration: BoxDecoration(
-                                  color: _secondaryColor,
-                                  border:
-                                      Border.all(color: _blackColor, width: 3),
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(13.5),
                                 ),
                                 child: Stack(
                                   children: [
                                     Container(
                                       width:
                                           (MediaQuery.of(context).size.width -
-                                                  72) *
+                                                  88) *
                                               ((_getCurrentProgressStatus(
                                                           _pklData?['status']) +
                                                       1.2) /
                                                   4),
-                                      height: 34,
-                                      margin: const EdgeInsets.all(3),
+                                      height: 27,
                                       decoration: BoxDecoration(
-                                        color: _primaryColor,
-                                        borderRadius: BorderRadius.circular(17),
+                                        color: const Color.fromARGB(
+                                            255, 88, 89, 90),
+                                        borderRadius:
+                                            BorderRadius.circular(13.5),
                                       ),
                                       child: Center(
                                         child: Padding(
@@ -2372,9 +1583,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                             _getStatusText(_pklData?['status']),
                                             style: const TextStyle(
                                               color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: -0.3,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w500,
                                             ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -2392,15 +1602,13 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
               // Container utama
               Container(
-                margin: const EdgeInsets.only(top: 24),
-                decoration: BoxDecoration(
-                  color: _secondaryColor,
-                  border: Border.all(color: _blackColor, width: 4),
-                  borderRadius: const BorderRadius.only(
+                margin: const EdgeInsets.only(top: 30),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(40),
                     topRight: Radius.circular(40),
                   ),
-                  boxShadow: const [_heavyShadow],
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -2411,108 +1619,95 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                           ? _buildQuickActionsSkeleton()
                           : Container(
                               width: double.infinity,
-                              height: 160,
+                              height: 140,
                               decoration: BoxDecoration(
-                                color: _primaryColor,
-                                border:
-                                    Border.all(color: _blackColor, width: 3),
-                                borderRadius: BorderRadius.circular(30),
-                                boxShadow: const [_heavyShadow],
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color.fromARGB(255, 128, 13, 7),
+                                    Color.fromARGB(255, 175, 20, 9),
+                                    Color(0xFFD11F0B),
+                                  ],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(31),
                               ),
                               child: Stack(
                                 children: [
                                   Positioned(
-                                    left: 150,
-                                    top: 20,
-                                    bottom: 20,
+                                    left: 140,
+                                    top: 22,
+                                    bottom: 22,
                                     child: Container(
-                                      width: 4,
-                                      color: _blackColor,
+                                      width: 1,
+                                      color: Colors.white,
                                     ),
                                   ),
                                   Positioned(
-                                    left: 166,
-                                    right: 20,
-                                    top: 80,
+                                    left: 158,
+                                    right: 22,
+                                    top: 70,
                                     child: Container(
-                                      height: 4,
-                                      color: _blackColor,
+                                      height: 1,
+                                      color: Colors.white,
                                     ),
                                   ),
                                   Positioned(
-                                    left: 30,
-                                    top: 25,
+                                    left: 45,
+                                    top: 40,
                                     child: _buildMenuOptionKiri('Pengajuan',
                                         Icons.assignment_add, _ajukanPKL),
                                   ),
                                   Positioned(
-                                    right: 40,
+                                    right: 85,
                                     top: 20,
                                     child: _buildMenuOptionKanan('Industri',
                                         Icons.factory, _bukaIndustri),
                                   ),
                                   Positioned(
-                                    right: 40,
-                                    bottom: 15,
+                                    right: 85,
+                                    bottom: 20,
                                     child: _buildMenuOptionKanan(
                                         'Riwayat', Icons.history, _bukaRiwayat),
                                   ),
                                 ],
                               ),
                             ),
-                      const SizedBox(height: 32),
+
+                      const SizedBox(height: 30),
+
                       // Judul Daftar Pengajuan PKL
                       _isLoading
                           ? _buildTitleSkeleton()
-                          : Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: _yellowColor,
-                                border:
-                                    Border.all(color: _blackColor, width: 3),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [_lightShadow],
-                              ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'PENGAJUAN PKL',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      color: _blackColor,
-                                      letterSpacing: -0.3,
-                                    ),
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Pengajuan PKL Disetujui',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black,
                                   ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: _secondaryColor,
-                                      border: Border.all(
-                                          color: _blackColor, width: 2),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      _hasApprovedApplication()
-                                          ? '1 DISETUJUI'
-                                          : (_hasRejectedApplication()
-                                              ? '1 DITOLAK'
-                                              : '0 DISETUJUI'),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: _blackColor,
-                                      ),
-                                    ),
+                                ),
+                                Text(
+                                  _hasApprovedApplication()
+                                      ? '1 Disetujui'
+                                      : (_hasRejectedApplication()
+                                          ? '1 Ditolak'
+                                          : _pklData != null
+                                              ? '1 Menunggu'
+                                              : '0 Pengajuan'),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                      const SizedBox(height: 20),
+
+                      const SizedBox(height: 16),
+
                       // Tampilkan pengajuan
                       if (_isLoading)
                         _buildPKLCardSkeleton()
@@ -2535,6 +1730,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                         })
                       else
                         _buildNoPengajuanCard(),
+
                       const SizedBox(height: 30),
                     ],
                   ),
@@ -2547,7 +1743,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     );
   }
 
-  // ========== SKELETON LOADING WIDGETS (SAMA) ==========
+  // ========== SKELETON LOADING WIDGETS ==========
   Widget _buildTimeSectionSkeleton() {
     return Column(
       children: [
@@ -2556,21 +1752,20 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           children: [
             _buildTimeItemSkeleton(),
             Container(
-              width: 4,
-              height: 50,
-              color: _blackColor,
+              width: 2,
+              height: 40,
+              color: Colors.grey[300],
             ),
             _buildTimeItemSkeleton(),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
         Container(
           width: double.infinity,
-          height: 40,
+          height: 27,
           decoration: BoxDecoration(
-            color: _secondaryColor,
-            border: Border.all(color: _blackColor, width: 3),
-            borderRadius: BorderRadius.circular(20),
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(13.5),
           ),
         ),
       ],
@@ -2581,19 +1776,15 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     return Column(
       children: [
         Container(
-          width: 50,
+          width: 40,
           height: 12,
-          color: _blackColor.withValues(alpha: 0.3),
+          color: Colors.grey[300],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Container(
-          width: 80,
-          height: 24,
-          decoration: BoxDecoration(
-            color: _secondaryColor,
-            border: Border.all(color: _blackColor, width: 2),
-            borderRadius: BorderRadius.circular(8),
-          ),
+          width: 60,
+          height: 18,
+          color: Colors.grey[300],
         ),
       ],
     );
@@ -2602,35 +1793,110 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   Widget _buildQuickActionsSkeleton() {
     return Container(
       width: double.infinity,
-      height: 160,
+      height: 140,
       decoration: BoxDecoration(
-        color: _primaryColor,
-        border: Border.all(color: _blackColor, width: 3),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: const [_heavyShadow],
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(31),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: 140,
+            top: 22,
+            bottom: 22,
+            child: Container(
+              width: 2,
+              color: Colors.grey[300],
+            ),
+          ),
+          Positioned(
+            left: 158,
+            right: 22,
+            top: 70,
+            child: Container(
+              height: 2,
+              color: Colors.grey[300],
+            ),
+          ),
+          Positioned(
+            left: 45,
+            top: 40,
+            child: _buildMenuOptionSkeleton(),
+          ),
+          Positioned(
+            right: 85,
+            top: 20,
+            child: _buildMenuOptionSkeletonKanan(),
+          ),
+          Positioned(
+            right: 85,
+            bottom: 20,
+            child: _buildMenuOptionSkeletonKanan(),
+          ),
+        ],
       ),
     );
   }
 
+  Widget _buildMenuOptionSkeleton() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: 60,
+          height: 12,
+          color: Colors.grey[300],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuOptionSkeletonKanan() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          width: 50,
+          height: 12,
+          color: Colors.grey[300],
+        ),
+      ],
+    );
+  }
+
   Widget _buildTitleSkeleton() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: _yellowColor,
-        border: Border.all(color: _blackColor, width: 3),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-              width: 150,
-              height: 20,
-              color: _blackColor.withValues(alpha: 0.3)),
-          Container(
-              width: 80, height: 20, color: _blackColor.withValues(alpha: 0.3)),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Container(
+          width: 150,
+          height: 20,
+          color: Colors.grey[300],
+        ),
+        Container(
+          width: 80,
+          height: 12,
+          color: Colors.grey[300],
+        ),
+      ],
     );
   }
 
@@ -2639,57 +1905,90 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _secondaryColor,
-        border: Border.all(color: _blackColor, width: 3),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha:0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.grey[200]!,
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 100,
-            height: 30,
+            width: 80,
+            height: 24,
             decoration: BoxDecoration(
-              color: _primaryColor,
-              border: Border.all(color: _blackColor, width: 2),
-              borderRadius: BorderRadius.circular(15),
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-          const SizedBox(height: 16),
-          Container(
-              width: 200,
-              height: 24,
-              color: _blackColor.withValues(alpha: 0.2)),
           const SizedBox(height: 12),
           Container(
-              width: double.infinity,
-              height: 16,
-              color: _blackColor.withValues(alpha: 0.2)),
+            width: 150,
+            height: 20,
+            color: Colors.grey[300],
+          ),
           const SizedBox(height: 8),
-          Container(
-              width: 150,
-              height: 16,
-              color: _blackColor.withValues(alpha: 0.2)),
-          const SizedBox(height: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(width: 200, height: 14, color: Colors.grey[200]),
+              const SizedBox(height: 4),
+              Container(width: 180, height: 14, color: Colors.grey[200]),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(width: 100, height: 12, color: Colors.grey[200]),
+              const SizedBox(height: 2),
+              Container(width: 80, height: 14, color: Colors.grey[300]),
+            ],
+          ),
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _accentColor,
-              border: Border.all(color: _blackColor, width: 2),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                    width: 100,
-                    height: 14,
-                    color: _blackColor.withValues(alpha: 0.2)),
-                const SizedBox(height: 8),
+                Container(width: 80, height: 12, color: Colors.grey[200]),
+                const SizedBox(height: 4),
                 Container(
                     width: double.infinity,
                     height: 14,
-                    color: _blackColor.withValues(alpha: 0.2)),
+                    color: Colors.grey[300]),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(width: 80, height: 12, color: Colors.grey[200]),
+                const SizedBox(height: 4),
+                Container(
+                    width: double.infinity,
+                    height: 14,
+                    color: Colors.grey[300]),
               ],
             ),
           ),
@@ -2703,69 +2002,58 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       width: double.infinity,
       padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        color: _secondaryColor,
-        border: Border.all(color: _blackColor, width: 4),
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: const [_heavyShadow],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(19),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha:0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: const Color.fromARGB(255, 180, 16, 4),
+          width: 1,
+        ),
       ),
       child: Column(
         children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: _primaryColor,
-              border: Border.all(color: _blackColor, width: 3),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.assignment_outlined,
-              size: 40,
-              color: _secondaryColor,
-            ),
+          const Icon(
+            Icons.assignment_outlined,
+            size: 60,
+            color: Color.fromARGB(255, 180, 16, 4),
           ),
-          const SizedBox(height: 24),
-          Text(
-            'BELUM ADA PENGAJUAN DISETUJUI',
+          const SizedBox(height: 20),
+          const Text(
+            'Belum ada pengajuan yang disetujui',
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: _blackColor,
-              letterSpacing: -0.5,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
             'Ajukan PKL untuk memulai praktik kerja lapangan',
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: _darkColor,
+              color: Colors.grey[700],
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _ajukanPKL,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _yellowColor,
-              foregroundColor: _blackColor,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              backgroundColor: const Color.fromARGB(255, 180, 16, 4),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: _blackColor, width: 3),
+                borderRadius: BorderRadius.circular(10),
               ),
-              elevation: 0,
-              shadowColor: Colors.transparent,
             ),
             child: const Text(
-              'AJUKAN PKL SEKARANG',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-                letterSpacing: -0.3,
-              ),
+              'Ajukan PKL Sekarang',
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],
@@ -2773,635 +2061,245 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     );
   }
 
-  // ========== CARD BUILDERS ==========
+  // ========== END SKELETON LOADING WIDGETS ==========
+
+  Widget _buildTimeItem(String label, String date) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          date,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPengajuanCard(Map<String, dynamic> pengajuan) {
     final status = pengajuan['status'];
     final isApproved = status.toLowerCase() == 'approved' ||
         status.toLowerCase() == 'disetujui';
-    final isRejected =
-        status.toLowerCase() == 'rejected' || status.toLowerCase() == 'ditolak';
-
-    final statusColor = isRejected
-        ? const Color(0xFFE63946)
-        : (isApproved ? const Color(0xFF06D6A0) : const Color(0xFFFFB703));
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _secondaryColor,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha:0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
         border: Border.all(
-          color: _blackColor,
-          width: 4,
+          color: Colors.grey[200]!,
+          width: 1,
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [_heavyShadow],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // HEADER STATUS
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-              border: Border(
-                bottom: BorderSide(color: _blackColor, width: 4),
+              color: _statusColor(status).withValues(alpha:0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _statusColor(status),
+                width: 1,
               ),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Icon status
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: _blackColor, width: 3),
-                    shape: BoxShape.circle,
-                    boxShadow: [_lightShadow],
-                  ),
-                  child: Icon(
-                    isRejected
-                        ? Icons.cancel
-                        : (isApproved ? Icons.check_circle : Icons.access_time),
-                    color: statusColor,
-                    size: 24,
-                  ),
+                Icon(
+                  isApproved ? Icons.check_circle : Icons.access_time,
+                  size: 14,
+                  color: _statusColor(status),
                 ),
-                const SizedBox(width: 12),
-                // Text status
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isRejected
-                            ? 'DITOLAK'
-                            : (isApproved ? 'DISETUJUI' : 'MENUNGGU'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      Text(
-                        isRejected
-                            ? 'Pengajuan PKL Anda ditolak'
-                            : (isApproved
-                                ? 'Pengajuan PKL Anda telah disetujui'
-                                : 'Pengajuan PKL Anda sedang diproses'),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // KONTEN UTAMA
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // INDUSTRI
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isRejected
-                        ? const Color(0xFFE63946).withValues(alpha: 0.1)
-                        : _primaryColor.withValues(alpha: 0.1),
-                    border: Border.all(
-                      color:
-                          isRejected ? const Color(0xFFE63946) : _primaryColor,
-                      width: 3,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: isRejected
-                              ? const Color(0xFFE63946)
-                              : _primaryColor,
-                          border: Border.all(color: _blackColor, width: 3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          isRejected ? Icons.block : Icons.factory,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isRejected ? 'LOKASI YG DIAJUKAN' : 'LOKASI PKL',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: _darkColor,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              pengajuan['industri_nama'],
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: _blackColor,
-                                letterSpacing: -0.3,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // CATATAN PENGAJUAN
-                if (pengajuan['catatan'] != null &&
-                    pengajuan['catatan'].isNotEmpty &&
-                    pengajuan['catatan'] != '-')
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _secondaryColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 30,
-                              height: 30,
-                              decoration: BoxDecoration(
-                                color: _primaryColor,
-                                border:
-                                    Border.all(color: _blackColor, width: 2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.note_add,
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'CATATAN PENGAJUAN',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: _blackColor,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: _blackColor, width: 2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            pengajuan['catatan'],
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // TAMPILAN KHUSUS UNTUK STATUS DITOLAK
-                if (isRejected) ...[
-                  // ALASAN PENOLAKAN
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE63946).withValues(alpha: 0.15),
-                      border: Border.all(
-                        color: const Color(0xFFE63946),
-                        width: 3,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE63946),
-                                border:
-                                    Border.all(color: _blackColor, width: 2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.warning_amber,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'ALASAN PENOLAKAN',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: _blackColor,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: _blackColor, width: 2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            pengajuan['kaprog_note'] ??
-                                'Tidak ada alasan yang diberikan',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // INFORMASI PENGAJUAN
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _accentColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [_lightShadow],
-                    ),
-                    child: Column(
-                      children: [
-                        // DIAJUKAN PADA
-                        _buildInfoRowCompact(
-                          icon: Icons.calendar_today_outlined,
-                          iconColor: const Color(0xFFFFB703),
-                          title: 'DIAJUKAN PADA',
-                          value: pengajuan['tanggal_permohonan'],
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // DIPUTUSKAN PADA
-                        _buildInfoRowCompact(
-                          icon: Icons.gavel_outlined,
-                          iconColor: const Color(0xFFE63946),
-                          title: 'DIPUTUSKAN PADA',
-                          value: pengajuan['decided_at'],
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // DIPROSES OLEH (KAPROG)
-                        _buildInfoRowCompact(
-                          icon: Icons.person_outline,
-                          iconColor: const Color(0xFFA8DADC),
-                          title: 'DIPROSES OLEH',
-                          value: pengajuan['diproses_oleh'],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // TOMBOL AJUKAN ULANG
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: _secondaryColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'BUTUH REVISI?',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: _blackColor,
-                            letterSpacing: -0.3,
-                        ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Perbaiki pengajuan Anda berdasarkan alasan penolakan di atas, lalu ajukan kembali.',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: _darkColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _ajukanPKL,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _yellowColor,
-                                  foregroundColor: _blackColor,
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 16, horizontal: 24),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(
-                                        color: _blackColor, width: 3),
-                                  ),
-                                  elevation: 0,
-                                  shadowColor: Colors.transparent,
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.refresh, size: 20),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'AJUKAN ULANG',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 14,
-                                        letterSpacing: -0.3,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else if (isApproved) ...[
-                  // TAMPILAN UNTUK DISETUJUI
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _accentColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [_lightShadow],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildInfoRowCompact(
-                          icon: Icons.person_outline,
-                          iconColor: const Color(0xFFE63946),
-                          title: 'DIPROSES OLEH',
-                          value: pengajuan['diproses_oleh'],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildInfoRowCompact(
-                          icon: Icons.school_outlined,
-                          iconColor: const Color(0xFF06D6A0),
-                          title: 'PEMBIMBING',
-                          value: pengajuan['pembimbing_pkl'],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildInfoRowCompact(
-                          icon: Icons.calendar_today_outlined,
-                          iconColor: const Color(0xFFFFB703),
-                          title: 'DIAJUKAN',
-                          value: pengajuan['tanggal_permohonan'],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildInfoRowCompact(
-                          icon: Icons.gavel_outlined,
-                          iconColor: const Color(0xFFA8DADC),
-                          title: 'DIPUTUSKAN',
-                          value: pengajuan['decided_at'],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // CATATAN APPROVAL JIKA ADA
-                  if (pengajuan['kaprog_note'] != null &&
-                      pengajuan['kaprog_note'].isNotEmpty &&
-                      pengajuan['kaprog_note'] != 'Tidak ada catatan')
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.only(top: 20),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF06D6A0).withValues(alpha: 0.1),
-                        border: Border.all(
-                            color: const Color(0xFF06D6A0), width: 3),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF06D6A0),
-                                  border:
-                                      Border.all(color: _blackColor, width: 2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.check_circle,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'CATATAN APPROVAL',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: _blackColor,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: Border.all(color: _blackColor, width: 2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              pengajuan['kaprog_note'],
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ] else ...[
-                  // TAMPILAN UNTUK MENUNGGU
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _accentColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [_lightShadow],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildInfoRowCompact(
-                          icon: Icons.person_outline,
-                          iconColor: const Color(0xFFE63946),
-                          title: 'DIAJUKAN PADA',
-                          value: pengajuan['tanggal_permohonan'],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildInfoRowCompact(
-                          icon: Icons.access_time,
-                          iconColor: const Color(0xFFFFB703),
-                          title: 'STATUS',
-                          value: 'Menunggu Persetujuan',
-                        ),
-                        const SizedBox(height: 16),
-                        if (pengajuan['diproses_oleh'] != null &&
-                            pengajuan['diproses_oleh'] != '-')
-                          _buildInfoRowCompact(
-                            icon: Icons.person_outline,
-                            iconColor: const Color(0xFFA8DADC),
-                            title: 'SEDANG DIPROSES',
-                            value: pengajuan['diproses_oleh'],
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRowCompact({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String value,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: _blackColor, width: 2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: iconColor,
-              border: Border.all(color: _blackColor, width: 2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 18,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+                const SizedBox(width: 4),
                 Text(
-                  title,
+                  status.toUpperCase(),
                   style: TextStyle(
+                    color: _statusColor(status),
                     fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: _darkColor,
-                    letterSpacing: 0.8,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            pengajuan['industri_nama'],
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Diproses oleh: ',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        TextSpan(
+                          text: pengajuan['diproses_oleh'],
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _statusColor(pengajuan['status']),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'Pembimbing PKL: ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      TextSpan(
+                        text: pengajuan['pembimbing_pkl'],
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _statusColor(pengajuan['status']),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Tanggal Pengajuan',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      pengajuan['tanggal_permohonan'],
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color.fromARGB(255, 248, 249, 250),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Catatan Pengajuan:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: _blackColor,
-                    letterSpacing: -0.3,
+                  pengajuan['catatan'],
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black87,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _statusColor(pengajuan['status']).withValues(alpha:0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Catatan Kaprog:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: _statusColor(pengajuan['status']),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  pengajuan['kaprog_note'],
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _statusColor(pengajuan['status']),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Diputuskan pada: ${pengajuan['decided_at']}',
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
             ),
           ),
         ],
@@ -3416,36 +2314,32 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 60,
-            height: 60,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
-              color: _secondaryColor,
-              border: Border.all(color: _blackColor, width: 3),
+              color: Colors.white,
               shape: BoxShape.circle,
-              boxShadow: [_lightShadow],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha:0.1),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Icon(
               icon,
-              color: _primaryColor,
-              size: 32,
+              color: const Color.fromARGB(255, 180, 16, 4),
+              size: 24,
             ),
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _yellowColor,
-              border: Border.all(color: _blackColor, width: 2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              title,
-              style: TextStyle(
-                color: _blackColor,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.3,
-              ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -3461,74 +2355,36 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: _secondaryColor,
-              border: Border.all(color: _blackColor, width: 3),
+              color: Colors.white,
               shape: BoxShape.circle,
-              boxShadow: [_lightShadow],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha:0.1),
+                  blurRadius: 6,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Icon(
               icon,
-              color: _primaryColor,
+              color: const Color.fromARGB(255, 180, 16, 4),
               size: 24,
             ),
           ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _yellowColor,
-              border: Border.all(color: _blackColor, width: 2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              title,
-              style: TextStyle(
-                color: _blackColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.3,
-              ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildTimeItem(String label, String date) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: _blackColor,
-            letterSpacing: -0.3,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: _yellowColor,
-            border: Border.all(color: _blackColor, width: 2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(
-            date,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: _blackColor,
-              letterSpacing: -0.5,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

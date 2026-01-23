@@ -28,25 +28,28 @@ class _IndustriListPageState extends State<IndustriListPage> {
   static final Map<int?, List<dynamic>> _industriCache = {};
   static DateTime? _lastFetchTime;
 
-  // Neo Brutalism Colors - SAMA DENGAN SISWA DASHBOARD
-  final Color _primaryColor = const Color(0xFFE63946); // Merah cerah
-  final Color _secondaryColor = const Color.fromARGB(255, 244, 255, 241); // Putih krem
-  final Color _accentColor = const Color(0xFFA8DADC); // Biru muda
-  final Color _darkColor = const Color(0xFF1D3557); // Biru tua
-  final Color _yellowColor = const Color(0xFFFFB703); // Kuning cerah
-  final Color _blackColor = Colors.black;
+  // Warna serius - menggunakan warna merah tua sebagai utama
+  final Color _primaryColor = const Color.fromARGB(255, 180, 16, 4); // Merah tua serius
+  final Color _secondaryColor = Colors.white; // Putih bersih
+  final Color _accentColor = const Color.fromARGB(255, 240, 240, 240); // Abu-abu sangat muda
+// Hitam gelap
+  final Color _borderColor = const Color.fromARGB(255, 200, 200, 200); // Abu-abu untuk border
+  final Color _textColor = const Color.fromARGB(255, 50, 50, 50); // Abu-abu gelap untuk teks
+  final Color _hintColor = const Color.fromARGB(255, 120, 120, 120); // Abu-abu untuk hint
 
-  // Neo Brutalism Shadows - SAMA DENGAN SISWA DASHBOARD
-  static const BoxShadow _heavyShadow = BoxShadow(
-    color: Colors.black,
-    offset: Offset(6, 6),
-    blurRadius: 0,
+  // Shadow yang lebih halus
+  final BoxShadow _softShadow = BoxShadow(
+    color: Colors.black.withValues(alpha:.1),
+    offset: const Offset(0, 2),
+    blurRadius: 6,
+    spreadRadius: 0,
   );
 
-  static const BoxShadow _lightShadow = BoxShadow(
-    color: Color.fromRGBO(0, 0, 0, 0.2),
-    offset: Offset(4, 4),
-    blurRadius: 0,
+  final BoxShadow _mediumShadow = BoxShadow(
+    color: Colors.black.withValues(alpha:.15),
+    offset: const Offset(0, 4),
+    blurRadius: 8,
+    spreadRadius: 0,
   );
 
   @override
@@ -342,26 +345,16 @@ class _IndustriListPageState extends State<IndustriListPage> {
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _yellowColor,
-          border: Border.all(color: _blackColor, width: 3),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [_lightShadow],
+          color: _primaryColor.withValues(alpha:.1),
+          border: Border.all(color: _primaryColor.withValues(alpha:.3), width: 1),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _darkColor,
-                border: Border.all(color: _blackColor, width: 2),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.filter_alt,
-                color: _yellowColor,
-                size: 20,
-              ),
+            Icon(
+              Icons.filter_alt,
+              color: _primaryColor,
+              size: 20,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -372,18 +365,16 @@ class _IndustriListPageState extends State<IndustriListPage> {
                     'Industri Sesuai Jurusan',
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: _blackColor,
-                      letterSpacing: -0.3,
+                      fontWeight: FontWeight.w600,
+                      color: _primaryColor,
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Menampilkan industri yang sesuai dengan jurusan Anda',
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Color.fromRGBO(0, 0, 0, 0.7),
+                      fontSize: 12,
+                      color: _hintColor,
                     ),
                   ),
                 ],
@@ -405,319 +396,171 @@ class _IndustriListPageState extends State<IndustriListPage> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return Container(
-          height: MediaQuery.of(context).size.height * 0.9,
+          height: MediaQuery.of(context).size.height * 0.85,
           decoration: BoxDecoration(
             color: _secondaryColor,
             borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(40),
-              topRight: Radius.circular(40),
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
             ),
-            border: Border.all(color: _blackColor, width: 4),
-            boxShadow: const [_heavyShadow],
+            boxShadow: [_mediumShadow],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header dengan tombol close
+              // Header
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: _primaryColor,
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(36),
-                    topRight: Radius.circular(36),
-                  ),
-                  border: Border(
-                    bottom: BorderSide(color: _blackColor, width: 4),
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
                   ),
                 ),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Close button - Neo Brutalism Style
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: _yellowColor,
-                          border: Border.all(color: _blackColor, width: 3),
-                          shape: BoxShape.circle,
-                          boxShadow: const [_lightShadow],
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          size: 20,
-                          color: _blackColor,
-                        ),
+                    Text(
+                      'Detail Industri',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: _secondaryColor,
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    
-                    // Title
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'DETAIL INDUSTRI',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            industri['nama'] ?? 'Industri',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _accentColor,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.close,
+                        color: _secondaryColor,
+                        size: 24,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // Content - Scrollable
+              // Content
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // ICON PROFILE BESAR - Neo Brutalism Style
+                      // Icon profil
                       Container(
-                        margin: const EdgeInsets.only(bottom: 30),
-                        child: Container(
-                          width: 120,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: _primaryColor,
-                            border: Border.all(color: _blackColor, width: 4),
-                            shape: BoxShape.circle,
-                            boxShadow: const [_heavyShadow],
-                          ),
-                          child: const Icon(
-                            Icons.factory_rounded,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        child: CircleAvatar(
+                          radius: 60,
+                          backgroundColor: _primaryColor,
+                          child: Icon(
+                            Icons.business,
                             size: 60,
-                            color: Colors.white,
+                            color: _secondaryColor,
                           ),
                         ),
                       ),
                       
-                      // DATA INDUSTRI - Menggunakan warna putih
-                      Column(
-                        children: [
-                          // NAMA INDUSTRI
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white, // Warna putih
-                              border: Border.all(color: _blackColor, width: 3),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: const [_lightShadow],
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: _primaryColor,
-                                    border: Border.all(color: _blackColor, width: 2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.business,
-                                    size: 22,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'NAMA INDUSTRI',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          color: _darkColor,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        industri['nama'] ?? '-',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w900,
-                                          color: _blackColor,
-                                          letterSpacing: -0.3,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+                      // Nama industri
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        child: Text(
+                          industri['nama'] ?? 'Industri',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: _textColor,
                           ),
-                          
-                          const SizedBox(height: 16),
-
-                          // ALAMAT
-                          _buildDetailItem(
-                            icon: Icons.location_on,
-                            title: 'ALAMAT',
-                            value: industri['alamat'] ?? '-',
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // TELEPON
-                          _buildDetailItem(
-                            icon: Icons.phone,
-                            title: 'TELEPON',
-                            value: industri['telepon'] ?? industri['no_telp'] ?? '-',
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // EMAIL
-                          _buildDetailItem(
-                            icon: Icons.email,
-                            title: 'EMAIL',
-                            value: industri['email'] ?? '-',
-                          ),
-                          
-                          // BIDANG (jika ada)
-                          if (industri['bidang'] != null && (industri['bidang'] as String).isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            _buildDetailItem(
-                              icon: Icons.work,
-                              title: 'BIDANG',
-                              value: industri['bidang'] ?? '-',
-                            ),
-                          ],
-                          
-                          // DESKRIPSI (jika ada)
-                          if (industri['deskripsi'] != null && (industri['deskripsi'] as String).isNotEmpty) ...[
-                            const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white, // Warna putih
-                                border: Border.all(color: _blackColor, width: 3),
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: const [_lightShadow],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 36,
-                                        height: 36,
-                                        decoration: BoxDecoration(
-                                          color: _primaryColor,
-                                          border: Border.all(color: _blackColor, width: 2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.description,
-                                          size: 18,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        'DESKRIPSI',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w800,
-                                          color: _blackColor,
-                                          letterSpacing: -0.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: _secondaryColor,
-                                      border: Border.all(color: _blackColor, width: 2),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      industri['deskripsi'] ?? '-',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        height: 1.5,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          
-                          const SizedBox(height: 30),
-                        ],
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                       
-                      // TOMBOL TUTUP - Neo Brutalism Style
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 30),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: _yellowColor,
-                            border: Border.all(color: _blackColor, width: 3),
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: const [_heavyShadow],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(27),
-                              onTap: () => Navigator.pop(context),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                child: Center(
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle,
-                                        size: 22,
-                                        color: _blackColor,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        'TUTUP',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w900,
-                                          color: _blackColor,
-                                          letterSpacing: -0.3,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                      // Informasi detail
+                      _buildDetailItem(
+                        icon: Icons.location_on,
+                        label: 'Alamat',
+                        value: industri['alamat'] ?? '-',
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      
+                      _buildDetailItem(
+                        icon: Icons.phone,
+                        label: 'Telepon',
+                        value: industri['telepon'] ?? industri['no_telp'] ?? '-',
+                      ),
+                      
+                      const SizedBox(height: 12),
+                      
+                      _buildDetailItem(
+                        icon: Icons.email,
+                        label: 'Email',
+                        value: industri['email'] ?? '-',
+                      ),
+                      
+                      if (industri['bidang'] != null && (industri['bidang'] as String).isNotEmpty) ...[
+                        const SizedBox(height: 12),
+                        _buildDetailItem(
+                          icon: Icons.work,
+                          label: 'Bidang',
+                          value: industri['bidang'] ?? '-',
+                        ),
+                      ],
+                      
+                      if (industri['deskripsi'] != null && (industri['deskripsi'] as String).isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Deskripsi',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: _textColor,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: _accentColor,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: _borderColor),
+                              ),
+                              child: Text(
+                                industri['deskripsi'] ?? '-',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  height: 1.5,
+                                  color: _hintColor,
                                 ),
                               ),
                             ),
+                          ],
+                        ),
+                      ],
+                      
+                      const SizedBox(height: 30),
+                      
+                      // Tombol tutup
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: _primaryColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          'Tutup',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _secondaryColor,
                           ),
                         ),
                       ),
@@ -732,62 +575,48 @@ class _IndustriListPageState extends State<IndustriListPage> {
     );
   }
 
-  // Widget untuk item detail dalam modal - Warna putih
+  // Widget untuk item detail dalam modal
   Widget _buildDetailItem({
     required IconData icon,
-    required String title,
+    required String label,
     required String value,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white, // Warna putih
-        border: Border.all(color: _blackColor, width: 3),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [_lightShadow],
+        color: _accentColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _borderColor),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _primaryColor,
-              border: Border.all(color: _blackColor, width: 2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 22,
-              color: Colors.white,
-            ),
+          Icon(
+            icon,
+            color: _primaryColor,
+            size: 20,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  label,
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: _darkColor,
-                    letterSpacing: 0.8,
+                    fontSize: 12,
+                    color: _hintColor,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: _blackColor,
-                    letterSpacing: -0.3,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _textColor,
                   ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -797,45 +626,43 @@ class _IndustriListPageState extends State<IndustriListPage> {
     );
   }
 
-  // Widget untuk card industri dalam list - Neo Brutalism Style
+  // Widget untuk card industri dalam list
   Widget _buildIndustriCard(int index) {
     final industri = _filteredIndustriList[index];
     
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: _secondaryColor,
-        border: Border.all(color: _blackColor, width: 3),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [_heavyShadow],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _borderColor),
+        boxShadow: [_softShadow],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(17),
+          borderRadius: BorderRadius.circular(12),
           onTap: () => _showIndustriDetail(context, industri),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icon/Logo - Neo Brutalism Style
+                // Icon
                 Container(
-                  width: 60,
-                  height: 60,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: _primaryColor,
-                    border: Border.all(color: _blackColor, width: 3),
-                    shape: BoxShape.circle,
-                    boxShadow: const [_lightShadow],
+                    borderRadius: BorderRadius.circular(25),
                   ),
-                  child: const Icon(
-                    Icons.factory,
-                    color: Colors.white,
-                    size: 30,
+                  child: Icon(
+                    Icons.business,
+                    color: _secondaryColor,
+                    size: 24,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 
                 // Detail
                 Expanded(
@@ -846,57 +673,42 @@ class _IndustriListPageState extends State<IndustriListPage> {
                       Text(
                         industri['nama'] ?? 'Industri',
                         style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: _blackColor,
-                          letterSpacing: -0.3,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: _textColor,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      
+                      // Alamat
+                      Text(
+                        industri['alamat'] ?? 'Alamat tidak tersedia',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _hintColor,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
                       
-                      // Alamat
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: _darkColor,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              industri['alamat'] ?? 'Alamat tidak tersedia',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color.fromRGBO(29, 53, 87, 0.8),
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      
-                      // Telepon
+                      // Telepon (jika ada)
                       if (industri['telepon'] != null && industri['telepon'].toString().isNotEmpty)
                         Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.phone,
                               size: 14,
-                              color: _darkColor,
+                              color: _hintColor,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               industri['telepon'].toString(),
                               style: TextStyle(
                                 fontSize: 12,
-                                color: _darkColor,
+                                color: _hintColor,
                               ),
                             ),
                           ],
@@ -905,20 +717,10 @@ class _IndustriListPageState extends State<IndustriListPage> {
                   ),
                 ),
                 
-                // Arrow indicator - Neo Brutalism Style
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: _yellowColor,
-                    border: Border.all(color: _blackColor, width: 2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    size: 14,
-                    color: _blackColor,
-                  ),
+                // Arrow indicator
+                Icon(
+                  Icons.chevron_right,
+                  color: _hintColor,
                 ),
               ],
             ),
@@ -931,232 +733,160 @@ class _IndustriListPageState extends State<IndustriListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _darkColor,
+      backgroundColor: _secondaryColor,
       body: SafeArea(
         child: Column(
           children: [
-            // APPBAR CUSTOM - Header yang lebih sederhana
+            // AppBar sederhana
             Container(
-              height: 70,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: _primaryColor,
-                border: Border(
-                  bottom: BorderSide(color: _blackColor, width: 3),
-                ),
+                boxShadow: [_softShadow],
               ),
               child: Row(
                 children: [
-                  // Back button
-                  Container(
-                    width: 45,
-                    height: 45,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: _blackColor, width: 3),
-                      shape: BoxShape.circle,
-                      boxShadow: const [_lightShadow],
-                    ),
-                    child: IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 18,
-                        color: _blackColor,
-                      ),
-                      padding: EdgeInsets.zero,
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(
+                      Icons.arrow_back,
+                      color: _secondaryColor,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 8),
                   
-                  // Title dengan design lebih minimalis
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
+                        Text(
                           'Daftar Industri',
                           style: TextStyle(
                             fontSize: 20,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -0.3,
+                            fontWeight: FontWeight.w600,
+                            color: _secondaryColor,
                           ),
                         ),
                         Text(
                           'Pilih industri untuk PKL',
                           style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                            color: _secondaryColor.withValues(alpha:.8),
                           ),
                         ),
                       ],
                     ),
                   ),
                   
-                  // Refresh button
-                  Container(
-                    width: 45,
-                    height: 45,
-                    decoration: BoxDecoration(
-                      color: _yellowColor,
-                      border: Border.all(color: _blackColor, width: 3),
-                      shape: BoxShape.circle,
-                      boxShadow: const [_lightShadow],
-                    ),
-                    child: IconButton(
-                      onPressed: _refreshData,
-                      icon: Icon(
-                        Icons.refresh,
-                        color: _blackColor,
-                        size: 20,
-                      ),
-                      padding: EdgeInsets.zero,
+                  IconButton(
+                    onPressed: _refreshData,
+                    icon: Icon(
+                      Icons.refresh,
+                      color: _secondaryColor,
                     ),
                   ),
                 ],
               ),
             ),
             
-            // CONTAINER UTAMA - tanpa lengkungan atas
-            Expanded(
+            // Search Bar
+            Container(
+              padding: const EdgeInsets.all(16),
               child: Container(
                 decoration: BoxDecoration(
                   color: _secondaryColor,
-                  border: Border.all(color: _blackColor, width: 3),
-                  boxShadow: const [_heavyShadow],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _borderColor),
+                  boxShadow: [_softShadow],
                 ),
-                child: Column(
-                  children: [
-                    // Search Bar
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Container(
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: _blackColor, width: 3),
-                          borderRadius: BorderRadius.circular(25),
-                          boxShadow: const [_lightShadow],
-                        ),
-                        child: Row(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _filterIndustri,
+                  decoration: InputDecoration(
+                    hintText: 'Cari industri...',
+                    hintStyle: TextStyle(
+                      color: _hintColor,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.search,
+                      color: _hintColor,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            onPressed: () {
+                              _searchController.clear();
+                              _filterIndustri('');
+                            },
+                            icon: Icon(
+                              Icons.clear,
+                              color: _hintColor,
+                            ),
+                          )
+                        : null,
+                  ),
+                  style: TextStyle(
+                    color: _textColor,
+                  ),
+                ),
+              ),
+            ),
+
+            // Content
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _refreshData,
+                color: _primaryColor,
+                backgroundColor: _secondaryColor,
+                child: _isLoading
+                    ? _buildLoadingState()
+                    : SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
                           children: [
-                            const SizedBox(width: 16),
-                            Icon(
-                              Icons.search,
-                              size: 20,
-                              color: _darkColor,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                onChanged: _filterIndustri,
-                                decoration: const InputDecoration(
-                                  hintText: 'Cari nama industri...',
-                                  hintStyle: TextStyle(
-                                    fontSize: 14,
-                                    color: Color.fromRGBO(29, 53, 87, 0.5),
-                                    fontWeight: FontWeight.w600,
+                            // Info filter jurusan
+                            _buildFilterInfo(),
+                            
+                            if (_filteredIndustriList.isEmpty)
+                              _buildEmptyState()
+                            else
+                              Column(
+                                children: [
+                                  // Info jumlah
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 16),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          _isSearching
+                                              ? '${_filteredIndustriList.length} hasil ditemukan'
+                                              : 'Total ${_filteredIndustriList.length} industri',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: _hintColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: _blackColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
+
+                                  // List industri
+                                  ...List.generate(_filteredIndustriList.length, (index) {
+                                    return _buildIndustriCard(index);
+                                  }),
+                                  
+                                  const SizedBox(height: 30),
+                                ],
                               ),
-                            ),
-                            if (_searchController.text.isNotEmpty)
-                              IconButton(
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _filterIndustri('');
-                                },
-                                icon: Icon(
-                                  Icons.close,
-                                  size: 18,
-                                  color: _darkColor,
-                                ),
-                              ),
-                            const SizedBox(width: 12),
                           ],
                         ),
                       ),
-                    ),
-
-                    // Content dengan RefreshIndicator
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _refreshData,
-                        color: _primaryColor,
-                        backgroundColor: _secondaryColor,
-                        child: _isLoading
-                            ? _buildLoadingState()
-                            : SingleChildScrollView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Column(
-                                  children: [
-                                    // Info filter jurusan - HANYA JIKA ADA
-                                    _buildFilterInfo(),
-                                    
-                                    if (_filteredIndustriList.isEmpty)
-                                      _buildEmptyState()
-                                    else
-                                      Column(
-                                        children: [
-                                          // Info jumlah - dengan border sederhana
-                                          Container(
-                                            margin: const EdgeInsets.only(bottom: 16),
-                                            padding: const EdgeInsets.all(12),
-                                            decoration: BoxDecoration(
-                                              color: _yellowColor,
-                                              border: Border.all(color: _blackColor, width: 2),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Icon(
-                                                  Icons.info,
-                                                  size: 16,
-                                                  color: _blackColor,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  _isSearching
-                                                      ? '${_filteredIndustriList.length} hasil ditemukan'
-                                                      : 'Total ${_filteredIndustriList.length} industri',
-                                                  style: TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: _blackColor,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-
-                                          // List industri
-                                          ...List.generate(_filteredIndustriList.length, (index) {
-                                            return _buildIndustriCard(index);
-                                          }),
-                                          
-                                          const SizedBox(height: 30),
-                                        ],
-                                      ),
-                                  ],
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],
@@ -1165,7 +895,7 @@ class _IndustriListPageState extends State<IndustriListPage> {
     );
   }
 
-  // Loading state dengan skeleton
+  // Loading state
   Widget _buildLoadingState() {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -1176,23 +906,23 @@ class _IndustriListPageState extends State<IndustriListPage> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: _secondaryColor,
-            border: Border.all(color: _blackColor, width: 3),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _borderColor),
+            boxShadow: [_softShadow],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Skeleton icon circle
+              // Skeleton icon
               Container(
-                width: 60,
-                height: 60,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
                   color: _accentColor,
-                  border: Border.all(color: _blackColor, width: 3),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(25),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               
               // Skeleton content
               Expanded(
@@ -1201,30 +931,27 @@ class _IndustriListPageState extends State<IndustriListPage> {
                   children: [
                     Container(
                       width: double.infinity,
-                      height: 18,
+                      height: 16,
                       decoration: BoxDecoration(
                         color: _accentColor,
-                        border: Border.all(color: _blackColor, width: 2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
-                      height: 14,
+                      height: 12,
                       decoration: BoxDecoration(
                         color: _accentColor,
-                        border: Border.all(color: _blackColor, width: 2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Container(
                       width: 100,
-                      height: 14,
+                      height: 12,
                       decoration: BoxDecoration(
                         color: _accentColor,
-                        border: Border.all(color: _blackColor, width: 2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -1243,87 +970,52 @@ class _IndustriListPageState extends State<IndustriListPage> {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: _secondaryColor,
-            border: Border.all(color: _blackColor, width: 3),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: const [_heavyShadow],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: _accentColor,
-                  border: Border.all(color: _blackColor, width: 2),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.factory_outlined,
-                  size: 50,
-                  color: _darkColor,
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.business_outlined,
+              size: 80,
+              color: _hintColor,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _isSearching ? 'Industri tidak ditemukan' : 'Belum ada industri',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _textColor,
               ),
-              const SizedBox(height: 20),
-              Text(
-                _isSearching ? 'Industri tidak ditemukan' : 'Belum ada industri',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: _blackColor,
-                  letterSpacing: -0.3,
-                ),
-                textAlign: TextAlign.center,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _isSearching
+                  ? 'Coba kata kunci pencarian lainnya'
+                  : 'Data industri akan ditampilkan di sini',
+              style: TextStyle(
+                fontSize: 14,
+                color: _hintColor,
               ),
-              const SizedBox(height: 8),
-              Text(
-                _isSearching
-                    ? 'Coba kata kunci pencarian lainnya'
-                    : 'Data industri akan ditampilkan di sini',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: _darkColor,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              if (_isSearching)
-                Container(
-                  decoration: BoxDecoration(
-                    color: _yellowColor,
-                    border: Border.all(color: _blackColor, width: 2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () {
-                        _searchController.clear();
-                        _filterIndustri('');
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        child: Text(
-                          'Hapus Pencarian',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            color: _blackColor,
-                          ),
-                        ),
-                      ),
-                    ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            if (_isSearching)
+              OutlinedButton(
+                onPressed: () {
+                  _searchController.clear();
+                  _filterIndustri('');
+                },
+                child: Text(
+                  'Hapus Pencarian',
+                  style: TextStyle(
+                    color: _primaryColor,
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
-      )
+      ),
     );
   }
 }

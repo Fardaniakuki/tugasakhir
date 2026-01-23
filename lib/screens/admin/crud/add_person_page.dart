@@ -14,7 +14,8 @@ class AddPersonPage extends StatefulWidget {
 }
 
 class _AddPersonPageState extends State<AddPersonPage> {
-  final Color brown = const Color(0xFF641E20);
+  final Color primaryColor = const Color(0xFF3B060A); // Warna baru
+  final Color accentColor = const Color(0xFF641E20); // Warna sekunder
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   // Controllers
@@ -47,10 +48,15 @@ class _AddPersonPageState extends State<AddPersonPage> {
   List<Map<String, dynamic>> jurusanList = [];
   int? selectedJurusanId;
 
-  // TAMBAHAN: Untuk kaprog di jurusan
+  // Untuk kaprog di jurusan
   List<Map<String, dynamic>> _kaprogList = [];
   String? _selectedKaprogId;
   bool _isLoadingKaprog = false;
+
+  // Untuk wali kelas di kelas
+  List<Map<String, dynamic>> _waliKelasList = [];
+  String? _selectedWaliKelasId;
+  bool _isLoadingWaliKelas = false;
 
   // Focus nodes untuk melacak field mana yang sedang aktif
   final FocusNode _namaFocus = FocusNode();
@@ -77,18 +83,23 @@ class _AddPersonPageState extends State<AddPersonPage> {
     _fetchJurusan();
     _setupFocusListeners();
     _setupTextControllers();
-    
-    // TAMBAHAN: Load data kaprog jika jenis data adalah Jurusan
+
+    // Load data kaprog jika jenis data adalah Jurusan
     if (widget.jenisData == 'Jurusan') {
       _loadKaprogData();
     }
+    
+    // Load data wali kelas jika jenis data adalah Kelas
+    if (widget.jenisData == 'Kelas') {
+      _loadWaliKelasData();
+    }
   }
 
-  // TAMBAHAN: Method untuk load data kaprog
+  // Method untuk load data kaprog
   Future<void> _loadKaprogData() async {
     try {
       setState(() => _isLoadingKaprog = true);
-      
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
 
@@ -102,7 +113,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
 
       if (response.statusCode == 200) {
         final decoded = json.decode(response.body);
-        
+
         List data = [];
         if (decoded['data'] != null && decoded['data']['data'] is List) {
           data = decoded['data']['data'];
@@ -137,7 +148,60 @@ class _AddPersonPageState extends State<AddPersonPage> {
     }
   }
 
-  // TAMBAHAN: Widget untuk dropdown kaprog
+  // Method untuk load data wali kelas
+  Future<void> _loadWaliKelasData() async {
+    try {
+      setState(() => _isLoadingWaliKelas = true);
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+
+        List data = [];
+        if (decoded['data'] != null && decoded['data']['data'] is List) {
+          data = decoded['data']['data'];
+        } else if (decoded['data'] is List) {
+          data = decoded['data'];
+        }
+
+        // Filter hanya guru yang is_wali_kelas = true
+        final List<Map<String, dynamic>> waliKelasData = [];
+        for (var guru in data) {
+          if (guru['is_wali_kelas'] == true) {
+            waliKelasData.add({
+              'id': guru['id']?.toString(),
+              'nama': guru['nama_lengkap'] ?? guru['nama'] ?? 'Unknown',
+              'kode_guru': guru['kode_guru'] ?? '',
+            });
+          }
+        }
+
+        setState(() {
+          _waliKelasList = waliKelasData;
+          _isLoadingWaliKelas = false;
+        });
+      } else {
+        throw Exception('Failed to load wali kelas data: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error loading wali kelas data: $e');
+      setState(() {
+        _isLoadingWaliKelas = false;
+      });
+    }
+  }
+
+  // Widget untuk dropdown kaprog
   Widget _buildKaprogDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -149,12 +213,11 @@ class _AddPersonPageState extends State<AddPersonPage> {
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
-          
           if (_isLoadingKaprog)
             Container(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey),
+                border: Border.all(color: Colors.grey[300]!),
                 color: Colors.white,
               ),
               padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
@@ -177,7 +240,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                 searchFieldProps: TextFieldProps(
                   decoration: InputDecoration(
                     hintText: 'Cari kaprog...',
-                    prefixIcon: Icon(Icons.search, color: brown),
+                    prefixIcon: Icon(Icons.search, color: primaryColor),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -189,11 +252,18 @@ class _AddPersonPageState extends State<AddPersonPage> {
                 itemBuilder: (context, item, isSelected) {
                   return Container(
                     padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? primaryColor.withOpacity(0.1)
+                          : Colors.transparent,
+                    ),
                     child: Text(
                       item['nama'] ?? '-',
                       style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                         fontSize: 14,
+                        color: Colors.black87,
                       ),
                     ),
                   );
@@ -208,21 +278,22 @@ class _AddPersonPageState extends State<AddPersonPage> {
               dropdownDecoratorProps: DropDownDecoratorProps(
                 dropdownSearchDecoration: InputDecoration(
                   hintText: 'Pilih Kaprog',
-                  prefixIcon: Icon(Icons.person, color: brown),
+                  prefixIcon: Icon(Icons.person, color: primaryColor),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.grey),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                    borderSide: BorderSide(color: primaryColor, width: 1.5),
                   ),
                   filled: true,
                   fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 ),
               ),
               onChanged: (selectedItem) {
@@ -230,22 +301,145 @@ class _AddPersonPageState extends State<AddPersonPage> {
                   _selectedKaprogId = selectedItem?['id']?.toString();
                 });
               },
-              selectedItem: _selectedKaprogId != null 
+              selectedItem: _selectedKaprogId != null
                   ? _kaprogList.firstWhere(
                       (kaprog) => kaprog['id'] == _selectedKaprogId,
                       orElse: () => {'id': null, 'nama': 'Tidak ada kaprog'},
                     )
                   : {'id': null, 'nama': 'Tidak ada kaprog'},
             ),
-          
           if (!_isLoadingKaprog && _kaprogList.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'Tidak ada guru yang terdaftar sebagai kaprog',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey,
+                  color: Colors.grey[600],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Widget untuk dropdown wali kelas
+  Widget _buildWaliKelasDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Wali Kelas',
+            style: TextStyle(fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 6),
+          if (_isLoadingWaliKelas)
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+                color: Colors.white,
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              child: const Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Memuat data wali kelas...'),
+                ],
+              ),
+            )
+          else
+            DropdownSearch<Map<String, dynamic>>(
+              popupProps: PopupProps.menu(
+                showSearchBox: true,
+                searchFieldProps: TextFieldProps(
+                  decoration: InputDecoration(
+                    hintText: 'Cari wali kelas...',
+                    prefixIcon: Icon(Icons.search, color: primaryColor),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                menuProps: MenuProps(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                itemBuilder: (context, item, isSelected) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? primaryColor.withOpacity(0.1)
+                          : Colors.transparent,
+                    ),
+                    child: Text(
+                      item['nama'] ?? '-',
+                      style: TextStyle(
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              items: [
+                // Opsi "Tidak ada wali kelas"
+                const {'id': null, 'nama': 'Tidak ada wali kelas'},
+                ..._waliKelasList,
+              ],
+              itemAsString: (item) => item['nama'] ?? '-',
+              dropdownDecoratorProps: DropDownDecoratorProps(
+                dropdownSearchDecoration: InputDecoration(
+                  hintText: 'Pilih Wali Kelas',
+                  prefixIcon: Icon(Icons.person, color: primaryColor),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: primaryColor, width: 1.5),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                ),
+              ),
+              onChanged: (selectedItem) {
+                setState(() {
+                  _selectedWaliKelasId = selectedItem?['id']?.toString();
+                });
+              },
+              selectedItem: _selectedWaliKelasId != null
+                  ? _waliKelasList.firstWhere(
+                      (waliKelas) => waliKelas['id'] == _selectedWaliKelasId,
+                      orElse: () => {'id': null, 'nama': 'Tidak ada wali kelas'},
+                    )
+                  : {'id': null, 'nama': 'Tidak ada wali kelas'},
+            ),
+          if (!_isLoadingWaliKelas && _waliKelasList.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'Tidak ada guru yang terdaftar sebagai wali kelas',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -257,25 +451,36 @@ class _AddPersonPageState extends State<AddPersonPage> {
 
   void _setupTextControllers() {
     // Setup listener untuk real-time validation
-    namaController.addListener(() => _validateField('nama', namaController.text, 3));
-    alamatController.addListener(() => _validateField('alamat', alamatController.text, 10));
-    noTelpController.addListener(() => _validatePhone('noTelp', noTelpController.text));
-    nisnController.addListener(() => _validateNISN('nisn', nisnController.text));
-    nipController.addListener(() => _validateField('nip', nipController.text, 8));
-    kodeGuruController.addListener(() => _validateField('kodeGuru', kodeGuruController.text, 3));
-    passwordController.addListener(() => _validateField('password', passwordController.text, 6));
-    kodeJurusanController.addListener(() => _validateField('kodeJurusan', kodeJurusanController.text, 2));
-    bidangController.addListener(() => _validateField('bidang', bidangController.text, 3));
-    emailController.addListener(() => _validateEmail('email', emailController.text));
-    picController.addListener(() => _validateField('pic', picController.text, 3));
-    picTelpController.addListener(() => _validatePhone('picTelp', picTelpController.text));
+    namaController
+        .addListener(() => _validateField('nama', namaController.text, 3));
+    alamatController
+        .addListener(() => _validateField('alamat', alamatController.text, 10));
+    noTelpController
+        .addListener(() => _validatePhone('noTelp', noTelpController.text));
+    nisnController
+        .addListener(() => _validateNISN('nisn', nisnController.text));
+    nipController
+        .addListener(() => _validateField('nip', nipController.text, 8));
+    kodeGuruController.addListener(
+        () => _validateField('kodeGuru', kodeGuruController.text, 3));
+    passwordController.addListener(
+        () => _validateField('password', passwordController.text, 6));
+    kodeJurusanController.addListener(
+        () => _validateField('kodeJurusan', kodeJurusanController.text, 2));
+    bidangController
+        .addListener(() => _validateField('bidang', bidangController.text, 3));
+    emailController
+        .addListener(() => _validateEmail('email', emailController.text));
+    picController
+        .addListener(() => _validateField('pic', picController.text, 3));
+    picTelpController
+        .addListener(() => _validatePhone('picTelp', picTelpController.text));
   }
 
   void _validateField(String fieldName, String value, int minLength) {
     final bool isValid = value.trim().length >= minLength;
-    final String errorMessage = value.trim().isEmpty 
-      ? '$fieldName harus diisi'
-      : 'Minimal $minLength karakter';
+    final String errorMessage =
+        value.trim().isEmpty ? 'Harus diisi' : 'Minimal $minLength karakter';
 
     setState(() {
       _fieldErrorMessages[fieldName] = isValid ? '' : errorMessage;
@@ -283,12 +488,14 @@ class _AddPersonPageState extends State<AddPersonPage> {
   }
 
   void _validatePhone(String fieldName, String value) {
-    final bool isValid = value.trim().length >= 10 && RegExp(r'^\d+$').hasMatch(value.trim());
-    final String errorMessage = value.trim().isEmpty 
-      ? 'No. Telp harus diisi'
-      : value.trim().length < 10 
-        ? 'Minimal 10 digit'
-        : 'Harus berupa angka';
+    final bool isValid = value.trim().isNotEmpty &&
+        value.trim().length >= 10 &&
+        RegExp(r'^\d+$').hasMatch(value.trim());
+    final String errorMessage = value.trim().isEmpty
+        ? 'Harus diisi'
+        : value.trim().length < 10
+            ? 'Minimal 10 digit'
+            : 'Harus berupa angka';
 
     setState(() {
       _fieldErrorMessages[fieldName] = isValid ? '' : errorMessage;
@@ -296,12 +503,14 @@ class _AddPersonPageState extends State<AddPersonPage> {
   }
 
   void _validateNISN(String fieldName, String value) {
-    final bool isValid = value.trim().length == 10 && RegExp(r'^\d+$').hasMatch(value.trim());
-    final String errorMessage = value.trim().isEmpty 
-      ? 'NISN harus diisi'
-      : value.trim().length != 10 
-        ? 'Harus tepat 10 digit'
-        : 'Harus berupa angka';
+    final bool isValid = value.trim().isNotEmpty &&
+        value.trim().length == 10 &&
+        RegExp(r'^\d+$').hasMatch(value.trim());
+    final String errorMessage = value.trim().isEmpty
+        ? 'Harus diisi'
+        : value.trim().length != 10
+            ? 'Harus tepat 10 digit'
+            : 'Harus berupa angka';
 
     setState(() {
       _fieldErrorMessages[fieldName] = isValid ? '' : errorMessage;
@@ -309,7 +518,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
   }
 
   void _validateEmail(String fieldName, String value) {
-    final bool isValid = value.trim().isEmpty || 
+    final bool isValid = value.trim().isEmpty ||
         RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim());
     const String errorMessage = 'Format email tidak valid';
 
@@ -349,16 +558,26 @@ class _AddPersonPageState extends State<AddPersonPage> {
     emailController.dispose();
     picController.dispose();
     picTelpController.dispose();
-    
+
     super.dispose();
   }
 
   void _setupFocusListeners() {
     // Setup listeners untuk trigger rebuild saat focus berubah
     final focusNodes = [
-      _namaFocus, _alamatFocus, _noTelpFocus, _nisnFocus, _tanggalLahirFocus,
-      _nipFocus, _kodeGuruFocus, _passwordFocus, _kodeJurusanFocus, _bidangFocus,
-      _emailFocus, _picFocus, _picTelpFocus
+      _namaFocus,
+      _alamatFocus,
+      _noTelpFocus,
+      _nisnFocus,
+      _tanggalLahirFocus,
+      _nipFocus,
+      _kodeGuruFocus,
+      _passwordFocus,
+      _kodeJurusanFocus,
+      _bidangFocus,
+      _emailFocus,
+      _picFocus,
+      _picTelpFocus
     ];
 
     for (var focusNode in focusNodes) {
@@ -453,25 +672,32 @@ class _AddPersonPageState extends State<AddPersonPage> {
     }
   }
 
-  // Fungsi untuk menampilkan alert/warning
-  void _showValidationAlert(String message) {
-    showDialog(
+  // Fungsi untuk menampilkan popup sukses
+  Future<void> _showSuccessPopup(String message) async {
+    await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('Peringatan'),
-          ],
-        ),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (context) => SuccessPopup(
+        title: 'Berhasil!',
+        message: message,
+        onClose: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).pop(true); // Return true ke halaman sebelumnya
+        },
+      ),
+    );
+  }
+
+  // Fungsi untuk menampilkan popup error
+  Future<void> _showErrorPopup(String title, String message) async {
+    await showDialog(
+      context: context,
+      builder: (context) => ErrorPopup(
+        title: title,
+        message: message,
+        onClose: () {
+          Navigator.of(context).pop();
+        },
       ),
     );
   }
@@ -481,108 +707,119 @@ class _AddPersonPageState extends State<AddPersonPage> {
     switch (widget.jenisData) {
       case 'Siswa':
         if (namaController.text.trim().length < 3) {
-          _showValidationAlert('Nama lengkap harus minimal 3 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Nama lengkap harus minimal 3 karakter');
           return false;
         }
         if (nisnController.text.trim().length != 10) {
-          _showValidationAlert('NISN harus tepat 10 digit');
+          _showErrorPopup('Validasi Gagal', 'NISN harus tepat 10 digit');
           return false;
         }
         if (noTelpController.text.trim().length < 10) {
-          _showValidationAlert('No. Telp harus minimal 10 digit');
+          _showErrorPopup('Validasi Gagal', 'No. Telp harus minimal 10 digit');
           return false;
         }
         if (alamatController.text.trim().length < 10) {
-          _showValidationAlert('Alamat harus minimal 10 karakter');
+          _showErrorPopup('Validasi Gagal', 'Alamat harus minimal 10 karakter');
           return false;
         }
         if (tanggalLahirController.text.isEmpty) {
-          _showValidationAlert('Tanggal lahir harus diisi');
+          _showErrorPopup('Validasi Gagal', 'Tanggal lahir harus diisi');
           return false;
         }
         if (selectedKelasId == null) {
-          _showValidationAlert('Kelas harus dipilih');
+          _showErrorPopup('Validasi Gagal', 'Kelas harus dipilih');
           return false;
         }
         break;
 
       case 'Guru':
         if (namaController.text.trim().length < 3) {
-          _showValidationAlert('Nama guru harus minimal 3 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Nama guru harus minimal 3 karakter');
           return false;
         }
         if (nipController.text.trim().length < 8) {
-          _showValidationAlert('NIP harus minimal 8 digit');
+          _showErrorPopup('Validasi Gagal', 'NIP harus minimal 8 digit');
           return false;
         }
         if (kodeGuruController.text.trim().length < 3) {
-          _showValidationAlert('Kode guru harus minimal 3 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Kode guru harus minimal 3 karakter');
           return false;
         }
         if (noTelpController.text.trim().length < 10) {
-          _showValidationAlert('No. Telp harus minimal 10 digit');
+          _showErrorPopup('Validasi Gagal', 'No. Telp harus minimal 10 digit');
           return false;
         }
         if (passwordController.text.trim().length < 6) {
-          _showValidationAlert('Password harus minimal 6 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Password harus minimal 6 karakter');
           return false;
         }
         break;
 
       case 'Jurusan':
         if (kodeJurusanController.text.trim().length < 2) {
-          _showValidationAlert('Kode jurusan harus minimal 2 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Kode jurusan harus minimal 2 karakter');
           return false;
         }
         if (namaController.text.trim().length < 3) {
-          _showValidationAlert('Nama jurusan harus minimal 3 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Nama jurusan harus minimal 3 karakter');
           return false;
         }
         break;
 
       case 'Kelas':
         if (namaController.text.trim().length < 2) {
-          _showValidationAlert('Nama kelas harus minimal 2 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Nama kelas harus minimal 2 karakter');
           return false;
         }
         if (selectedJurusanId == null) {
-          _showValidationAlert('Jurusan harus dipilih');
+          _showErrorPopup('Validasi Gagal', 'Jurusan harus dipilih');
           return false;
         }
         break;
 
       case 'Industri':
         if (namaController.text.trim().length < 3) {
-          _showValidationAlert('Nama industri harus minimal 3 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Nama industri harus minimal 3 karakter');
           return false;
         }
         if (alamatController.text.trim().length < 10) {
-          _showValidationAlert('Alamat harus minimal 10 karakter');
+          _showErrorPopup('Validasi Gagal', 'Alamat harus minimal 10 karakter');
           return false;
         }
         if (bidangController.text.trim().length < 3) {
-          _showValidationAlert('Bidang harus minimal 3 karakter');
+          _showErrorPopup('Validasi Gagal', 'Bidang harus minimal 3 karakter');
           return false;
         }
-        if (emailController.text.trim().isNotEmpty && 
-            !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(emailController.text.trim())) {
-          _showValidationAlert('Format email tidak valid');
+        if (emailController.text.trim().isNotEmpty &&
+            !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                .hasMatch(emailController.text.trim())) {
+          _showErrorPopup('Validasi Gagal', 'Format email tidak valid');
           return false;
         }
         if (noTelpController.text.trim().length < 10) {
-          _showValidationAlert('No. Telp harus minimal 10 digit');
+          _showErrorPopup('Validasi Gagal', 'No. Telp harus minimal 10 digit');
           return false;
         }
         if (picController.text.trim().length < 3) {
-          _showValidationAlert('Nama PIC harus minimal 3 karakter');
+          _showErrorPopup(
+              'Validasi Gagal', 'Nama PIC harus minimal 3 karakter');
           return false;
         }
         if (picTelpController.text.trim().length < 10) {
-          _showValidationAlert('No. Telp PIC harus minimal 10 digit');
+          _showErrorPopup(
+              'Validasi Gagal', 'No. Telp PIC harus minimal 10 digit');
           return false;
         }
         if (selectedJurusanId == null) {
-          _showValidationAlert('Jurusan harus dipilih');
+          _showErrorPopup('Validasi Gagal', 'Jurusan harus dipilih');
           return false;
         }
         break;
@@ -631,7 +868,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
           'kode': kodeJurusanController.text.trim(),
           'nama': namaController.text.trim(),
         };
-        // TAMBAHAN: Tambahkan kaprog_guru_id jika dipilih
+        // Tambahkan kaprog_guru_id jika dipilih
         if (_selectedKaprogId != null && 
             _selectedKaprogId!.isNotEmpty && 
             _selectedKaprogId != 'null') {
@@ -647,13 +884,22 @@ class _AddPersonPageState extends State<AddPersonPage> {
           'jurusan_id': selectedJurusanId ?? 0,
           'nama': namaController.text.trim(),
         };
+        // Tambahkan wali_kelas_guru_id jika dipilih
+        if (_selectedWaliKelasId != null && 
+            _selectedWaliKelasId!.isNotEmpty && 
+            _selectedWaliKelasId != 'null') {
+          final waliKelasId = int.tryParse(_selectedWaliKelasId!);
+          if (waliKelasId != null) {
+            payload['wali_kelas_guru_id'] = waliKelasId;
+          }
+        }
         break;
       case 'Industri':
         endpoint = '/api/industri';
         payload = {
           'alamat': alamatController.text.trim(),
           'bidang': bidangController.text.trim(),
-          'email': emailController.text.trim(),
+          'email': emailController.text.trim().isNotEmpty ? emailController.text.trim() : null,
           'jurusan_id': selectedJurusanId ?? 0,
           'nama': namaController.text.trim(),
           'no_telp': noTelpController.text.trim(),
@@ -668,6 +914,11 @@ class _AddPersonPageState extends State<AddPersonPage> {
     final prefs = await SharedPreferences.getInstance();
     final accessToken = prefs.getString('access_token') ?? '';
 
+    // Debug: Print payload untuk memastikan tipe data benar
+    print('Payload untuk ${widget.jenisData}:');
+    print(jsonEncode(payload));
+    print('URL: $url');
+
     try {
       final response = await http.post(
         url,
@@ -678,40 +929,62 @@ class _AddPersonPageState extends State<AddPersonPage> {
         body: jsonEncode(payload),
       );
 
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green),
-                SizedBox(width: 8),
-                Text('Berhasil'),
-              ],
-            ),
-            content: const Text('Data berhasil ditambahkan!'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context, true);
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+        // Sukses
+        await _showSuccessPopup('Data ${widget.jenisData} berhasil ditambahkan!');
       } else {
-        if (!mounted) return;
-        // Tampilkan error dari API
-        final errorResponse = jsonDecode(response.body);
-        final errorMessage = errorResponse['message'] ?? 'Gagal menyimpan data';
-        _showValidationAlert(errorMessage);
+        // Error dari API
+        Map<String, dynamic> errorResponse;
+        try {
+          errorResponse = jsonDecode(response.body);
+        } catch (e) {
+          errorResponse = {'message': response.body};
+        }
+        
+        String errorMessage = 'Gagal menyimpan data';
+        
+        if (errorResponse['message'] != null) {
+          errorMessage = errorResponse['message'];
+        } else if (errorResponse['error'] != null) {
+          if (errorResponse['error'] is String) {
+            errorMessage = errorResponse['error'];
+          } else if (errorResponse['error'] is Map && errorResponse['error']['message'] != null) {
+            errorMessage = errorResponse['error']['message'];
+          }
+        }
+        
+        // Parse error lebih detail jika ada
+        if (errorResponse['errors'] != null) {
+          final errors = errorResponse['errors'];
+          if (errors is Map) {
+            final errorDetails = errors.entries.map((e) => '${e.key}: ${e.value}').join('\n');
+            errorMessage = '$errorMessage\n\n$errorDetails';
+          } else if (errors is List) {
+            errorMessage = '$errorMessage\n\n${errors.join('\n')}';
+          }
+        }
+        
+        await _showErrorPopup('Gagal Menyimpan', errorMessage);
       }
     } catch (e) {
-      if (!mounted) return;
-      _showValidationAlert('Terjadi kesalahan: $e');
+      // Network error atau lainnya
+      print('Error catch: $e');
+      print('Error type: ${e.runtimeType}');
+      
+      String errorMessage = 'Terjadi kesalahan: $e';
+      if (e is TypeError) {
+        errorMessage += '\n\nError type casting: ${e.toString()}';
+        // Cek kemungkinan penyebab
+        errorMessage += '\n\nKemungkinan penyebab:';
+        errorMessage += '\n- Data boolean dikirim sebagai string';
+        errorMessage += '\n- ID yang diharapkan integer tapi dikirim string';
+        errorMessage += '\n- Format payload tidak sesuai';
+      }
+      
+      await _showErrorPopup('Kesalahan Sistem', errorMessage);
     }
   }
 
@@ -726,18 +999,17 @@ class _AddPersonPageState extends State<AddPersonPage> {
       String? additionalHint,
       required FocusNode focusNode,
       required String fieldName}) {
-    
     final bool isFocused = focusNode.hasFocus;
     final bool hasError = _fieldErrorMessages[fieldName]?.isNotEmpty ?? false;
     final String errorMessage = _fieldErrorMessages[fieldName] ?? '';
     final bool showError = isFocused && hasError;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Label tanpa bintang
+          // Label
           Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
           const SizedBox(height: 6),
           TextFormField(
@@ -750,26 +1022,6 @@ class _AddPersonPageState extends State<AddPersonPage> {
             onChanged: (value) {
               // Real-time validation sudah di-handle oleh listener di initState
             },
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return '$label harus diisi';
-              }
-              if (minLength != null && value.trim().length < minLength) {
-                return 'Minimal $minLength karakter';
-              }
-              if (additionalHint != null && value.trim().isNotEmpty) {
-                if (additionalHint.contains('digit') && !RegExp(r'^\d+$').hasMatch(value.trim())) {
-                  return 'Harus berupa angka';
-                }
-                if (additionalHint.contains('email') && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
-                  return 'Format email tidak valid';
-                }
-                if (additionalHint.contains('tepat') && minLength != null && value.trim().length != minLength) {
-                  return 'Harus tepat $minLength digit';
-                }
-              }
-              return null;
-            },
             decoration: InputDecoration(
               hintText: hint ?? 'Masukkan $label',
               prefixIcon: Container(
@@ -779,7 +1031,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(icon, color: brown, size: 22),
+                    Icon(icon, color: primaryColor, size: 22),
                     const SizedBox(width: 8),
                     Container(
                       width: 1,
@@ -794,12 +1046,12 @@ class _AddPersonPageState extends State<AddPersonPage> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Colors.grey),
+                borderSide: BorderSide(color: Colors.grey[300]!),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
-                  color: showError ? Colors.red : Colors.red,
+                  color: showError ? Colors.red : primaryColor,
                   width: 1.5,
                 ),
               ),
@@ -815,7 +1067,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
               fillColor: Colors.white,
             ),
           ),
-          // Alert info di bawah box input - HANYA muncul saat focused dan ada error
+          // Alert info di bawah box input
           if (showError)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 8),
@@ -855,7 +1107,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
               searchFieldProps: TextFieldProps(
                 decoration: InputDecoration(
                   hintText: 'Cari $label...',
-                  prefixIcon: Icon(Icons.search, color: brown),
+                  prefixIcon: Icon(Icons.search, color: primaryColor),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -864,31 +1116,51 @@ class _AddPersonPageState extends State<AddPersonPage> {
               menuProps: MenuProps(
                 borderRadius: BorderRadius.circular(12),
               ),
+              itemBuilder: (context, item, isSelected) {
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? primaryColor.withOpacity(0.1)
+                        : Colors.transparent,
+                  ),
+                  child: Text(
+                    item[displayKey] ?? '-',
+                    style: TextStyle(
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 14,
+                      color: Colors.black87,
+                    ),
+                  ),
+                );
+              },
             ),
             items: items,
             itemAsString: (item) => item[displayKey] ?? '-',
             dropdownDecoratorProps: DropDownDecoratorProps(
               dropdownSearchDecoration: InputDecoration(
                 hintText: 'Pilih $label',
-                prefixIcon: Icon(icon, color: brown),
+                prefixIcon: Icon(icon, color: primaryColor),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.grey),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                  borderSide: BorderSide(color: primaryColor, width: 1.5),
                 ),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               ),
             ),
             onChanged: onChanged,
-            selectedItem: selectedId != null 
+            selectedItem: selectedId != null
                 ? items.firstWhere(
                     (item) => item['id'] == selectedId,
                     orElse: () => {},
@@ -902,12 +1174,25 @@ class _AddPersonPageState extends State<AddPersonPage> {
 
   // Widget untuk checkbox guru
   Widget _buildCheckbox(String label, bool value, Function(bool?) onChanged) {
-    return CheckboxListTile(
-      title: Text(label),
-      value: value,
-      onChanged: onChanged,
-      activeColor: brown,
-      contentPadding: EdgeInsets.zero,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Checkbox(
+            value: value,
+            onChanged: onChanged,
+            activeColor: primaryColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14),
+          ),
+        ],
+      ),
     );
   }
 
@@ -917,6 +1202,18 @@ class _AddPersonPageState extends State<AddPersonPage> {
       initialDate: DateTime(2005),
       firstDate: DateTime(1990),
       lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryColor,
+              onPrimary: Colors.white,
+            ),
+            dialogBackgroundColor: Colors.white,
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       tanggalLahirController.text =
@@ -932,65 +1229,90 @@ class _AddPersonPageState extends State<AddPersonPage> {
       backgroundColor: Colors.white,
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Header
-              Stack(
+        child: Column(
+          children: [
+            // Header dengan gradient
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(
+                  top: 60, bottom: 30, left: 20, right: 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primaryColor, primaryColor.withOpacity(0.9)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.only(top: 60, bottom: 20),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF8B0000), Color(0xFFB22222)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white, size: 22),
+                        onPressed: () => Navigator.pop(context),
                       ),
-                      borderRadius:
-                          BorderRadius.vertical(bottom: Radius.circular(30)),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
                           'Tambah $jenis',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundColor: Colors.white,
-                          child: Icon(Icons.person_add, size: 50, color: brown),
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(40),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 15,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _getIconForJenisData(jenis),
+                        size: 40,
+                        color: primaryColor,
+                      ),
                     ),
                   ),
-                  Positioned(
-                    top: 50,
-                    left: 16,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
+            ),
 
-              Padding(
+            // Form Content
+            Expanded(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
+                    // Input fields berdasarkan jenis data
                     if (jenis == 'Siswa') ...[
                       buildInputField(
                           Icons.person, 'Nama Lengkap', namaController,
                           minLength: 3,
                           focusNode: _namaFocus,
                           fieldName: 'nama'),
-                      
+
                       // Pilih Kelas
                       _buildDropdownSearch(
                         label: 'Kelas',
@@ -1010,13 +1332,13 @@ class _AddPersonPageState extends State<AddPersonPage> {
                           focusNode: _alamatFocus,
                           fieldName: 'alamat'),
                       buildInputField(Icons.numbers, 'NISN', nisnController,
-                          type: TextInputType.number, 
+                          type: TextInputType.number,
                           minLength: 10,
                           additionalHint: 'Tepat 10 digit',
                           focusNode: _nisnFocus,
                           fieldName: 'nisn'),
                       buildInputField(Icons.phone, 'No. Telp', noTelpController,
-                          type: TextInputType.phone, 
+                          type: TextInputType.phone,
                           minLength: 10,
                           additionalHint: 'Minimal 10 digit',
                           focusNode: _noTelpFocus,
@@ -1028,40 +1350,40 @@ class _AddPersonPageState extends State<AddPersonPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Tanggal Lahir', style: TextStyle(fontWeight: FontWeight.w500)),
+                            const Text('Tanggal Lahir',
+                                style: TextStyle(fontWeight: FontWeight.w500)),
                             const SizedBox(height: 6),
                             TextFormField(
                               controller: tanggalLahirController,
                               focusNode: _tanggalLahirFocus,
                               readOnly: true,
                               onTap: _pickTanggalLahir,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Tanggal lahir harus diisi';
-                                }
-                                return null;
-                              },
                               decoration: InputDecoration(
                                 hintText: 'Pilih Tanggal',
-                                prefixIcon: Icon(Icons.calendar_today, color: brown),
+                                prefixIcon: Icon(Icons.calendar_today_rounded,
+                                    color: primaryColor),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Colors.grey),
+                                  borderSide:
+                                      BorderSide(color: Colors.grey[300]!),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                                  borderSide: BorderSide(
+                                      color: primaryColor, width: 1.5),
                                 ),
                                 errorBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Colors.red),
+                                  borderSide:
+                                      const BorderSide(color: Colors.red),
                                 ),
                                 focusedErrorBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                                  borderSide: const BorderSide(
+                                      color: Colors.red, width: 1.5),
                                 ),
                                 filled: true,
                                 fillColor: Colors.white,
@@ -1069,19 +1391,6 @@ class _AddPersonPageState extends State<AddPersonPage> {
                                     vertical: 20, horizontal: 12),
                               ),
                             ),
-                            // Alert info untuk tanggal lahir - HANYA muncul saat focused
-                            if (_tanggalLahirFocus.hasFocus)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 4, left: 8),
-                                child: Text(
-                                  'Harus diisi',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 12,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),
@@ -1092,7 +1401,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                           fieldName: 'nama'),
                       buildInputField(Icons.badge, 'NIP', nipController,
                           minLength: 8,
-                          additionalHint: 'Minimal 8 digit',
+                          additionalHint: 'Minimal 18 digit',
                           focusNode: _nipFocus,
                           fieldName: 'nip'),
                       buildInputField(
@@ -1101,13 +1410,14 @@ class _AddPersonPageState extends State<AddPersonPage> {
                           focusNode: _kodeGuruFocus,
                           fieldName: 'kodeGuru'),
                       buildInputField(Icons.phone, 'No. Telp', noTelpController,
-                          type: TextInputType.phone, 
+                          type: TextInputType.phone,
                           minLength: 10,
                           additionalHint: 'Minimal 10 digit',
                           focusNode: _noTelpFocus,
                           fieldName: 'noTelp'),
-                      buildInputField(Icons.lock, 'Password', passwordController,
-                          obscure: true, 
+                      buildInputField(
+                          Icons.lock, 'Password', passwordController,
+                          obscure: true,
                           minLength: 6,
                           additionalHint: 'Minimal 6 karakter',
                           focusNode: _passwordFocus,
@@ -1115,42 +1425,62 @@ class _AddPersonPageState extends State<AddPersonPage> {
 
                       // Checkbox untuk peran guru
                       const SizedBox(height: 16),
-                      const Text('Peran Guru', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
-                      const SizedBox(height: 8),
-                      _buildCheckbox('Kaprog', isKaprog, (value) {
-                        setState(() {
-                          isKaprog = value ?? false;
-                        });
-                      }),
-                      _buildCheckbox('Koordinator', isKoordinator, (value) {
-                        setState(() {
-                          isKoordinator = value ?? false;
-                        });
-                      }),
-                      _buildCheckbox('Pembimbing', isPembimbing, (value) {
-                        setState(() {
-                          isPembimbing = value ?? false;
-                        });
-                      }),
-                      _buildCheckbox('Wali Kelas', isWaliKelas, (value) {
-                        setState(() {
-                          isWaliKelas = value ?? false;
-                        });
-                      }),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[200]!),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Peran Guru',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600, fontSize: 16),
+                            ),
+                            const SizedBox(height: 12),
+                            _buildCheckbox('Kaprog', isKaprog, (value) {
+                              setState(() {
+                                isKaprog = value ?? false;
+                              });
+                            }),
+                            _buildCheckbox('Koordinator', isKoordinator,
+                                (value) {
+                              setState(() {
+                                isKoordinator = value ?? false;
+                              });
+                            }),
+                            _buildCheckbox('Pembimbing', isPembimbing, (value) {
+                              setState(() {
+                                isPembimbing = value ?? false;
+                              });
+                            }),
+                            _buildCheckbox('Wali Kelas', isWaliKelas, (value) {
+                              setState(() {
+                                isWaliKelas = value ?? false;
+                              });
+                            }),
+                          ],
+                        ),
+                      ),
                     ] else if (jenis == 'Jurusan') ...[
                       buildInputField(
                           Icons.code, 'Kode Jurusan', kodeJurusanController,
                           minLength: 2,
                           focusNode: _kodeJurusanFocus,
                           fieldName: 'kodeJurusan'),
-                      buildInputField(Icons.book, 'Nama Jurusan', namaController,
+                      buildInputField(
+                          Icons.book, 'Nama Jurusan', namaController,
                           minLength: 3,
                           focusNode: _namaFocus,
                           fieldName: 'nama'),
-                      // TAMBAHAN: Dropdown Kaprog untuk Jurusan
+                      // Dropdown Kaprog untuk Jurusan
                       _buildKaprogDropdown(),
                     ] else if (jenis == 'Kelas') ...[
-                      buildInputField(Icons.class_, 'Nama Kelas', namaController,
+                      buildInputField(
+                          Icons.class_, 'Nama Kelas', namaController,
                           minLength: 2,
                           focusNode: _namaFocus,
                           fieldName: 'nama'),
@@ -1168,6 +1498,9 @@ class _AddPersonPageState extends State<AddPersonPage> {
                         icon: Icons.school,
                         displayKey: 'nama',
                       ),
+                      const SizedBox(height: 16),
+                      // Dropdown Wali Kelas untuk Kelas
+                      _buildWaliKelasDropdown(),
                     ] else if (jenis == 'Industri') ...[
                       buildInputField(
                           Icons.business, 'Nama Industri', namaController,
@@ -1183,7 +1516,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                           focusNode: _bidangFocus,
                           fieldName: 'bidang'),
                       buildInputField(Icons.email, 'Email', emailController,
-                          type: TextInputType.emailAddress, 
+                          type: TextInputType.emailAddress,
                           additionalHint: 'Format email yang valid (opsional)',
                           focusNode: _emailFocus,
                           fieldName: 'email'),
@@ -1201,47 +1534,429 @@ class _AddPersonPageState extends State<AddPersonPage> {
                         displayKey: 'nama',
                       ),
                       buildInputField(Icons.phone, 'No. Telp', noTelpController,
-                          type: TextInputType.phone, 
+                          type: TextInputType.phone,
                           minLength: 10,
                           additionalHint: 'Minimal 10 digit',
                           focusNode: _noTelpFocus,
                           fieldName: 'noTelp'),
                       buildInputField(Icons.person, 'PIC', picController,
-                          minLength: 3,
-                          focusNode: _picFocus,
-                          fieldName: 'pic'),
-                      buildInputField(Icons.phone, 'PIC Telp', picTelpController,
-                          type: TextInputType.phone, 
+                          minLength: 3, focusNode: _picFocus, fieldName: 'pic'),
+                      buildInputField(
+                          Icons.phone, 'PIC Telp', picTelpController,
+                          type: TextInputType.phone,
                           minLength: 10,
                           additionalHint: 'Minimal 10 digit',
                           focusNode: _picTelpFocus,
                           fieldName: 'picTelp'),
                     ],
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 30),
+
+                    // Simpan Button
                     SizedBox(
                       width: double.infinity,
-                      child: ElevatedButton.icon(
+                      child: ElevatedButton(
                         onPressed: () {
                           if (_formKey.currentState!.validate()) {
                             _submitData();
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: brown,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 18),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          elevation: 2,
+                          shadowColor: primaryColor.withOpacity(0.3),
                         ),
-                        icon: const Icon(Icons.save, color: Colors.white),
-                        label: const Text('Simpan',
-                            style: TextStyle(color: Colors.white, fontSize: 16)),
+                        child: const Text(
+                          'Simpan Data',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper function untuk mendapatkan icon berdasarkan jenis data
+  IconData _getIconForJenisData(String jenis) {
+    switch (jenis) {
+      case 'Siswa':
+        return Icons.person;
+      case 'Guru':
+        return Icons.school;
+      case 'Jurusan':
+        return Icons.category;
+      case 'Kelas':
+        return Icons.class_;
+      case 'Industri':
+        return Icons.business;
+      default:
+        return Icons.add;
+    }
+  }
+}
+
+// ============================================
+// POPUP SUKSES ELEGAN
+// ============================================
+
+class SuccessPopup extends StatefulWidget {
+  final String title;
+  final String message;
+  final VoidCallback onClose;
+
+  const SuccessPopup({
+    Key? key,
+    required this.title,
+    required this.message,
+    required this.onClose,
+  }) : super(key: key);
+
+  @override
+  State<SuccessPopup> createState() => _SuccessPopupState();
+}
+
+class _SuccessPopupState extends State<SuccessPopup>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+
+    _controller.forward();
+
+    // Auto close setelah 3 detik
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _closePopup();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _closePopup() {
+    _controller.reverse().then((_) {
+      if (mounted) {
+        widget.onClose();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        _closePopup();
+        return false;
+      },
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Container(
+              width: 320,
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Success Icon dengan animasi
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.green.withOpacity(0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: Colors.green,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Title
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                      letterSpacing: -0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Message
+                  Text(
+                    widget.message,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey[700],
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Close Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _closePopup,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B060A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Tutup',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================
+// POPUP ERROR ELEGAN
+// ============================================
+
+class ErrorPopup extends StatefulWidget {
+  final String title;
+  final String message;
+  final VoidCallback onClose;
+
+  const ErrorPopup({
+    Key? key,
+    required this.title,
+    required this.message,
+    required this.onClose,
+  }) : super(key: key);
+
+  @override
+  State<ErrorPopup> createState() => _ErrorPopupState();
+}
+
+class _ErrorPopupState extends State<ErrorPopup>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
+    );
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _closePopup() {
+    _controller.reverse().then((_) {
+      if (mounted) {
+        widget.onClose();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: () async {
+        _closePopup();
+        return false;
+      },
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: FadeTransition(
+            opacity: _fadeAnimation,
+            child: Container(
+              width: 320,
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Error Icon
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.red.withOpacity(0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.error_rounded,
+                      color: Colors.red,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Title
+                  Text(
+                    widget.title,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.red,
+                      letterSpacing: -0.5,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Message
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withOpacity(0.1)),
+                    ),
+                    child: Text(
+                      widget.message,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[800],
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Close Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _closePopup,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Mengerti',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
