@@ -14,280 +14,460 @@ class KaprogProfilePage extends StatefulWidget {
 }
 
 class _KaprogProfilePageState extends State<KaprogProfilePage> {
-  // Warna-warna profesional
-  static const Color _primaryColor = Color(0xFF6B1B1B); // Merah marun
-// Abu-abu gelap
-  static const Color _accentColor = Color(0xFF9F0712); // Merah
-  static const Color _lightColor = Color(0xFFF5F5F5); // Abu-abu muda
-  static const Color _textColor = Color(0xFF333333); // Teks gelap
-  static const Color _borderColor = Color(0xFFE0E0E0); // Border abu-abu muda
+  static const Color _primaryColor = Color(0xFF6B1B1B);
+  static const Color _accentColor = Color(0xFF9F0712);
+  static const Color _lightColor = Color(0xFFF5F5F5);
+  static const Color _textColor = Color(0xFF333333);
+  static const Color _borderColor = Color(0xFFE0E0E0);
 
-  Map<String, String> _profileData = {
+  // Data guru yang sedang login
+  Map<String, dynamic> _guruData = {
     'nama': 'KAPROG',
+    'kode_guru': '-',
     'nip': '-',
-    'kodeGuru': '-'
+    'no_telp': '-',
   };
+  
   bool _isLoading = true;
-  String _debugInfo = '';
+  bool _isEditing = false;
+  
+  // Controller untuk form edit
+  final TextEditingController _namaController = TextEditingController();
+  final TextEditingController _kodeGuruController = TextEditingController();
+  final TextEditingController _nipController = TextEditingController();
+  final TextEditingController _telpController = TextEditingController();
+  
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
-    _loadProfileData();
+    _loadGuruData();
   }
-Future<void> _loadProfileData() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    final userId = prefs.getInt('user_id');
 
-    _debugInfo = 'Memulai load profile...\n';
-    
-    if (token == null) {
-      _debugInfo += 'Token tidak ditemukan\n';
-      await _loadFromSharedPrefs();
-      return;
-    }
-
-    if (userId == null) {
-      _debugInfo += 'User ID tidak ditemukan\n';
-      await _loadFromSharedPrefs();
-      return;
-    }
-
-    _debugInfo += 'User ID: $userId\n';
-
-    // COBA: Ambil data guru dari endpoint yang benar
+  Future<void> _loadGuruData() async {
     try {
-      // Pertama, kita perlu ID guru dari user_id
-      // Dari data sebelumnya, user_id: 26 -> guru_id: 12
+      final prefs = await SharedPreferences.getInstance();
       
-      // Cari guru_id terlebih dahulu dari endpoint pembimbing
-      final pembimbingUrl = '${dotenv.env['API_BASE_URL']}/api/pkl/pembimbing';
-      _debugInfo += 'Mencari guru_id dari: $pembimbingUrl\n';
+      print('📥 Loading guru data for Kaprog...');
       
-      final pembimbingResponse = await http.get(
-        Uri.parse(pembimbingUrl),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (pembimbingResponse.statusCode == 200) {
-        final dynamic pembimbingData = jsonDecode(pembimbingResponse.body);
-        
-        int? guruId;
-        
-        if (pembimbingData is List) {
-          for (var guru in pembimbingData) {
-            if (guru is Map) {
-              final Map<String, dynamic> guruMap = _convertToStringMap(guru);
-              final dynamic guruUserId = guruMap['user_id'];
-              
-              if (guruUserId != null && guruUserId.toString() == userId.toString()) {
-                guruId = int.tryParse(guruMap['id']?.toString() ?? '');
-                _debugInfo += 'Found guru_id: $guruId from user_id match\n';
-                break;
-              }
-              
-              // Juga cek berdasarkan nama
-              final String userName = prefs.getString('user_name') ?? '';
-              final String guruNama = guruMap['nama']?.toString() ?? '';
-              if (guruNama.toLowerCase() == userName.toLowerCase()) {
-                guruId = int.tryParse(guruMap['id']?.toString() ?? '');
-                _debugInfo += 'Found guru_id: $guruId from name match\n';
-                break;
-              }
-            }
-          }
-        }
-        
-        // Jika tidak ditemukan, gunakan user_id langsung (dari contoh, user_id 26 -> guru_id 12)
-        if (guruId == null) {
-          // Coba dengan asumsi user_id = guru_id atau pattern tertentu
-          // Dari data: user_id 26 -> guru_id 12, mungkin ada hubungan
-          _debugInfo += 'Guru not found in pembimbing list, trying alternative...\n';
-          
-          // Coba endpoint guru dengan user_id langsung
-          final guruUrl = '${dotenv.env['API_BASE_URL']}/api/guru/$userId';
-          _debugInfo += 'Trying direct guru URL: $guruUrl\n';
-          
-          final guruResponse = await http.get(
-            Uri.parse(guruUrl),
-            headers: {'Authorization': 'Bearer $token'},
-          );
-          
-          if (guruResponse.statusCode == 200) {
-            final dynamic guruData = jsonDecode(guruResponse.body);
-            print('=== GURU BY USER_ID RESPONSE ===');
-            print('Full response: $guruData');
-            
-            await _processGuruData(guruData, prefs);
-            return;
-          } else {
-            _debugInfo += 'Guru by user_id failed: ${guruResponse.statusCode}\n';
-          }
-        } else {
-          // Gunakan guru_id yang ditemukan
-          final guruUrl = '${dotenv.env['API_BASE_URL']}/api/guru/$guruId';
-          _debugInfo += 'Fetching guru data from: $guruUrl\n';
-          
-          final guruResponse = await http.get(
-            Uri.parse(guruUrl),
-            headers: {'Authorization': 'Bearer $token'},
-          );
-          
-          if (guruResponse.statusCode == 200) {
-            final dynamic guruData = jsonDecode(guruResponse.body);
-            print('=== GURU BY ID RESPONSE ===');
-            print('Full response: $guruData');
-            
-            await _processGuruData(guruData, prefs);
-            return;
-          } else {
-            _debugInfo += 'Guru by id failed: ${guruResponse.statusCode}\n';
-          }
-        }
-      } else {
-        _debugInfo += 'Pembimbing API failed: ${pembimbingResponse.statusCode}\n';
+      // Debug: print semua keys untuk melihat data apa yang tersimpan
+      final allKeys = prefs.getKeys();
+      print('🔑 SEMUA DATA DI SHAREDPREFERENCES:');
+      for (final key in allKeys) {
+        print('   $key: ${prefs.get(key)}');
       }
       
-      // Fallback ke SharedPreferences
-      _debugInfo += 'Falling back to SharedPreferences\n';
-      await _loadFromSharedPrefs();
+      // Ambil data dari berbagai kemungkinan key
+      final String? userName = prefs.getString('user_name');
+      final String? kodeGuru = prefs.getString('kode_guru');
+      final String? userNip = prefs.getString('user_nip');
+      final String? userPhone = prefs.getString('user_phone');
+      final String? guruNama = prefs.getString('guru_nama');
+      final String? guruKode = prefs.getString('guru_kode_guru');
+      final String? guruNip = prefs.getString('guru_nip');
+      final String? guruTelp = prefs.getString('guru_no_telp');
       
-    } catch (e) {
-      _debugInfo += 'API Error: $e\n';
-      print('Error fetching from API: $e');
-      await _loadFromSharedPrefs();
-    }
-    
-  } catch (e) {
-    _debugInfo += 'General Error: $e\n';
-    print('Error loading profile: $e');
-    await _loadFromSharedPrefs();
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
-    
-    print('=== DEBUG INFO ===');
-    print(_debugInfo);
-    print('=== END DEBUG ===');
-  }
-}
-
-Future<void> _processGuruData(dynamic guruData, SharedPreferences prefs) async {
-  try {
-    if (guruData is Map) {
-      Map<String, dynamic>? guruMap;
+      // Prioritaskan data dari guru_* keys (lebih lengkap)
+      final String nama = userName ?? guruNama ?? 'KAPROG';
+      final String kode = kodeGuru ?? guruKode ?? '-';
+      final String nip = userNip ?? guruNip ?? '-';
+      final String telp = userPhone ?? guruTelp ?? '-';
       
-      if (guruData.containsKey('data') && guruData['data'] is Map) {
-        guruMap = _convertToStringMap(guruData['data'] as Map);
-      } else {
-        guruMap = _convertToStringMap(guruData);
-      }
-      
-      print('=== PROCESSED GURU DATA ===');
-      guruMap.forEach((key, value) {
-        print('$key: $value');
-      });
-      
-      // Ambil data dengan field yang benar
-      final String nama = guruMap['nama']?.toString() ?? 'KAPROG';
-      final String nip = guruMap['nip']?.toString() ?? '-';
-      final String kodeGuru = guruMap['kode_guru']?.toString() ?? '-';
-      
-      _debugInfo += 'Nama: $nama\n';
-      _debugInfo += 'NIP: $nip\n';
-      _debugInfo += 'Kode Guru: $kodeGuru\n';
+      // Set controller untuk form edit
+      _namaController.text = nama;
+      _kodeGuruController.text = kode;
+      _nipController.text = nip;
+      _telpController.text = telp;
       
       setState(() {
-        _profileData = {
+        _guruData = {
           'nama': nama.toUpperCase(),
+          'kode_guru': kode,
           'nip': nip,
-          'kodeGuru': kodeGuru,
+          'no_telp': telp,
         };
+        _isLoading = false;
       });
       
-      // Simpan ke cache
-      await prefs.setString('user_nip', nip);
-      await prefs.setString('kode_guru', kodeGuru);
-      await prefs.setString('nama', nama);
+      print('\n✅ DATA GURU YANG DIPAKAI:');
+      print('   Nama: ${_guruData['nama']}');
+      print('   Kode: ${_guruData['kode_guru']}');
+      print('   NIP: ${_guruData['nip']}');
+      print('   Telp: ${_guruData['no_telp']}');
       
-      return;
-        }
-    
-    _debugInfo += 'Invalid guru data format\n';
-    await _loadFromSharedPrefs();
-    
-  } catch (e) {
-    _debugInfo += 'Process error: $e\n';
-    await _loadFromSharedPrefs();
+    } catch (e) {
+      print('❌ Error loading guru data: $e');
+      
+      setState(() {
+        _guruData = {
+          'nama': 'KAPROG',
+          'kode_guru': '-',
+          'nip': '-',
+          'no_telp': '-',
+        };
+        _isLoading = false;
+      });
+    }
   }
-}
 
-Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
-  final Map<String, dynamic> result = {};
-  map.forEach((key, value) {
-    result[key.toString()] = value;
-  });
-  return result;
-}
-  Future<void> _loadFromSharedPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    _debugInfo += 'Loading from SharedPreferences...\n';
-    
-    // Print semua keys untuk debugging
-    final Set<String> allKeys = prefs.getKeys();
-    _debugInfo += 'All SharedPreferences keys: ${allKeys.join(', ')}\n';
-    
-    final String? userName = prefs.getString('user_name');
-    final String? name = prefs.getString('nama');
-    final String? guruName = prefs.getString('guru_nama');
-    
-    _debugInfo += 'user_name: $userName\n';
-    _debugInfo += 'nama: $name\n';
-    _debugInfo += 'guru_nama: $guruName\n';
-    
-    // Cari NIP dari berbagai kemungkinan key
-    String? nip;
-    for (var key in allKeys) {
-      if (key.toLowerCase().contains('nip')) {
-        final String? value = prefs.getString(key);
-        _debugInfo += 'Found NIP in $key: $value\n';
-        if (value != null && value.isNotEmpty && value != '-') {
-          nip = value;
-          break;
-        }
-      }
+  Future<void> _updateGuruData() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
-    
-    // Cari kode guru dari berbagai kemungkinan key
-    String? kodeGuru;
-    for (var key in allKeys) {
-      if (key.toLowerCase().contains('kode') || key.toLowerCase().contains('code')) {
-        final String? value = prefs.getString(key);
-        _debugInfo += 'Found kode in $key: $value\n';
-        if (value != null && value.isNotEmpty && value != '-') {
-          kodeGuru = value;
-          break;
-        }
+
+    try {
+      await dotenv.load(fileName: '.env');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      final guruId = prefs.getInt('guru_id') ?? 0;
+
+      print('🔍 DEBUG UPDATE GURU DATA:');
+      print('   Guru ID: $guruId');
+      print('   Token exists: ${token != null}');
+
+      if (token == null || guruId == 0) {
+        _showErrorDialog('Token tidak ditemukan atau ID guru tidak valid');
+        return;
       }
-    }
-    
-    final String namaTerpilih = userName ?? name ?? guruName ?? 'KAPROG';
-    final String nipTerpilih = nip ?? '-';
-    final String kodeGuruTerpilih = kodeGuru ?? '-';
-    
-    _debugInfo += 'Final - Nama: $namaTerpilih, NIP: $nipTerpilih, Kode Guru: $kodeGuruTerpilih\n';
-    
-    setState(() {
-      _profileData = {
-        'nama': namaTerpilih.toUpperCase(),
-        'nip': nipTerpilih,
-        'kodeGuru': kodeGuruTerpilih,
+
+      // Tampilkan loading
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(
+              color: _primaryColor,
+            ),
+          ),
+        );
+      }
+
+      // Data yang akan dikirim
+      final Map<String, dynamic> requestData = {
+        'nama': _namaController.text.trim(),
+        'kode_guru': _kodeGuruController.text.trim(),
+        'nip': _nipController.text.trim(),
+        'no_telp': _telpController.text.trim(),
+        'is_kaprog': true, // Karena ini kaprog
+        'is_wali_kelas': false,
+        'is_pembimbing': false,
+        'is_koordinator': false,
+        'is_active': true,
+        'password': '',
       };
-    });
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final url = Uri.parse('$baseUrl/api/guru/$guruId');
+
+      print('🔄 Updating guru data...');
+      print('   URL: $url');
+      print('   Request data: $requestData');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(requestData),
+      );
+
+      // Tutup loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      print('📤 Response status: ${response.statusCode}');
+      print('📤 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['success'] == true) {
+          // Update data lokal
+          setState(() {
+            _guruData['nama'] = _namaController.text.trim().toUpperCase();
+            _guruData['kode_guru'] = _kodeGuruController.text.trim();
+            _guruData['nip'] = _nipController.text.trim();
+            _guruData['no_telp'] = _telpController.text.trim();
+            _isEditing = false;
+          });
+
+          // Update SharedPreferences
+          await prefs.setString('user_name', _namaController.text.trim());
+          await prefs.setString('kode_guru', _kodeGuruController.text.trim());
+          await prefs.setString('user_nip', _nipController.text.trim());
+          await prefs.setString('user_phone', _telpController.text.trim());
+          await prefs.setString('guru_nama', _namaController.text.trim());
+          await prefs.setString('guru_kode_guru', _kodeGuruController.text.trim());
+          await prefs.setString('guru_nip', _nipController.text.trim());
+          await prefs.setString('guru_no_telp', _telpController.text.trim());
+
+          _showSuccessDialog('Data berhasil diperbarui');
+        } else {
+          final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
+          _showErrorDialog(errorMsg.toString());
+        }
+      } else {
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMsg = errorData['message'] ?? 
+                          errorData['error'] ?? 
+                          'Terjadi kesalahan: ${response.statusCode}';
+          _showErrorDialog(errorMsg.toString());
+        } catch (e) {
+          _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+      _showErrorDialog('Terjadi kesalahan: $e');
+    }
+  }
+
+  void _showSuccessDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text(
+              'Sukses',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: _textColor,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: _primaryColor,
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.error, color: Colors.red),
+            SizedBox(width: 8),
+            Text(
+              'Error',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: _textColor,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: _primaryColor,
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Edit Data Profil',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _textColor,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Nama
+          TextFormField(
+            controller: _namaController,
+            decoration: InputDecoration(
+              labelText: 'Nama',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _primaryColor, width: 2),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Nama tidak boleh kosong';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          
+          // Kode Guru
+          TextFormField(
+            controller: _kodeGuruController,
+            decoration: InputDecoration(
+              labelText: 'Kode Guru',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _primaryColor, width: 2),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Kode guru tidak boleh kosong';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          
+          // NIP
+          TextFormField(
+            controller: _nipController,
+            decoration: InputDecoration(
+              labelText: 'NIP',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _primaryColor, width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // No Telepon
+          TextFormField(
+            controller: _telpController,
+            decoration: InputDecoration(
+              labelText: 'No. Telepon',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _primaryColor, width: 2),
+              ),
+            ),
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 20),
+          
+          // Tombol Simpan & Batal
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isEditing = false;
+                    });
+                    // Reset ke data awal
+                    _namaController.text = _guruData['nama'];
+                    _kodeGuruController.text = _guruData['kode_guru'];
+                    _nipController.text = _guruData['nip'];
+                    _telpController.text = _guruData['no_telp'];
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    foregroundColor: _textColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Batal'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _updateGuruData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Simpan'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: _borderColor),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
   }
 
   @override
@@ -304,7 +484,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.1),
+                    color: Colors.grey.withValues(alpha:0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -329,6 +509,19 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const Spacer(),
+                  if (!_isLoading && !_isEditing)
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _isEditing = true;
+                        });
+                      },
+                      icon: const Icon(
+                        Icons.edit,
+                        color: _primaryColor,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -367,7 +560,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                               : Column(
                                   children: [
                                     Text(
-                                      _profileData['nama']!,
+                                      _guruData['nama']!,
                                       style: const TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w700,
@@ -376,18 +569,19 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                                       textAlign: TextAlign.center,
                                     ),
                                     const SizedBox(height: 8),
+                                    // Role badge
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 16, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: _primaryColor.withValues(alpha: 0.1),
+                                        color: _primaryColor.withValues(alpha:0.1),
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: _primaryColor.withValues(alpha: 0.3),
+                                          color: _primaryColor.withValues(alpha:0.3),
                                         ),
                                       ),
                                       child: const Text(
-                                        'KOORDINATOR PROGRAM KEAHLIAN',
+                                        'KEPALA KONSENTRASI KEAHLIAN',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
@@ -401,11 +595,11 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                       ),
                     ),
 
-                    // Informasi Pribadi Card
+                    // Data Detail Section
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
-                      margin: const EdgeInsets.only(bottom: 20),
+                      margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -415,7 +609,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha: 0.05),
+                            color: Colors.grey.withValues(alpha:0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -424,48 +618,27 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.person_outline,
-                                color: _primaryColor,
-                                size: 20,
+                          if (_isEditing)
+                            _buildEditForm()
+                          else ...[
+                            const Text(
+                              'Data Profil',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: _textColor,
                               ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Informasi Pribadi',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: _textColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          const Divider(color: _borderColor),
-                          const SizedBox(height: 16),
+                            ),
+                            const SizedBox(height: 16),
+                            const Divider(color: _borderColor),
+                            const SizedBox(height: 16),
 
-                          // NIP
-                          _buildInfoItem(
-                            icon: Icons.badge_outlined,
-                            label: 'NIP',
-                            value: _isLoading 
-                                ? 'Memuat...'
-                                : (_profileData['nip']!.isNotEmpty && _profileData['nip']! != '-' 
-                                    ? _profileData['nip']! 
-                                    : 'NIP tidak ditemukan'),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // KODE GURU
-                          _buildInfoItem(
-                            icon: Icons.code_outlined,
-                            label: 'Kode Guru',
-                            value: _isLoading ? 'Memuat...' : _profileData['kodeGuru']!,
-                          ),
-
+                            _buildDetailItem('Kode Guru', _guruData['kode_guru']!),
+                            const SizedBox(height: 12),
+                            _buildDetailItem('NIP', _guruData['nip']!),
+                            const SizedBox(height: 12),
+                            _buildDetailItem('No. Telepon', _guruData['no_telp']!),
+                          ],
                         ],
                       ),
                     ),
@@ -524,7 +697,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                       ),
                     ),
 
-                    // Logout Button
+                    // Logout Button dengan jarak
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -557,7 +730,8 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    // TAMBAH JARAK KE BAWAH
+                    const SizedBox(height: 80),
                   ],
                 ),
               ),
@@ -568,45 +742,35 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
     );
   }
 
-  Widget _buildInfoItem({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          color: _primaryColor,
-          size: 22,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey,
-                ),
+  Widget _buildDetailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: _textColor,
               ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _textColor,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -629,7 +793,7 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha: 0.1),
+                  color: _primaryColor.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -697,7 +861,6 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
       ],
     );
   }
-
 
   void _showUnderDevelopment(String featureName, BuildContext context) {
     showDialog(
@@ -909,16 +1072,28 @@ Map<String, dynamic> _convertToStringMap(Map<dynamic, dynamic> map) {
   }
 
   Future<void> _processLogout() async {
-    final prefs = await SharedPreferences.getInstance();
+    print('🔄 Processing logout for Kaprog...');
 
-    // Hapus data login
-    await prefs.remove('access_token');
-    await prefs.remove('user_name');
-    await prefs.remove('user_nip');
-    await prefs.remove('nip');
-    await prefs.remove('guru_nip');
-    await prefs.remove('kode_guru');
-    await prefs.remove('guru_kode');
-    await prefs.remove('nama');
+    final prefs = await SharedPreferences.getInstance();
+    final currentUsername = prefs.getString('user_name');
+
+    print('👤 Current username: $currentUsername');
+
+    // Hapus semua data login
+    print('🗑️ Removing all login data...');
+    final allKeys = prefs.getKeys();
+    for (final key in allKeys) {
+      // Hapus semua kecuali notifications
+      if (!key.startsWith('notifications_')) {
+        await prefs.remove(key);
+        print('   Removed: $key');
+      }
+    }
+
+    print('✅ Logout completed successfully');
+    print('   - User: ${currentUsername ?? 'unknown_user'}');
+    print('   - Role: Kaprog');
+    print('   - All login data: REMOVED');
+    print('   - Notifications: PRESERVED');
   }
 }

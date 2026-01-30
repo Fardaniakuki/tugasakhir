@@ -524,7 +524,7 @@ class _EditTeacherPageState extends State<EditTeacherPage> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: _primaryColor,
+            activeThumbColor: _primaryColor,
             activeTrackColor: _primaryColor.withValues(alpha:0.5),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),

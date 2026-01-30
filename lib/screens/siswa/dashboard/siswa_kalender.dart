@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart'; // Pastikan ini diimpor
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SiswaKalender extends StatefulWidget {
@@ -11,353 +12,432 @@ class SiswaKalender extends StatefulWidget {
 
 class _SiswaKalenderState extends State<SiswaKalender> {
   // ========== VARIABEL UTAMA ==========
-  DateTime _currentDate = DateTime.now();
-  DateTime? _selectedDate;
-  late List<List<DateTime?>> _calendarDays;
-  late String _currentMonth;
+  DateTime _tanggalSekarang = DateTime.now();
+  DateTime? _tanggalTerpilih;
+  late List<List<DateTime?>> _hariKalender;
+  late String _bulanSekarang;
 
-  // ========== STATE MANAGEMENT ==========
-  bool _isLoading = true;
-  bool _isCheckingToken = true;
-  String _errorMessage = '';
-  List<KegiatanPkl> _allKegiatan = [];
-  final Map<DateTime, List<KegiatanPkl>> _events = {};
+  // ========== MANAJEMEN STATE ==========
+  bool _sedangMemuat = true;
+  bool _sedangMemeriksaToken = true;
+  String _pesanError = '';
+  List<KegiatanPkl> _semuaKegiatan = [];
+  final Map<DateTime, List<KegiatanPkl>> _acara = {};
 
   // ========== WARNA SISWA ==========
-  static const Color _primaryColor = Color(0xFF9f0712); // Merah siswa
-  static const Color _yellowColor = Color(0xFFFFB703);
-  static const Color _greenColor = Color(0xFF4CAF50);
-  static const Color _redColor = Color(0xFFF44336);
-  static const Color _blueColor = Color(0xFF2196F3);
-  static const Color _purpleColor = Color(0xFF9C27B0);
-  static const Color _textSecondary = Color(0xFF666666);
-  static const Color _borderColor = Color(0xFFE0E0E0);
-  static const Color _pastDayColor = Color(0xFFF5F5F5);
-  static const Color _pastDayTextColor = Color(0xFF999999);
-  static const Color _textPrimary = Color(0xFF333333);
+  static const Color _warnaUtama = Color(0xFF9f0712); // Merah siswa
+  static const Color _warnaKuning = Color(0xFFFFB703);
+  static const Color _warnaHijau = Color(0xFF4CAF50);
+  static const Color _warnaMerah = Color(0xFFF44336);
+  static const Color _warnaBiru = Color(0xFF2196F3);
+  static const Color _warnaUngu = Color(0xFF9C27B0);
+  static const Color _teksSekunder = Color(0xFF666666);
+  static const Color _warnaBatas = Color(0xFFE0E0E0);
+  static const Color _warnaHariLalu = Color(0xFFF5F5F5);
+  static const Color _warnaTeksHariLalu = Color(0xFF999999);
+  static const Color _teksPrimer = Color(0xFF333333);
+
+  bool _dateFormatInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
-    _generateCalendar();
-    _checkTokenAndLoadData();
+    _initDateFormatting();
+    _tanggalTerpilih = DateTime.now();
   }
 
-  // ========== CHECK TOKEN & LOAD DATA ==========
-  Future<void> _checkTokenAndLoadData() async {
+  // ========== INISIALISASI DATE FORMATTING ==========
+  Future<void> _initDateFormatting() async {
+    try {
+      // Inisialisasi date formatting untuk locale Indonesia
+      await initializeDateFormatting('id_ID', null);
+      setState(() {
+        _dateFormatInitialized = true;
+      });
+      _buatKalender();
+      _periksaTokenDanMuatData();
+    } catch (e) {
+      print('Error initializing date formatting: $e');
+      // Fallback ke locale default jika ada error
+      setState(() {
+        _dateFormatInitialized = true;
+      });
+      _buatKalender();
+      _periksaTokenDanMuatData();
+    }
+  }
+
+  // ========== PERIKSA TOKEN & MUAT DATA ==========
+  Future<void> _periksaTokenDanMuatData() async {
     final prefs = await SharedPreferences.getInstance();
     prefs.getString('access_token');
 
     // Untuk demo, kita anggap token selalu ada
-    // Jika ingin simulasi login, bisa uncomment kode berikut:
-    /*
-    if (token == null || token.isEmpty) {
-      _redirectToLogin();
-      return;
-    }
-    */
-
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulasi loading
-    await _loadDummyData();
+    await Future.delayed(const Duration(milliseconds: 500));
+    await _muatDataContoh();
   }
 
+  // ========== FUNGSI UNTUK MENGECEK STATUS KEGIATAN ==========
+  String _dapatkanStatusKegiatan(KegiatanPkl kegiatan) {
+    final sekarang = DateTime.now();
+    final hariIni = DateTime(sekarang.year, sekarang.month, sekarang.day);
+    final tanggalSelesai = DateTime(
+      kegiatan.tanggalSelesai.year,
+      kegiatan.tanggalSelesai.month,
+      kegiatan.tanggalSelesai.day,
+    );
+    
+    // Jika tanggal selesai sudah lewat dari hari ini, statusnya "selesai"
+    if (tanggalSelesai.isBefore(hariIni)) {
+      return 'selesai';
+    }
+    
+    // Jika tanggal mulai belum tiba, statusnya "akan datang"
+    final tanggalMulai = DateTime(
+      kegiatan.tanggalMulai.year,
+      kegiatan.tanggalMulai.month,
+      kegiatan.tanggalMulai.day,
+    );
+    if (tanggalMulai.isAfter(hariIni)) {
+      return 'akan datang';
+    }
+    
+    // Jika sedang berlangsung (antara tanggal mulai dan selesai)
+    return 'aktif';
+  }
 
-  // ========== LOAD DATA DUMMY ==========
-  Future<void> _loadDummyData() async {
+  // ========== MUAT DATA CONTOH ==========
+  Future<void> _muatDataContoh() async {
     setState(() {
-      _isCheckingToken = false;
-      _isLoading = true;
-      _errorMessage = '';
+      _sedangMemeriksaToken = false;
+      _sedangMemuat = true;
+      _pesanError = '';
     });
 
     try {
       // Simulasi loading
       await Future.delayed(const Duration(seconds: 1));
 
-      // Data dummy kegiatan PKL
-      final dummyKegiatan = [
+      // Data contoh kegiatan PKL dengan tanggal yang lebih realistis
+      final contohKegiatan = [
         KegiatanPkl(
           id: 1,
           deskripsi: 'Pembekalan awal PKL untuk semua siswa kelas XII. Materi meliputi tata tertib perusahaan, keselamatan kerja, dan etika kerja.',
           jenisKegiatan: 'Pembekalan',
           tahunAjaranId: 1,
-          tanggalMulai: DateTime.now().subtract(const Duration(days: 5)),
-          tanggalSelesai: DateTime.now().subtract(const Duration(days: 3)),
-          status: 'active',
-          createdBy: 1,
-          createdAt: DateTime.now().subtract(const Duration(days: 10)),
-          updatedAt: DateTime.now().subtract(const Duration(days: 10)),
+          tanggalMulai: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 10),
+          tanggalSelesai: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 8),
+          dibuatOleh: 1,
+          dibuatPada: DateTime.now().subtract(const Duration(days: 20)),
+          diperbaruiPada: DateTime.now().subtract(const Duration(days: 20)),
         ),
         KegiatanPkl(
           id: 2,
           deskripsi: 'Monitoring pertama kemajuan siswa di tempat PKL. Pembimbing akan mengunjungi perusahaan mitra.',
-          jenisKegiatan: 'Monitoring1',
+          jenisKegiatan: 'Monitoring 1',
           tahunAjaranId: 1,
-          tanggalMulai: DateTime.now().add(const Duration(days: 2)),
-          tanggalSelesai: DateTime.now().add(const Duration(days: 2)),
-          status: 'active',
-          createdBy: 1,
-          createdAt: DateTime.now().subtract(const Duration(days: 8)),
-          updatedAt: DateTime.now().subtract(const Duration(days: 8)),
+          tanggalMulai: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day + 2),
+          tanggalSelesai: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day + 2),
+          dibuatOleh: 1,
+          dibuatPada: DateTime.now().subtract(const Duration(days: 15)),
+          diperbaruiPada: DateTime.now().subtract(const Duration(days: 15)),
         ),
         KegiatanPkl(
           id: 3,
           deskripsi: 'Kegiatan monitoring kedua untuk evaluasi perkembangan siswa. Fokus pada pencapaian kompetensi.',
-          jenisKegiatan: 'Monitoring2',
+          jenisKegiatan: 'Monitoring 2',
           tahunAjaranId: 1,
-          tanggalMulai: DateTime.now().add(const Duration(days: 15)),
-          tanggalSelesai: DateTime.now().add(const Duration(days: 15)),
-          status: 'active',
-          createdBy: 1,
-          createdAt: DateTime.now().subtract(const Duration(days: 5)),
-          updatedAt: DateTime.now().subtract(const Duration(days: 5)),
+          tanggalMulai: DateTime(DateTime.now().year, DateTime.now().month + 1, 5),
+          tanggalSelesai: DateTime(DateTime.now().year, DateTime.now().month + 1, 5),
+          dibuatOleh: 1,
+          dibuatPada: DateTime.now().subtract(const Duration(days: 10)),
+          diperbaruiPada: DateTime.now().subtract(const Duration(days: 10)),
         ),
         KegiatanPkl(
           id: 4,
           deskripsi: 'Penjemputan siswa dari tempat PKL dan pembekalan akhir sebelum presentasi.',
           jenisKegiatan: 'Penjemputan',
           tahunAjaranId: 1,
-          tanggalMulai: DateTime.now().add(const Duration(days: 30)),
-          tanggalSelesai: DateTime.now().add(const Duration(days: 30)),
-          status: 'active',
-          createdBy: 1,
-          createdAt: DateTime.now().subtract(const Duration(days: 3)),
-          updatedAt: DateTime.now().subtract(const Duration(days: 3)),
+          tanggalMulai: DateTime(DateTime.now().year, DateTime.now().month + 1, 25),
+          tanggalSelesai: DateTime(DateTime.now().year, DateTime.now().month + 1, 25),
+          dibuatOleh: 1,
+          dibuatPada: DateTime.now().subtract(const Duration(days: 5)),
+          diperbaruiPada: DateTime.now().subtract(const Duration(days: 5)),
         ),
         KegiatanPkl(
           id: 5,
           deskripsi: 'Workshop pembuatan laporan PKL dan persiapan presentasi akhir.',
-          jenisKegiatan: 'Pembekalan',
+          jenisKegiatan: 'Workshop Laporan',
           tahunAjaranId: 1,
-          tanggalMulai: DateTime.now().add(const Duration(days: 25)),
-          tanggalSelesai: DateTime.now().add(const Duration(days: 26)),
-          status: 'active',
-          createdBy: 1,
-          createdAt: DateTime.now().subtract(const Duration(days: 2)),
-          updatedAt: DateTime.now().subtract(const Duration(days: 2)),
+          tanggalMulai: DateTime(DateTime.now().year, DateTime.now().month + 1, 20),
+          tanggalSelesai: DateTime(DateTime.now().year, DateTime.now().month + 1, 21),
+          dibuatOleh: 1,
+          dibuatPada: DateTime.now().subtract(const Duration(days: 3)),
+          diperbaruiPada: DateTime.now().subtract(const Duration(days: 3)),
         ),
         KegiatanPkl(
           id: 6,
           deskripsi: 'Presentasi hasil PKL di depan penguji dan pembimbing.',
-          jenisKegiatan: 'Monitoring2',
+          jenisKegiatan: 'Presentasi Akhir',
           tahunAjaranId: 1,
-          tanggalMulai: DateTime.now().add(const Duration(days: 35)),
-          tanggalSelesai: DateTime.now().add(const Duration(days: 36)),
-          status: 'active',
-          createdBy: 1,
-          createdAt: DateTime.now().subtract(const Duration(days: 1)),
-          updatedAt: DateTime.now().subtract(const Duration(days: 1)),
+          tanggalMulai: DateTime(DateTime.now().year, DateTime.now().month + 2, 1),
+          tanggalSelesai: DateTime(DateTime.now().year, DateTime.now().month + 2, 2),
+          dibuatOleh: 1,
+          dibuatPada: DateTime.now().subtract(const Duration(days: 1)),
+          diperbaruiPada: DateTime.now().subtract(const Duration(days: 1)),
         ),
       ];
 
       setState(() {
-        _allKegiatan = dummyKegiatan;
-        _initializeEvents();
-        _isLoading = false;
+        _semuaKegiatan = contohKegiatan;
+        _inisialisasiAcara();
+        _sedangMemuat = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error loading data: $e';
-        _isLoading = false;
+        _pesanError = 'Error memuat data: $e';
+        _sedangMemuat = false;
       });
     }
   }
 
-  void _initializeEvents() {
-    _events.clear();
+  void _inisialisasiAcara() {
+    _acara.clear();
 
-    for (var kegiatan in _allKegiatan) {
-      // Tambahkan event untuk setiap hari dalam rentang tanggal
-      DateTime currentDate = kegiatan.tanggalMulai;
-      final endDate = kegiatan.tanggalSelesai;
+    for (var kegiatan in _semuaKegiatan) {
+      // Tambahkan acara untuk setiap hari dalam rentang tanggal
+      DateTime tanggalSekarang = kegiatan.tanggalMulai;
+      final tanggalAkhir = kegiatan.tanggalSelesai;
 
-      while (!currentDate.isAfter(endDate)) {
-        final dateKey = DateTime(
-          currentDate.year,
-          currentDate.month,
-          currentDate.day,
+      while (!tanggalSekarang.isAfter(tanggalAkhir)) {
+        final kunciTanggal = DateTime(
+          tanggalSekarang.year,
+          tanggalSekarang.month,
+          tanggalSekarang.day,
         );
 
-        if (_events.containsKey(dateKey)) {
-          _events[dateKey]!.add(kegiatan);
+        if (_acara.containsKey(kunciTanggal)) {
+          _acara[kunciTanggal]!.add(kegiatan);
         } else {
-          _events[dateKey] = [kegiatan];
+          _acara[kunciTanggal] = [kegiatan];
         }
 
-        currentDate = currentDate.add(const Duration(days: 1));
+        tanggalSekarang = tanggalSekarang.add(const Duration(days: 1));
       }
     }
   }
 
-  // ========== GENERATE KALENDER ==========
-  void _generateCalendar() {
-    _currentMonth = DateFormat('MMMM yyyy').format(_currentDate);
-    _calendarDays = [];
+  // ========== BUAT KALENDER ==========
+  void _buatKalender() {
+    // Set locale ke Indonesia untuk format bulan
+    try {
+      _bulanSekarang = DateFormat('MMMM yyyy', 'id_ID').format(_tanggalSekarang);
+    } catch (e) {
+      // Fallback ke locale default jika ada error
+      _bulanSekarang = DateFormat('MMMM yyyy').format(_tanggalSekarang);
+    }
+    
+    _hariKalender = [];
 
-    final firstDayOfMonth = DateTime(_currentDate.year, _currentDate.month, 1);
-    final lastDayOfMonth = DateTime(_currentDate.year, _currentDate.month + 1, 0);
-    final int startingWeekday = firstDayOfMonth.weekday % 7;
+    final hariPertamaBulan = DateTime(_tanggalSekarang.year, _tanggalSekarang.month, 1);
+    final hariTerakhirBulan = DateTime(_tanggalSekarang.year, _tanggalSekarang.month + 1, 0);
+    final int hariAwalMinggu = hariPertamaBulan.weekday % 7;
 
-    final List<DateTime?> currentWeek = [];
+    final List<DateTime?> mingguSekarang = [];
 
     // Tambahkan hari dari bulan sebelumnya
-    if (startingWeekday > 0) {
-      final previousMonthLastDay = DateTime(_currentDate.year, _currentDate.month, 0);
-      for (int i = startingWeekday - 1; i >= 0; i--) {
-        final previousDate = DateTime(
-          previousMonthLastDay.year,
-          previousMonthLastDay.month,
-          previousMonthLastDay.day - i,
+    if (hariAwalMinggu > 0) {
+      final hariTerakhirBulanSebelumnya = DateTime(_tanggalSekarang.year, _tanggalSekarang.month, 0);
+      for (int i = hariAwalMinggu - 1; i >= 0; i--) {
+        final tanggalSebelumnya = DateTime(
+          hariTerakhirBulanSebelumnya.year,
+          hariTerakhirBulanSebelumnya.month,
+          hariTerakhirBulanSebelumnya.day - i,
         );
-        currentWeek.add(previousDate);
+        mingguSekarang.add(tanggalSebelumnya);
       }
     }
 
     // Tambahkan hari dari bulan ini
-    for (int day = 1; day <= lastDayOfMonth.day; day++) {
-      final date = DateTime(_currentDate.year, _currentDate.month, day);
-      currentWeek.add(date);
+    for (int hari = 1; hari <= hariTerakhirBulan.day; hari++) {
+      final tanggal = DateTime(_tanggalSekarang.year, _tanggalSekarang.month, hari);
+      mingguSekarang.add(tanggal);
 
-      if (currentWeek.length == 7) {
-        _calendarDays.add(List.from(currentWeek));
-        currentWeek.clear();
+      if (mingguSekarang.length == 7) {
+        _hariKalender.add(List.from(mingguSekarang));
+        mingguSekarang.clear();
       }
     }
 
     // Tambahkan hari dari bulan berikutnya
-    if (currentWeek.isNotEmpty) {
-      int nextMonthDay = 1;
-      while (currentWeek.length < 7) {
-        final nextDate = DateTime(_currentDate.year, _currentDate.month + 1, nextMonthDay);
-        currentWeek.add(nextDate);
-        nextMonthDay++;
+    if (mingguSekarang.isNotEmpty) {
+      int hariBulanBerikutnya = 1;
+      while (mingguSekarang.length < 7) {
+        final tanggalBerikutnya = DateTime(_tanggalSekarang.year, _tanggalSekarang.month + 1, hariBulanBerikutnya);
+        mingguSekarang.add(tanggalBerikutnya);
+        hariBulanBerikutnya++;
       }
-      _calendarDays.add(currentWeek);
+      _hariKalender.add(mingguSekarang);
     }
   }
 
   // ========== FUNGSI NAVIGASI ==========
-  void _goToPreviousMonth() {
+  void _keBulanSebelumnya() {
     setState(() {
-      _currentDate = DateTime(_currentDate.year, _currentDate.month - 1, 1);
-      _generateCalendar();
+      _tanggalSekarang = DateTime(_tanggalSekarang.year, _tanggalSekarang.month - 1, 1);
+      _buatKalender();
     });
   }
 
-  void _goToNextMonth() {
+  void _keBulanBerikutnya() {
     setState(() {
-      _currentDate = DateTime(_currentDate.year, _currentDate.month + 1, 1);
-      _generateCalendar();
+      _tanggalSekarang = DateTime(_tanggalSekarang.year, _tanggalSekarang.month + 1, 1);
+      _buatKalender();
     });
   }
 
-  // ========== HELPER FUNCTIONS ==========
-  bool _isToday(DateTime date) {
-    final now = DateTime.now();
-    return date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day;
+  // ========== FUNGSI BANTUAN ==========
+  bool _adalahHariIni(DateTime tanggal) {
+    final sekarang = DateTime.now();
+    return tanggal.year == sekarang.year &&
+        tanggal.month == sekarang.month &&
+        tanggal.day == sekarang.day;
   }
 
-  bool _isSelected(DateTime date) {
-    return _selectedDate != null &&
-        _selectedDate!.year == date.year &&
-        _selectedDate!.month == date.month &&
-        _selectedDate!.day == date.day;
+  bool _adalahTerpilih(DateTime tanggal) {
+    return _tanggalTerpilih != null &&
+        _tanggalTerpilih!.year == tanggal.year &&
+        _tanggalTerpilih!.month == tanggal.month &&
+        _tanggalTerpilih!.day == tanggal.day;
   }
 
-  bool _isCurrentMonth(DateTime date) {
-    return date.year == _currentDate.year && date.month == _currentDate.month;
+  bool _adalahBulanSekarang(DateTime tanggal) {
+    return tanggal.year == _tanggalSekarang.year && tanggal.month == _tanggalSekarang.month;
   }
 
-  bool _hasEvent(DateTime date) {
-    return _events.containsKey(DateTime(date.year, date.month, date.day));
+  bool _punyaAcara(DateTime tanggal) {
+    return _acara.containsKey(DateTime(tanggal.year, tanggal.month, tanggal.day));
   }
 
-  bool _isPastDay(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final checkDate = DateTime(date.year, date.month, date.day);
-    return checkDate.isBefore(today);
+  bool _adalahHariLalu(DateTime tanggal) {
+    final sekarang = DateTime.now();
+    final hariIni = DateTime(sekarang.year, sekarang.month, sekarang.day);
+    final tanggalPeriksa = DateTime(tanggal.year, tanggal.month, tanggal.day);
+    return tanggalPeriksa.isBefore(hariIni);
   }
 
-  Color _getJenisColor(String jenis) {
+  Color _dapatkanWarnaJenis(String jenis) {
     switch (jenis) {
       case 'Pembekalan':
-        return _primaryColor;
-      case 'Monitoring1':
-        return _greenColor;
-      case 'Monitoring2':
-        return _blueColor;
+        return _warnaUtama;
+      case 'Monitoring 1':
+        return _warnaHijau;
+      case 'Monitoring 2':
+        return _warnaBiru;
       case 'Penjemputan':
-        return _purpleColor;
+        return _warnaUngu;
+      case 'Workshop Laporan':
+        return _warnaKuning;
+      case 'Presentasi Akhir':
+        return _warnaMerah;
       default:
-        return _primaryColor;
+        return _warnaUtama;
     }
   }
 
-  String _getJenisIcon(String jenis) {
+  Color _dapatkanWarnaStatus(String status) {
+    switch (status) {
+      case 'aktif':
+        return _warnaHijau;
+      case 'akan datang':
+        return _warnaBiru;
+      case 'selesai':
+        return Colors.grey;
+      default:
+        return _warnaUtama;
+    }
+  }
+
+  String _dapatkanIkonJenis(String jenis) {
     switch (jenis) {
       case 'Pembekalan':
         return '📚';
-      case 'Monitoring1':
+      case 'Monitoring 1':
         return '📋';
-      case 'Monitoring2':
+      case 'Monitoring 2':
         return '📊';
       case 'Penjemputan':
         return '🚌';
+      case 'Workshop Laporan':
+        return '📝';
+      case 'Presentasi Akhir':
+        return '🎤';
       default:
         return '📅';
     }
   }
 
-  String _formatDateForDisplay(DateTime date) {
-    return DateFormat('EEEE, dd MMMM yyyy').format(date);
+  String _formatTanggalUntukTampilan(DateTime tanggal) {
+    try {
+      return DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(tanggal);
+    } catch (e) {
+      // Fallback ke locale default jika ada error
+      return DateFormat('EEEE, dd MMMM yyyy').format(tanggal);
+    }
   }
 
-  String _formatDateShort(DateTime date) {
-    return DateFormat('dd MMM').format(date);
+  String _formatTanggalPendek(DateTime tanggal) {
+    try {
+      return DateFormat('dd MMM', 'id_ID').format(tanggal);
+    } catch (e) {
+      // Fallback ke locale default jika ada error
+      return DateFormat('dd MMM').format(tanggal);
+    }
   }
 
-  List<KegiatanPkl> _getKegiatanForDay(DateTime day) {
-    final dateKey = DateTime(day.year, day.month, day.day);
-    return _events[dateKey] ?? [];
+  String _formatTanggalTanpaLocale(DateTime tanggal) {
+    return DateFormat('dd MMM yyyy').format(tanggal);
+  }
+
+  List<KegiatanPkl> _dapatkanKegiatanUntukHari(DateTime hari) {
+    final kunciTanggal = DateTime(hari.year, hari.month, hari.day);
+    return _acara[kunciTanggal] ?? [];
   }
 
   // Fungsi untuk mendapatkan jadwal yang akan datang
-  List<KegiatanPkl> _getUpcomingKegiatan() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+  List<KegiatanPkl> _dapatkanKegiatanMendatang() {
+    final sekarang = DateTime.now();
+    final hariIni = DateTime(sekarang.year, sekarang.month, sekarang.day);
 
     // Filter kegiatan yang tanggal selesai >= hari ini
-    final List<KegiatanPkl> upcomingKegiatan = _allKegiatan
-        .where((kegiatan) => !kegiatan.tanggalSelesai.isBefore(today))
+    final List<KegiatanPkl> kegiatanMendatang = _semuaKegiatan
+        .where((kegiatan) => !kegiatan.tanggalSelesai.isBefore(hariIni))
         .toList();
 
-    // Sort by tanggal mulai (ascending)
-    upcomingKegiatan.sort((a, b) => a.tanggalMulai.compareTo(b.tanggalMulai));
+    // Urutkan berdasarkan tanggal mulai (menaik)
+    kegiatanMendatang.sort((a, b) => a.tanggalMulai.compareTo(b.tanggalMulai));
 
-    return upcomingKegiatan;
+    return kegiatanMendatang;
   }
 
   // Fungsi untuk mendapatkan kegiatan pada hari terpilih atau jadwal terdekat
-  List<KegiatanPkl> _getDisplayedKegiatan() {
-    final dayKegiatan = _getKegiatanForDay(_selectedDate ?? DateTime.now());
+  List<KegiatanPkl> _dapatkanKegiatanYangDitampilkan() {
+    final kegiatanHari = _dapatkanKegiatanUntukHari(_tanggalTerpilih ?? DateTime.now());
 
     // Jika ada kegiatan pada hari terpilih, tampilkan
-    if (dayKegiatan.isNotEmpty) {
-      return dayKegiatan;
+    if (kegiatanHari.isNotEmpty) {
+      return kegiatanHari;
     }
 
     // Jika tidak ada, tampilkan jadwal yang akan datang
-    return _getUpcomingKegiatan();
+    return _dapatkanKegiatanMendatang();
   }
 
-  // ========== BUILD WIDGET ==========
+  // ========== MEMBANGUN WIDGET ==========
   @override
   Widget build(BuildContext context) {
-    if (_isCheckingToken) {
+    // Tampilkan loading jika date formatting belum diinisialisasi
+    if (!_dateFormatInitialized) {
       return Scaffold(
         backgroundColor: Colors.white,
         body: Center(
@@ -367,24 +447,51 @@ class _SiswaKalenderState extends State<SiswaKalender> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _primaryColor, width: 2),
+              border: Border.all(color: _warnaUtama, width: 2),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: const CircularProgressIndicator(
-              color: _primaryColor,
+              color: _warnaUtama,
             ),
           ),
         ),
       );
     }
 
-    if (_isLoading) {
+    if (_sedangMemeriksaToken) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _warnaUtama, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const CircularProgressIndicator(
+              color: _warnaUtama,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_sedangMemuat) {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
@@ -392,13 +499,13 @@ class _SiswaKalenderState extends State<SiswaKalender> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircularProgressIndicator(
-                color: _primaryColor,
+                color: _warnaUtama,
               ),
               SizedBox(height: 16),
               Text(
                 'Memuat jadwal...',
                 style: TextStyle(
-                  color: _primaryColor,
+                  color: _warnaUtama,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -408,34 +515,34 @@ class _SiswaKalenderState extends State<SiswaKalender> {
       );
     }
 
-    if (_errorMessage.isNotEmpty) {
+    if (_pesanError.isNotEmpty) {
       return Scaffold(
         backgroundColor: Colors.white,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, color: _redColor, size: 64),
+              const Icon(Icons.error_outline, color: _warnaMerah, size: 64),
               const SizedBox(height: 16),
               const Text(
                 'Terjadi kesalahan',
                 style: TextStyle(
-                  color: _redColor,
+                  color: _warnaMerah,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                _errorMessage,
+                _pesanError,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: _textSecondary),
+                style: const TextStyle(color: _teksSekunder),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _loadDummyData,
+                onPressed: _muatDataContoh,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
+                  backgroundColor: _warnaUtama,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -457,9 +564,9 @@ class _SiswaKalenderState extends State<SiswaKalender> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _loadDummyData,
+          onRefresh: _muatDataContoh,
           backgroundColor: Colors.white,
-          color: _primaryColor,
+          color: _warnaUtama,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
@@ -473,10 +580,10 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: _borderColor),
+                    border: Border.all(color: _warnaBatas),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha:0.08),
+                        color: Colors.black.withOpacity(0.08),
                         blurRadius: 16,
                         offset: const Offset(0, 6),
                       ),
@@ -510,7 +617,6 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                               ),
                             ],
                           ),
-                    
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -522,18 +628,18 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: _primaryColor.withValues(alpha:0.1),
+                              color: _warnaUtama.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: _primaryColor.withValues(alpha:0.2),
+                                color: _warnaUtama.withOpacity(0.2),
                               ),
                             ),
                             child: Text(
-                              '${_allKegiatan.length} Total Kegiatan',
+                              '${_semuaKegiatan.length} Total Kegiatan',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: _primaryColor,
+                                color: _warnaUtama,
                               ),
                             ),
                           ),
@@ -544,18 +650,18 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: _greenColor.withValues(alpha:0.1),
+                              color: _warnaHijau.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: _greenColor.withValues(alpha:0.2),
+                                color: _warnaHijau.withOpacity(0.2),
                               ),
                             ),
                             child: Text(
-                              '${_getUpcomingKegiatan().length} Akan Datang',
+                              '${_dapatkanKegiatanMendatang().length} Akan Datang',
                               style: const TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: _greenColor,
+                                color: _warnaHijau,
                               ),
                             ),
                           ),
@@ -574,10 +680,10 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: _borderColor),
+                    border: Border.all(color: _warnaBatas),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha:0.08),
+                        color: Colors.black.withOpacity(0.08),
                         blurRadius: 18,
                         offset: const Offset(0, 8),
                       ),
@@ -586,9 +692,9 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _buildNavButton(
-                        icon: Icons.chevron_left,
-                        onPressed: _goToPreviousMonth,
+                      _bangunTombolNavigasi(
+                        ikon: Icons.chevron_left,
+                        onPressed: _keBulanSebelumnya,
                       ),
                       Expanded(
                         child: Container(
@@ -597,20 +703,20 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                _primaryColor.withValues(alpha:0.05),
-                                _primaryColor.withValues(alpha:0.05),
+                                _warnaUtama.withOpacity(0.05),
+                                _warnaUtama.withOpacity(0.05),
                               ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: _primaryColor.withValues(alpha:0.2),
+                              color: _warnaUtama.withOpacity(0.2),
                             ),
                           ),
                           child: Center(
                             child: Text(
-                              _currentMonth.toUpperCase(),
+                              _bulanSekarang.toUpperCase(),
                               style: const TextStyle(
                                 color: Color(0xFF9f0712),
                                 fontWeight: FontWeight.w800,
@@ -621,9 +727,9 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                           ),
                         ),
                       ),
-                      _buildNavButton(
-                        icon: Icons.chevron_right,
-                        onPressed: _goToNextMonth,
+                      _bangunTombolNavigasi(
+                        ikon: Icons.chevron_right,
+                        onPressed: _keBulanBerikutnya,
                       ),
                     ],
                   ),
@@ -637,10 +743,10 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: _borderColor),
+                    border: Border.all(color: _warnaBatas),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha:0.08),
+                        color: Colors.black.withOpacity(0.08),
                         blurRadius: 18,
                         offset: const Offset(0, 8),
                       ),
@@ -648,13 +754,13 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                   ),
                   child: Column(
                     children: [
-                      // HEADER HARI
+                      // HEADER HARI (Minggu sampai Sabtu)
                       Row(
-                        children: ['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day) {
+                        children: ['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((hari) {
                           return Expanded(
                             child: Center(
                               child: Text(
-                                day,
+                                hari,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: Color(0xFF666666),
@@ -669,12 +775,12 @@ class _SiswaKalenderState extends State<SiswaKalender> {
 
                       // HARI-HARI
                       Column(
-                        children: _calendarDays.map((week) {
+                        children: _hariKalender.map((minggu) {
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: Row(
-                              children: week.map((date) {
-                                if (date == null) {
+                              children: minggu.map((tanggal) {
+                                if (tanggal == null) {
                                   return Expanded(
                                     child: Container(
                                       margin: const EdgeInsets.all(4),
@@ -683,24 +789,24 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                   );
                                 }
 
-                                final isCurrentMonth = _isCurrentMonth(date);
-                                final hasEvent = _hasEvent(date);
-                                final isToday = _isToday(date);
-                                final isSelected = _isSelected(date);
-                                final isPastDay = _isPastDay(date);
+                                final adalahBulanSekarang = _adalahBulanSekarang(tanggal);
+                                final punyaAcara = _punyaAcara(tanggal);
+                                final adalahHariIni = _adalahHariIni(tanggal);
+                                final adalahTerpilih = _adalahTerpilih(tanggal);
+                                final adalahHariLalu = _adalahHariLalu(tanggal);
 
                                 return Expanded(
                                   child: GestureDetector(
                                     onTap: () {
                                       setState(() {
-                                        _selectedDate = date;
-                                        if (!isCurrentMonth) {
-                                          _currentDate = DateTime(
-                                            date.year,
-                                            date.month,
+                                        _tanggalTerpilih = tanggal;
+                                        if (!adalahBulanSekarang) {
+                                          _tanggalSekarang = DateTime(
+                                            tanggal.year,
+                                            tanggal.month,
                                             1,
                                           );
-                                          _generateCalendar();
+                                          _buatKalender();
                                         }
                                       });
                                     },
@@ -708,32 +814,32 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                       margin: const EdgeInsets.all(4),
                                       height: 50,
                                       decoration: BoxDecoration(
-                                        color: isPastDay
-                                            ? _pastDayColor
-                                            : isSelected
-                                                ? _primaryColor
-                                                : isToday
-                                                    ? _yellowColor.withValues(alpha:0.15)
+                                        color: adalahHariLalu
+                                            ? _warnaHariLalu
+                                            : adalahTerpilih
+                                                ? _warnaUtama
+                                                : adalahHariIni
+                                                    ? _warnaKuning.withOpacity(0.15)
                                                     : Colors.white,
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: isPastDay
+                                          color: adalahHariLalu
                                               ? Colors.grey[200]!
-                                              : isSelected
-                                                  ? _primaryColor
-                                                  : isToday
-                                                      ? _yellowColor
+                                              : adalahTerpilih
+                                                  ? _warnaUtama
+                                                  : adalahHariIni
+                                                      ? _warnaKuning
                                                       : Colors.grey[200]!,
-                                          width: isPastDay
+                                          width: adalahHariLalu
                                               ? 1
-                                              : isSelected
+                                              : adalahTerpilih
                                                   ? 2
-                                                  : (isToday ? 1.5 : 1),
+                                                  : (adalahHariIni ? 1.5 : 1),
                                         ),
-                                        boxShadow: isSelected
+                                        boxShadow: adalahTerpilih
                                             ? [
                                                 BoxShadow(
-                                                  color: _primaryColor.withValues(alpha:0.3),
+                                                  color: _warnaUtama.withOpacity(0.3),
                                                   blurRadius: 6,
                                                   offset: const Offset(0, 3),
                                                 ),
@@ -748,40 +854,40 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
                                               Text(
-                                                date.day.toString(),
+                                                tanggal.day.toString(),
                                                 style: TextStyle(
                                                   fontSize: 16,
-                                                  fontWeight: isSelected
+                                                  fontWeight: adalahTerpilih
                                                       ? FontWeight.w800
                                                       : FontWeight.w600,
-                                                  color: isPastDay
-                                                      ? _pastDayTextColor
-                                                      : isSelected
+                                                  color: adalahHariLalu
+                                                      ? _warnaTeksHariLalu
+                                                      : adalahTerpilih
                                                           ? Colors.white
-                                                          : isCurrentMonth
+                                                          : adalahBulanSekarang
                                                               ? Colors.black
                                                               : Colors.grey[400],
                                                 ),
                                               ),
-                                              if (hasEvent && isPastDay)
+                                              if (punyaAcara && adalahHariLalu)
                                                 Container(
                                                   margin: const EdgeInsets.only(top: 2),
                                                   width: 6,
                                                   height: 6,
                                                   decoration: const BoxDecoration(
-                                                    color: _pastDayTextColor,
+                                                    color: _warnaTeksHariLalu,
                                                     shape: BoxShape.circle,
                                                   ),
                                                 ),
-                                              if (hasEvent && !isPastDay)
+                                              if (punyaAcara && !adalahHariLalu)
                                                 Container(
                                                   margin: const EdgeInsets.only(top: 2),
                                                   width: 6,
                                                   height: 6,
                                                   decoration: BoxDecoration(
-                                                    color: isSelected
+                                                    color: adalahTerpilih
                                                         ? Colors.white
-                                                        : _primaryColor,
+                                                        : _warnaUtama,
                                                     shape: BoxShape.circle,
                                                   ),
                                                 ),
@@ -803,7 +909,6 @@ class _SiswaKalenderState extends State<SiswaKalender> {
 
                 const SizedBox(height: 20),
 
-
                 // DETAIL HARI TERPILIH
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -811,10 +916,10 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: _borderColor),
+                    border: Border.all(color: _warnaBatas),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha:0.08),
+                        color: Colors.black.withOpacity(0.08),
                         blurRadius: 18,
                         offset: const Offset(0, 8),
                       ),
@@ -830,8 +935,8 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _selectedDate != null
-                                    ? _formatDateForDisplay(_selectedDate!)
+                                _tanggalTerpilih != null
+                                    ? _formatTanggalUntukTampilan(_tanggalTerpilih!)
                                     : 'Pilih Tanggal',
                                 style: const TextStyle(
                                   fontSize: 16,
@@ -841,9 +946,9 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _getKegiatanForDay(_selectedDate ?? DateTime.now()).isEmpty
+                                _dapatkanKegiatanUntukHari(_tanggalTerpilih ?? DateTime.now()).isEmpty
                                     ? 'Menampilkan jadwal yang akan datang'
-                                    : '${_getKegiatanForDay(_selectedDate ?? DateTime.now()).length} kegiatan pada hari ini',
+                                    : '${_dapatkanKegiatanUntukHari(_tanggalTerpilih ?? DateTime.now()).length} kegiatan pada hari ini',
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: Color(0xFF666666),
@@ -857,22 +962,22 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: _getDisplayedKegiatan().isEmpty
-                                  ? Colors.grey.withValues(alpha:0.1)
-                                  : _greenColor.withValues(alpha:0.1),
+                              color: _dapatkanKegiatanYangDitampilkan().isEmpty
+                                  ? Colors.grey.withOpacity(0.1)
+                                  : _warnaHijau.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: _getDisplayedKegiatan().isEmpty
-                                    ? Colors.grey.withValues(alpha:0.3)
-                                    : _greenColor.withValues(alpha:0.3),
+                                color: _dapatkanKegiatanYangDitampilkan().isEmpty
+                                    ? Colors.grey.withOpacity(0.3)
+                                    : _warnaHijau.withOpacity(0.3),
                               ),
                             ),
                             child: Text(
-                              '${_getDisplayedKegiatan().length} Kegiatan',
+                              '${_dapatkanKegiatanYangDitampilkan().length} Kegiatan',
                               style: TextStyle(
-                                color: _getDisplayedKegiatan().isEmpty
+                                color: _dapatkanKegiatanYangDitampilkan().isEmpty
                                     ? Colors.grey
-                                    : _greenColor,
+                                    : _warnaHijau,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -882,14 +987,14 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                       ),
                       const SizedBox(height: 16),
 
-                      // LIST KEGIATAN
-                      if (_getDisplayedKegiatan().isEmpty)
+                      // DAFTAR KEGIATAN
+                      if (_dapatkanKegiatanYangDitampilkan().isEmpty)
                         Container(
                           padding: const EdgeInsets.all(40),
                           decoration: BoxDecoration(
                             color: Colors.grey[50],
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: _borderColor),
+                            border: Border.all(color: _warnaBatas),
                           ),
                           child: Column(
                             children: [
@@ -921,9 +1026,9 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                         )
                       else
                         Column(
-                          children: _getDisplayedKegiatan().map((kegiatan) {
-                            final isTodayEvent = _isToday(kegiatan.tanggalMulai);
-                            final isPastEvent = _isPastDay(kegiatan.tanggalMulai);
+                          children: _dapatkanKegiatanYangDitampilkan().map((kegiatan) {
+                            final statusKegiatan = _dapatkanStatusKegiatan(kegiatan);
+                            final adalahAcaraHariIni = _adalahHariIni(kegiatan.tanggalMulai);
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -931,17 +1036,17 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: isPastEvent
+                                  color: statusKegiatan == 'selesai'
                                       ? Colors.grey[300]!
-                                      : isTodayEvent
-                                          ? _primaryColor.withValues(alpha:0.5)
-                                          : _getJenisColor(kegiatan.jenisKegiatan)
-                                              .withValues(alpha:0.3),
-                                  width: isPastEvent ? 1 : 1.5,
+                                      : adalahAcaraHariIni
+                                          ? _warnaUtama.withOpacity(0.5)
+                                          : _dapatkanWarnaJenis(kegiatan.jenisKegiatan)
+                                              .withOpacity(0.3),
+                                  width: statusKegiatan == 'selesai' ? 1 : 1.5,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha:0.05),
+                                    color: Colors.black.withOpacity(0.05),
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
                                   ),
@@ -958,16 +1063,16 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                         Container(
                                           padding: const EdgeInsets.all(10),
                                           decoration: BoxDecoration(
-                                            color: _getJenisColor(kegiatan.jenisKegiatan)
-                                                .withValues(alpha:isPastEvent ? 0.05 : 0.1),
+                                            color: _dapatkanWarnaJenis(kegiatan.jenisKegiatan)
+                                                .withOpacity(statusKegiatan == 'selesai' ? 0.05 : 0.1),
                                             borderRadius: BorderRadius.circular(10),
                                             border: Border.all(
-                                              color: _getJenisColor(kegiatan.jenisKegiatan)
-                                                  .withValues(alpha:isPastEvent ? 0.1 : 0.3),
+                                              color: _dapatkanWarnaJenis(kegiatan.jenisKegiatan)
+                                                  .withOpacity(statusKegiatan == 'selesai' ? 0.1 : 0.3),
                                             ),
                                           ),
                                           child: Text(
-                                            _getJenisIcon(kegiatan.jenisKegiatan),
+                                            _dapatkanIkonJenis(kegiatan.jenisKegiatan),
                                             style: const TextStyle(fontSize: 16),
                                           ),
                                         ),
@@ -981,9 +1086,9 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                                 style: TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.w700,
-                                                  color: isPastEvent
+                                                  color: statusKegiatan == 'selesai'
                                                       ? Colors.grey[600]
-                                                      : _getJenisColor(kegiatan.jenisKegiatan),
+                                                      : _dapatkanWarnaJenis(kegiatan.jenisKegiatan),
                                                 ),
                                               ),
                                               const SizedBox(height: 2),
@@ -992,18 +1097,18 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                                   Icon(
                                                     Icons.calendar_today,
                                                     size: 12,
-                                                    color: isPastEvent
+                                                    color: statusKegiatan == 'selesai'
                                                         ? Colors.grey[500]
-                                                        : _textSecondary,
+                                                        : _teksSekunder,
                                                   ),
                                                   const SizedBox(width: 4),
                                                   Text(
-                                                    _formatDateShort(kegiatan.tanggalMulai),
+                                                    _formatTanggalPendek(kegiatan.tanggalMulai),
                                                     style: TextStyle(
                                                       fontSize: 11,
-                                                      color: isPastEvent
+                                                      color: statusKegiatan == 'selesai'
                                                           ? Colors.grey[600]
-                                                          : _textSecondary,
+                                                          : _teksSekunder,
                                                     ),
                                                   ),
                                                   if (kegiatan.tanggalSelesai !=
@@ -1012,12 +1117,12 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                                       children: [
                                                         const SizedBox(width: 4),
                                                         Text(
-                                                          '- ${_formatDateShort(kegiatan.tanggalSelesai)}',
+                                                          ' - ${_formatTanggalPendek(kegiatan.tanggalSelesai)}',
                                                           style: TextStyle(
                                                             fontSize: 11,
-                                                            color: isPastEvent
+                                                            color: statusKegiatan == 'selesai'
                                                                 ? Colors.grey[600]
-                                                                : _textSecondary,
+                                                                : _teksSekunder,
                                                           ),
                                                         ),
                                                       ],
@@ -1027,17 +1132,17 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                             ],
                                           ),
                                         ),
-                                        if (isTodayEvent)
+                                        if (adalahAcaraHariIni && statusKegiatan != 'selesai')
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 8,
                                               vertical: 4,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: _primaryColor.withValues(alpha:0.1),
+                                              color: _warnaUtama.withOpacity(0.1),
                                               borderRadius: BorderRadius.circular(6),
                                               border: Border.all(
-                                                color: _primaryColor.withValues(alpha:0.3),
+                                                color: _warnaUtama.withOpacity(0.3),
                                               ),
                                             ),
                                             child: const Text(
@@ -1049,7 +1154,7 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                               ),
                                             ),
                                           ),
-                                        if (isPastEvent)
+                                        if (statusKegiatan == 'selesai')
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 8,
@@ -1078,9 +1183,9 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
-                                        color: isPastEvent
+                                        color: statusKegiatan == 'selesai'
                                             ? Colors.grey[700]
-                                            : _textPrimary,
+                                            : _teksPrimer,
                                         height: 1.4,
                                       ),
                                     ),
@@ -1107,19 +1212,18 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                                 style: TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w700,
-                                                  color: _textSecondary,
+                                                  color: _teksSekunder,
                                                 ),
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                DateFormat('dd MMM yyyy')
-                                                    .format(kegiatan.tanggalMulai),
+                                                _formatTanggalTanpaLocale(kegiatan.tanggalMulai),
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w600,
-                                                  color: isPastEvent
+                                                  color: statusKegiatan == 'selesai'
                                                       ? Colors.grey[600]
-                                                      : _textPrimary,
+                                                      : _teksPrimer,
                                                 ),
                                               ),
                                             ],
@@ -1138,19 +1242,18 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                                 style: TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w700,
-                                                  color: _textSecondary,
+                                                  color: _teksSekunder,
                                                 ),
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                DateFormat('dd MMM yyyy')
-                                                    .format(kegiatan.tanggalSelesai),
+                                                _formatTanggalTanpaLocale(kegiatan.tanggalSelesai),
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w600,
-                                                  color: isPastEvent
+                                                  color: statusKegiatan == 'selesai'
                                                       ? Colors.grey[600]
-                                                      : _textPrimary,
+                                                      : _teksPrimer,
                                                 ),
                                               ),
                                             ],
@@ -1169,20 +1272,16 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                                 style: TextStyle(
                                                   fontSize: 10,
                                                   fontWeight: FontWeight.w700,
-                                                  color: _textSecondary,
+                                                  color: _teksSekunder,
                                                 ),
                                               ),
                                               const SizedBox(height: 4),
                                               Text(
-                                                kegiatan.status == 'active'
-                                                    ? 'AKTIF'
-                                                    : 'SELESAI',
+                                                statusKegiatan.toUpperCase(),
                                                 style: TextStyle(
                                                   fontSize: 13,
                                                   fontWeight: FontWeight.w700,
-                                                  color: kegiatan.status == 'active'
-                                                      ? _greenColor
-                                                      : Colors.grey,
+                                                  color: _dapatkanWarnaStatus(statusKegiatan),
                                                 ),
                                               ),
                                             ],
@@ -1209,8 +1308,8 @@ class _SiswaKalenderState extends State<SiswaKalender> {
     );
   }
 
-  Widget _buildNavButton({
-    required IconData icon,
+  Widget _bangunTombolNavigasi({
+    required IconData ikon,
     required VoidCallback onPressed,
   }) {
     return GestureDetector(
@@ -1221,17 +1320,17 @@ class _SiswaKalenderState extends State<SiswaKalender> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _borderColor),
+          border: Border.all(color: _warnaBatas),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
           ],
         ),
         child: Center(
-          child: Icon(icon, color: _primaryColor, size: 22),
+          child: Icon(ikon, color: _warnaUtama, size: 22),
         ),
       ),
     );
@@ -1246,10 +1345,9 @@ class KegiatanPkl {
   final int tahunAjaranId;
   final DateTime tanggalMulai;
   final DateTime tanggalSelesai;
-  final String status;
-  final int createdBy;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  final int dibuatOleh;
+  final DateTime dibuatPada;
+  final DateTime diperbaruiPada;
 
   KegiatanPkl({
     required this.id,
@@ -1258,9 +1356,8 @@ class KegiatanPkl {
     required this.tahunAjaranId,
     required this.tanggalMulai,
     required this.tanggalSelesai,
-    required this.status,
-    required this.createdBy,
-    required this.createdAt,
-    required this.updatedAt,
+    required this.dibuatOleh,
+    required this.dibuatPada,
+    required this.diperbaruiPada,
   });
 }

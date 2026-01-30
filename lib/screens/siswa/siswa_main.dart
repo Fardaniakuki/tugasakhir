@@ -180,7 +180,7 @@ class _SiswaMainState extends State<SiswaMain> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Ajukan Izin / Sakit',
+                        'Ajukan Izin / Pindah PKL',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -225,9 +225,9 @@ class _SiswaMainState extends State<SiswaMain> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: _buildIzinTypeOption(
-                              value: 'sakit',
-                              label: 'Sakit',
-                              icon: Icons.medical_services,
+                              value: 'Pindah PKL',
+                              label: 'Pindah PKL',
+                              icon: Icons.work_outline,
                             ),
                           ),
                         ],
@@ -728,7 +728,7 @@ class __SiswaBottomBarState extends State<_SiswaBottomBar> {
             index: 2,
             icon: Icons.assignment_outlined,
             activeIcon: Icons.assignment,
-            label: 'Rekap',
+            label: 'Permohonan',
           ),
 
           // Menu 4: Pengaturan

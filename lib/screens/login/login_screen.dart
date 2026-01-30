@@ -93,32 +93,46 @@ class _LoginScreenState extends State<LoginScreen> {
     final token = prefs.getString('access_token');
     final role = prefs.getString('user_role');
 
+    print('[DEBUG] Checking login status...');
+    print('[DEBUG] Token: ${token != null ? "Exists" : "Not found"}');
+    print('[DEBUG] Role: $role');
+
     if (token != null && role != null && mounted) {
       Widget targetPage;
 
-      switch (role) {
-        case 'Siswa':
+      // PERHATIAN: Gunakan lowercase untuk konsistensi dan handle semua kemungkinan
+      final roleLower = role.toLowerCase();
+      print('[DEBUG] Role in lowercase: $roleLower');
+
+      switch (roleLower) {
+        case 'siswa':
           targetPage = const SiswaMain();
           break;
-        case 'Guru':
+        case 'guru':
           targetPage = const GuruDashboard();
           break;
-        case 'Pembimbing':
+        case 'pembimbing':
           targetPage = const PembimbingMainScreen();
           break;
-        case 'Wali Kelas':
+        case 'wali kelas':
+        case 'wali_kelas':
           targetPage = const WalikelasMainScreen();
           break;
-        case 'Kaprog':
+        case 'kaprog':
+        case 'kepala konsentrasi keahlian':
+        case 'kepala_konsentrasi_keahlian':
+          print('[DEBUG] Role recognized as Kaprog, navigating to KaprogMainScreen');
           targetPage = const KaprogMainScreen();
           break;
-        case 'Admin':
+        case 'admin':
           targetPage = const AdminMain();
           break;
-        case 'Koordinator':
+        case 'koordinator':
           targetPage = const KoordinatorMain();
           break;
         default:
+          print('[DEBUG] Unknown role in checkLoginStatus: $role');
+          print('[DEBUG] Defaulting to GuruDashboard');
           return;
       }
 
@@ -127,6 +141,8 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
         MaterialPageRoute(builder: (_) => targetPage),
       );
+    } else {
+      print('[DEBUG] No valid token or role found');
     }
   }
 
@@ -147,7 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String capitalize(String s) =>
       s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : '';
 
-  // Fungsi untuk mengambil data profil guru
+  // Fungsi untuk mengambil data profil guru berdasarkan user_id atau nama
   Future<Map<String, dynamic>?> _fetchGuruProfile(
       SharedPreferences prefs) async {
     try {
@@ -168,69 +184,92 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final baseUrl =
           dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      String url;
+      
+      // PENTING: Cari berdasarkan user_id yang didapat dari login
+      if (userId != null) {
+        // Gunakan endpoint dengan search untuk mencari berdasarkan nama atau kode
+        final searchTerm = userName ?? kodeGuru ?? '';
+        final url = '$baseUrl/api/guru?search=$searchTerm&limit=10';
+        
+        print('Request URL: $url');
 
-      // Coba dengan endpoint yang berbeda berdasarkan data yang tersedia
-      if (userId != null && userId > 0) {
-        // Coba endpoint profil berdasarkan user_id
-        url = '$baseUrl/api/guru/profile';
-      } else if (kodeGuru != null && kodeGuru.isNotEmpty) {
-        // Coba endpoint dengan kode_guru
-        url = '$baseUrl/api/guru?search=$kodeGuru&limit=1';
-      } else if (userName != null && userName.isNotEmpty) {
-        // Coba endpoint dengan nama
-        url = '$baseUrl/api/guru?search=$userName&limit=1';
-      } else {
-        print('Tidak ada data yang cukup untuk mengambil profil guru');
-        return null;
-      }
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
 
-      print('Request URL: $url');
+        print('Response Status: ${response.statusCode}');
+        print('Response Body: ${response.body}');
 
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      );
-
-      print('Response Status: ${response.statusCode}');
-      print('Response Body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        if (data['success'] == true) {
-          if (data['data'] != null) {
-            // Handle berbagai struktur response
-            if (data['data'] is Map) {
-              // Single guru object
-              return data['data'];
-            } else if (data['data'] is List) {
-              // List of gurus
-              final guruList = data['data'] as List;
-              if (guruList.isNotEmpty) {
-                // Cari guru yang cocok dengan kode_guru atau nama
-                if (kodeGuru != null) {
-                  final matchingGuru = guruList.firstWhere(
-                    (guru) => guru['kode_guru'] == kodeGuru,
-                    orElse: () => guruList.first,
-                  );
-                  return matchingGuru;
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          
+          if (data['success'] == true) {
+            // PERHATIAN: Data structure adalah {"data": {"data": [...]}}
+            if (data['data'] != null && data['data'] is Map) {
+              final dataMap = data['data'] as Map<String, dynamic>;
+              
+              if (dataMap['data'] != null && dataMap['data'] is List) {
+                final guruList = dataMap['data'] as List;
+                
+                if (guruList.isNotEmpty) {
+                  // Cari guru yang sesuai dengan user_id dari login
+                  for (final guru in guruList) {
+                    final guruUserId = guru['user_id'];
+                    if (guruUserId == userId) {
+                      print('Found matching guru by user_id: $guruUserId');
+                      print('Guru data: $guru');
+                      return guru;
+                    }
+                  }
+                  
+                  // Jika tidak ditemukan by user_id, coba dengan kode_guru
+                  if (kodeGuru != null && kodeGuru.isNotEmpty) {
+                    for (final guru in guruList) {
+                      final guruKode = guru['kode_guru'];
+                      if (guruKode == kodeGuru) {
+                        print('Found matching guru by kode_guru: $guruKode');
+                        return guru;
+                      }
+                    }
+                  }
+                  
+                  // Jika masih tidak ditemukan, ambil yang pertama
+                  print('Using first guru from list');
+                  return guruList.first;
                 }
-                return guruList.first;
               }
             }
-          } else if (data['guru'] != null) {
-            // Alternatif struktur
-            return data['guru'];
           }
         }
-      } else if (response.statusCode == 404) {
-        print('Endpoint tidak ditemukan, mencoba alternatif...');
-        // Coba alternatif endpoint
-        return await _tryAlternativeEndpoints(prefs);
+      } else if (kodeGuru != null && kodeGuru.isNotEmpty) {
+        // Fallback: cari langsung dengan kode_guru
+        final url = '$baseUrl/api/guru?search=$kodeGuru&limit=1';
+        print('Fallback URL: $url');
+        
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+        );
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['success'] == true && 
+              data['data'] != null && 
+              data['data'] is Map &&
+              (data['data'] as Map)['data'] is List) {
+            final guruList = (data['data'] as Map)['data'] as List;
+            if (guruList.isNotEmpty) {
+              return guruList.first;
+            }
+          }
+        }
       }
 
       return null;
@@ -238,49 +277,6 @@ class _LoginScreenState extends State<LoginScreen> {
       print('Error fetching guru profile: $e');
       return null;
     }
-  }
-
-  Future<Map<String, dynamic>?> _tryAlternativeEndpoints(
-      SharedPreferences prefs) async {
-    final token = prefs.getString('access_token');
-    if (token == null) return null;
-
-    final baseUrl =
-        dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-    final userId = prefs.getInt('user_id');
-    final kodeGuru = prefs.getString('kode_guru');
-
-    // Coba endpoint alternatif
-    final endpoints = [
-      if (userId != null) '$baseUrl/api/users/$userId/profile',
-      if (kodeGuru != null) '$baseUrl/api/guru/by-kode/$kodeGuru',
-      '$baseUrl/api/guru/my-profile',
-      '$baseUrl/api/auth/profile',
-    ];
-
-    for (final endpoint in endpoints) {
-      try {
-        print('Mencoba endpoint: $endpoint');
-        final response = await http.get(
-          Uri.parse(endpoint),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data['success'] == true && data['data'] != null) {
-            return data['data'];
-          }
-        }
-      } catch (e) {
-        print('Error endpoint $endpoint: $e');
-      }
-    }
-
-    return null;
   }
 
   Future<void> _showRoleSelectionDialog(
@@ -291,13 +287,26 @@ class _LoginScreenState extends State<LoginScreen> {
   ) async {
     if (!mounted) return;
 
+    // DEBUG: Tampilkan data user yang diterima
+    print('=== SHOW ROLE SELECTION DIALOG ===');
+    print('User data keys: ${userData.keys.toList()}');
+    print('is_kaprog: ${userData['is_kaprog']}');
+    print('is_koordinator: ${userData['is_koordinator']}');
+    print('is_pembimbing: ${userData['is_pembimbing']}');
+    print('is_wali_kelas: ${userData['is_wali_kelas']}');
+
     // Ambil data profil guru terlebih dahulu
     final guruProfile = await _fetchGuruProfile(prefs);
 
     // Gabungkan data dari login dengan data profil
-    final Map<String, dynamic> combinedData = {...userData};
+    final Map<String, dynamic> combinedData = Map.from(userData);
     if (guruProfile != null) {
-      combinedData.addAll(guruProfile);
+      // Prioritaskan data dari guruProfile (karena lebih lengkap)
+      guruProfile.forEach((key, value) {
+        if (value != null) {
+          combinedData[key] = value;
+        }
+      });
     }
 
     return showDialog(
@@ -308,11 +317,25 @@ class _LoginScreenState extends State<LoginScreen> {
           userData: combinedData,
           userName: userName,
           onRoleSelected: (role) async {
-            // Simpan role
-            await prefs.setString('user_role', role);
+            // SIMPAN KE SHAREDPREFERENCES DENGAN KEY YANG KONSISTEN
+            String roleToSave = role;
+            
+            // DEBUG: Log role yang diterima dari dialog
+            print('[DEBUG] Role received from dialog: $role');
+            
+            // Jika role adalah 'Kepala Konsentrasi Keahlian', simpan sebagai 'kaprog'
+            if (role == 'Kepala Konsentrasi Keahlian') {
+              roleToSave = 'kaprog'; // Simpan sebagai 'kaprog' untuk sistem
+              print('[DEBUG] Converting role to: $roleToSave');
+            }
+            
+            // Simpan role dengan key yang konsisten (gunakan lowercase)
+            final roleLower = roleToSave.toLowerCase();
+            await prefs.setString('user_role', roleLower);
+            print('[DEBUG] Saved role to SharedPreferences: $roleLower');
 
             // Simpan semua data user
-            await _saveAllUserData(prefs, combinedData, role);
+            await _saveAllUserData(prefs, combinedData, roleToSave);
 
             // SIMPAN DATA GURU TAMBAHAN jika ada
             if (guruProfile != null) {
@@ -322,23 +345,30 @@ class _LoginScreenState extends State<LoginScreen> {
             if (!mounted) return;
 
             Widget targetPage;
-            switch (role) {
-              case 'Pembimbing':
+            
+            // GUNAKAN ROLE_TO_SAVE (yang sudah dikonversi) untuk navigasi
+            switch (roleLower) {
+              case 'pembimbing':
                 targetPage = const PembimbingMainScreen();
                 break;
-              case 'Wali Kelas':
+              case 'wali kelas':
+              case 'wali_kelas':
                 targetPage = const WalikelasMainScreen();
                 break;
-              case 'Kaprog':
+              case 'kaprog':
+              case 'kepala konsentrasi keahlian':
+                print('[DEBUG] Navigating to KaprogMainScreen');
                 targetPage = const KaprogMainScreen();
                 break;
-              case 'Admin':
+              case 'admin':
                 targetPage = const AdminMain();
                 break;
-              case 'Koordinator':
+              case 'koordinator':
                 targetPage = const KoordinatorMain();
                 break;
+              case 'guru':
               default:
+                print('[DEBUG] Defaulting to GuruDashboard for role: $roleToSave');
                 targetPage = const GuruDashboard();
             }
 
@@ -370,22 +400,27 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString('user_nip', userData['nip'].toString());
       }
 
+      // PERHATIAN: no_telp ada di data guru, bukan di data login awal
       if (userData['no_telp'] != null) {
         await prefs.setString('user_phone', userData['no_telp'].toString());
+        print('Saved phone number: ${userData['no_telp']}');
+      } else {
+        print('No phone number found in userData');
+        print('Available keys: ${userData.keys.toList()}');
       }
 
       // Simpan status role dari data guru
       if (userData['is_wali_kelas'] != null) {
-        await prefs.setBool('is_wali_kelas', userData['is_wali_kelas']);
+        await prefs.setBool('is_wali_kelas', userData['is_wali_kelas'] == true);
       }
       if (userData['is_pembimbing'] != null) {
-        await prefs.setBool('is_pembimbing', userData['is_pembimbing']);
+        await prefs.setBool('is_pembimbing', userData['is_pembimbing'] == true);
       }
       if (userData['is_kaprog'] != null) {
-        await prefs.setBool('is_kaprog', userData['is_kaprog']);
+        await prefs.setBool('is_kaprog', userData['is_kaprog'] == true);
       }
       if (userData['is_koordinator'] != null) {
-        await prefs.setBool('is_koordinator', userData['is_koordinator']);
+        await prefs.setBool('is_koordinator', userData['is_koordinator'] == true);
       }
 
       print('=== DATA DISIMPAN UNTUK ROLE: $role ===');
@@ -407,24 +442,32 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _saveGuruProfileData(
       SharedPreferences prefs, Map<String, dynamic> guruData) async {
     try {
-      // Simpan semua field dari data guru
-      for (final key in guruData.keys) {
+      // Simpan semua field penting dari data guru
+      final importantKeys = [
+        'id', 'user_id', 'kode_guru', 'nip', 'nama', 
+        'no_telp', 'is_koordinator', 'is_pembimbing', 
+        'is_wali_kelas', 'is_kaprog', 'is_active'
+      ];
+      
+      for (final key in importantKeys) {
         final value = guruData[key];
-        if (value is String) {
-          await prefs.setString('guru_$key', value);
-        } else if (value is int) {
-          await prefs.setInt('guru_$key', value);
-        } else if (value is bool) {
-          await prefs.setBool('guru_$key', value);
-        } else if (value is double) {
-          await prefs.setDouble('guru_$key', value);
-        } else if (value != null) {
-          await prefs.setString('guru_$key', value.toString());
+        if (value != null) {
+          if (value is String) {
+            await prefs.setString('guru_$key', value);
+          } else if (value is int) {
+            await prefs.setInt('guru_$key', value);
+          } else if (value is bool) {
+            await prefs.setBool('guru_$key', value);
+          } else if (value is double) {
+            await prefs.setDouble('guru_$key', value);
+          } else {
+            await prefs.setString('guru_$key', value.toString());
+          }
         }
       }
 
       print('=== GURU PROFILE DATA SAVED ===');
-      print('Total keys saved: ${guruData.keys.length}');
+      print('Phone saved to: guru_no_telp = ${guruData['no_telp']}');
     } catch (e) {
       print('Error saving guru profile: $e');
     }
@@ -487,7 +530,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> loginToAPI(String endpoint, Map<String, dynamic> body) async {
-    await dotenv.load(fileName: ".env"); // Load .env file
+    await dotenv.load(fileName: '.env'); // Load .env file
 
     final baseUrl =
         dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
@@ -524,7 +567,6 @@ class _LoginScreenState extends State<LoginScreen> {
         print('User id: ${user['id']}');
         print('User nama: ${user['nama']}');
         print('User kode_guru: ${user['kode_guru']}');
-        print('User role: ${user['role']}');
 
         final prefs = await SharedPreferences.getInstance();
 
@@ -551,7 +593,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
 
-        // SIMPAN NIP jika ada
+        // SIMPAN NIP jika ada (biasanya belum ada di login response)
         if (user['nip'] != null) {
           await prefs.setString('user_nip', user['nip'].toString());
         }
@@ -561,12 +603,10 @@ class _LoginScreenState extends State<LoginScreen> {
         final savedId = prefs.getInt('user_id');
         final savedName = prefs.getString('user_name');
         final savedKode = prefs.getString('kode_guru');
-        final savedNip = prefs.getString('user_nip');
 
         print('Saved User ID: $savedId');
         print('Saved User Name: $savedName');
         print('Saved Kode Guru: $savedKode');
-        print('Saved NIP: $savedNip');
 
         // Set role
         if (selectedRole == 'Siswa') {
@@ -579,20 +619,12 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         if (endpoint == '/auth/guru/login' && !isAdminMode) {
-          // Ambil data profil guru sebelum menampilkan dialog
-          final guruProfile = await _fetchGuruProfile(prefs);
-          final combinedUser =
-              Map<String, dynamic>.from(user); // PERBAIKAN DI SINI
-          if (guruProfile != null) {
-            combinedUser.addAll(guruProfile);
-          }
-
           // Tampilkan dialog pemilihan role untuk guru
           await _showRoleSelectionDialog(
             context,
-            combinedUser,
+            user,
             prefs,
-            capitalize(user['nama']),
+            capitalize(user['nama'] ?? 'Guru'),
           );
         } else {
           Widget targetPage;
@@ -829,7 +861,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(25),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
+                        color: Colors.black.withValues(alpha:0.25),
                         blurRadius: 3,
                         offset: const Offset(0, 4),
                       ),
@@ -885,7 +917,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(25),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.25),
+                        color: Colors.black.withValues(alpha:0.25),
                         blurRadius: 3,
                         offset: const Offset(0, 4),
                       ),
@@ -1027,7 +1059,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
+                                    color: Colors.black.withValues(alpha:0.05),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -1129,7 +1161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         boxShadow: [
                                           BoxShadow(
                                             color: Colors.black
-                                                .withValues(alpha: 0.15),
+                                                .withValues(alpha:0.15),
                                             blurRadius: 6,
                                             offset: const Offset(0, 3),
                                           ),

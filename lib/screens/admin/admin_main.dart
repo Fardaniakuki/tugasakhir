@@ -178,7 +178,8 @@ class _AdminMainState extends State<AdminMain> {
           color: Colors.black87,
         ),
       ),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      trailing:
+          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
       onTap: () {
         Navigator.pop(context);
         if (jenis == 'Siswa') {
@@ -244,7 +245,8 @@ class _AdminMainState extends State<AdminMain> {
                     color: const Color(0xFF641E20).withAlpha(25),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.upload_file, color: Color(0xFF641E20)),
+                  child:
+                      const Icon(Icons.upload_file, color: Color(0xFF641E20)),
                 ),
                 title: const Text(
                   'Import Excel',
@@ -309,7 +311,7 @@ class _AdminMainState extends State<AdminMain> {
             color: const Color(0xFF641E20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.15),
+                color: Colors.black.withValues(alpha: 0.15),
                 blurRadius: 8,
                 spreadRadius: 1,
                 offset: const Offset(0, 3),
@@ -332,7 +334,7 @@ class _AdminMainState extends State<AdminMain> {
         padding: const EdgeInsets.all(12),
         decoration: isSelected
             ? BoxDecoration(
-                color: const Color(0xFF641E20).withOpacity(0.1),
+                color: const Color(0xFF641E20).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               )
             : null,
@@ -423,7 +425,6 @@ class _AdminMainState extends State<AdminMain> {
               return _buildPageWithGestureDetector(index, page);
             }).toList(),
           ),
-
           Positioned(
             left: 20,
             right: 20,
@@ -445,7 +446,7 @@ class _AdminMainState extends State<AdminMain> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: Colors.black.withValues(alpha: 0.1),
                         blurRadius: 10,
                         spreadRadius: 0,
                         offset: const Offset(0, 2),
@@ -523,7 +524,7 @@ class LifecycleEventHandler extends WidgetsBindingObserver {
 class ExcelImportPage extends StatefulWidget {
   final VoidCallback? onImportSuccess;
 
-  const ExcelImportPage({Key? key, this.onImportSuccess}) : super(key: key);
+  const ExcelImportPage({super.key, this.onImportSuccess});
 
   @override
   State<ExcelImportPage> createState() => _ExcelImportPageState();
@@ -549,9 +550,9 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
+
       print('🔑 Token loaded: ${token != null ? "Yes" : "No"}');
-      
+
       setState(() {
         _authToken = token;
       });
@@ -649,13 +650,13 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.2),
+          color: Colors.grey.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -665,7 +666,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: const Color(0xFF641E20).withOpacity(0.1),
+              color: const Color(0xFF641E20).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
@@ -765,7 +766,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.05),
+            color: Colors.grey.withValues(alpha: 0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -778,11 +779,13 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: const Color(0xFF641E20).withOpacity(0.1),
+              color: const Color(0xFF641E20).withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              _selectedFile == null ? Icons.cloud_upload_rounded : Icons.insert_drive_file_rounded,
+              _selectedFile == null
+                  ? Icons.cloud_upload_rounded
+                  : Icons.insert_drive_file_rounded,
               size: 40,
               color: const Color(0xFF641E20),
             ),
@@ -802,7 +805,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
 
           // Description
           Text(
-            _selectedFile == null 
+            _selectedFile == null
                 ? 'Pilih file Excel (.xlsx/.xls) untuk memulai import'
                 : '${_selectedFile!.name} (${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB)',
             textAlign: TextAlign.center,
@@ -911,11 +914,17 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
         // Summary Cards
         Row(
           children: [
-            Expanded(child: _buildSummaryCard('Total', summary['total_rows'].toString(), Colors.blue)),
+            Expanded(
+                child: _buildSummaryCard(
+                    'Total', summary['total_rows'].toString(), Colors.blue)),
             const SizedBox(width: 12),
-            Expanded(child: _buildSummaryCard('Valid', summary['valid_count'].toString(), Colors.green)),
+            Expanded(
+                child: _buildSummaryCard(
+                    'Valid', summary['valid_count'].toString(), Colors.green)),
             const SizedBox(width: 12),
-            Expanded(child: _buildSummaryCard('Error', summary['error_count'].toString(), Colors.orange)),
+            Expanded(
+                child: _buildSummaryCard(
+                    'Error', summary['error_count'].toString(), Colors.orange)),
           ],
         ),
         const SizedBox(height: 25),
@@ -975,9 +984,9 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -1009,7 +1018,8 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
       children: [
         Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.green, size: 18),
+            const Icon(Icons.check_circle_rounded,
+                color: Colors.green, size: 18),
             const SizedBox(width: 8),
             const Text(
               'Data Valid',
@@ -1023,7 +1033,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -1047,7 +1057,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             'NISN: ${row['nisn']} • ${row['kelas']}',
             true,
           );
-        }).toList(),
+        }),
         const SizedBox(height: 20),
       ],
     );
@@ -1073,7 +1083,7 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -1097,20 +1107,25 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             'Error: $errors',
             false,
           );
-        }).toList(),
+        }),
       ],
     );
   }
 
-  Widget _buildDataItem(int number, String title, String subtitle, bool isSuccess) {
+  Widget _buildDataItem(
+      int number, String title, String subtitle, bool isSuccess) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isSuccess ? Colors.green.withOpacity(0.05) : Colors.orange.withOpacity(0.05),
+        color: isSuccess
+            ? Colors.green.withValues(alpha: 0.05)
+            : Colors.orange.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isSuccess ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+          color: isSuccess
+              ? Colors.green.withValues(alpha: 0.2)
+              : Colors.orange.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -1119,7 +1134,9 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: isSuccess ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+              color: isSuccess
+                  ? Colors.green.withValues(alpha: 0.2)
+                  : Colors.orange.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Center(
@@ -1177,10 +1194,14 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.only(top: 20),
       decoration: BoxDecoration(
-        color: _isSuccess ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+        color: _isSuccess
+            ? Colors.green.withValues(alpha: 0.1)
+            : Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _isSuccess ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
+          color: _isSuccess
+              ? Colors.green.withValues(alpha: 0.3)
+              : Colors.red.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -1287,7 +1308,8 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
       }
     } on DioException catch (e) {
       setState(() {
-        _statusMessage = e.response?.data?['message'] ?? e.message ?? 'Gagal upload';
+        _statusMessage =
+            e.response?.data?['message'] ?? e.message ?? 'Gagal upload';
         _isSuccess = false;
       });
     } finally {
@@ -1322,9 +1344,9 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
             'Data berhasil diimport!',
             '${_previewData!['summary']['valid_count']} data siswa telah ditambahkan.',
           );
-          
+
           widget.onImportSuccess?.call();
-          
+
           if (mounted) {
             Navigator.pop(context);
           }
@@ -1384,17 +1406,18 @@ class SuccessPopup extends StatefulWidget {
   final VoidCallback onClose;
 
   const SuccessPopup({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     required this.onClose,
-  }) : super(key: key);
+  });
 
   @override
   State<SuccessPopup> createState() => _SuccessPopupState();
 }
 
-class _SuccessPopupState extends State<SuccessPopup> with SingleTickerProviderStateMixin {
+class _SuccessPopupState extends State<SuccessPopup>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
@@ -1402,22 +1425,22 @@ class _SuccessPopupState extends State<SuccessPopup> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    
+
     _controller = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
     );
-    
+
     _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
-    
+
     _controller.forward();
-    
+
     // Auto close setelah 3 detik
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
@@ -1462,7 +1485,7 @@ class _SuccessPopupState extends State<SuccessPopup> with SingleTickerProviderSt
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 30,
                     spreadRadius: 5,
                     offset: const Offset(0, 10),
@@ -1477,10 +1500,10 @@ class _SuccessPopupState extends State<SuccessPopup> with SingleTickerProviderSt
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.green.withOpacity(0.3),
+                        color: Colors.green.withValues(alpha: 0.3),
                         width: 2,
                       ),
                     ),

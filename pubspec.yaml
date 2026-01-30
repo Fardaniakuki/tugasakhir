@@ -30,13 +30,17 @@ dependencies:
     sdk: flutter
   url_launcher: ^6.3.2
   image_picker: ^1.2.1
-  pdfx: ^2.9.2
-  path_provider: ^2.1.5
+  pdfx: ^2.9.2                    # Sudah ada, tapi ini untuk view PDF
+  path_provider: ^2.1.5          # Sudah ada
   file_picker: ^10.3.8
   cached_network_image: ^3.2.3
   photo_view: ^0.15.0
   flutter_pdfview: ^1.4.4
   open_file: ^3.2.1
+  pdf: ^3.10.8                   # Untuk membuat PD
+  printing: ^5.11.2             
+  permission_handler: ^12.0.1
+
 
 
 
@@ -56,7 +60,5 @@ flutter:
     - assets/images/login_background.webp
     - assets/images/login_background.png
     - assets/images/smkn2.webp
-    - assets/icons/
-    - assets/logos/
     - assets/animations/
     - .env

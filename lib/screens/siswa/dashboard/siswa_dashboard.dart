@@ -20,8 +20,8 @@ class SiswaDashboard extends StatefulWidget {
 }
 
 class _SiswaDashboardState extends State<SiswaDashboard> {
-  String _namaSiswa = 'Loading...';
-  String _kelasSiswa = 'Loading...';
+  String _namaSiswa = 'Memuat...';
+  String _kelasSiswa = 'Memuat...';
   int? _kelasId;
   bool _isLoading = true;
   bool _hasToken = false;
@@ -198,14 +198,14 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       return;
     }
 
-    final String type = data['type'] ?? 'unknown';
+    final String type = data['type'] ?? 'tidak_dikenal';
 
     switch (type) {
       case 'pkl_approved':
-        await _handlePKLApproved(data);
+        await _handlePKLDisetujui(data);
         break;
       case 'pkl_rejected':
-        await _handlePKLRejected(data);
+        await _handlePKLDitolak(data);
         break;
       default:
     }
@@ -264,7 +264,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     } catch (e) {}
   }
 
-  Future<void> _handlePKLApproved(Map<String, dynamic> data) async {
+  Future<void> _handlePKLDisetujui(Map<String, dynamic> data) async {
     final notificationData = data['data'];
     if (notificationData == null) return;
 
@@ -285,7 +285,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         'catatan': catatan,
         'timestamp': DateTime.now().toIso8601String(),
         'read': false,
-        'type': 'approved',
+        'type': 'disetujui',
         'data': data,
       };
 
@@ -313,7 +313,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     await _loadAllData();
   }
 
-  Future<void> _handlePKLRejected(Map<String, dynamic> data) async {
+  Future<void> _handlePKLDitolak(Map<String, dynamic> data) async {
     final notificationData = data['data'];
     if (notificationData == null) return;
 
@@ -334,7 +334,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         'catatan': catatan,
         'timestamp': DateTime.now().toIso8601String(),
         'read': false,
-        'type': 'rejected',
+        'type': 'ditolak',
         'data': data,
       };
 
@@ -468,16 +468,16 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                               itemBuilder: (context, index) {
                                 final notification = _notifications[index];
                                 final isRead = notification['read'] ?? false;
-                                final isApproved =
-                                    notification['type'] == 'approved';
-                                final isRejected =
-                                    notification['type'] == 'rejected';
+                                final isDisetujui =
+                                    notification['type'] == 'disetujui';
+                                final isDitolak =
+                                    notification['type'] == 'ditolak';
 
                                 return _buildNotificationCard(
                                   notification,
                                   isRead,
-                                  isApproved,
-                                  isRejected,
+                                  isDisetujui,
+                                  isDitolak,
                                   index,
                                   setState,
                                 );
@@ -561,8 +561,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   Widget _buildNotificationCard(
     Map<String, dynamic> notification,
     bool isRead,
-    bool isApproved,
-    bool isRejected,
+    bool isDisetujui,
+    bool isDitolak,
     int index,
     StateSetter setState,
   ) {
@@ -609,9 +609,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: isRejected
+                    color: isDitolak
                         ? Colors.red
-                        : (isApproved ? Colors.green : Colors.orange),
+                        : (isDisetujui ? Colors.green : Colors.orange),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -668,7 +668,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                     color: Colors.grey[500],
                   ),
                 ),
-                if (isRejected)
+                if (isDitolak)
                   TextButton(
                     onPressed: _ajukanPKL,
                     style: TextButton.styleFrom(
@@ -979,7 +979,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
           final approvedApplications = _pklApplications.where((app) {
             final status = app['status'].toString().toLowerCase();
-            return status == 'approved' || status == 'disetujui';
+            return status == 'disetujui' || status == 'approved';
           }).toList();
 
           if (approvedApplications.isNotEmpty) {
@@ -1160,7 +1160,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         builder: (context) => AjukanPKLDialog(
           token: token,
           kelasId: _kelasId,
-          primaryColor: const Color(0xFF9f0712), // Ganti null dengan warna yang valid
+          primaryColor: const Color(0xFF9f0712),
         ),
       );
 
@@ -1334,14 +1334,14 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     if (status == null) return 0;
 
     switch (status.toLowerCase()) {
-      case 'pending':
       case 'menunggu':
+      case 'pending':
         return 1;
-      case 'approved':
       case 'disetujui':
+      case 'approved':
         return 2;
-      case 'completed':
       case 'selesai':
+      case 'completed':
         return 3;
       default:
         return 0;
@@ -1352,30 +1352,30 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     if (status == null) return 'Belum Mengajukan';
 
     switch (status.toLowerCase()) {
-      case 'pending':
       case 'menunggu':
+      case 'pending':
         return 'Menunggu';
-      case 'approved':
       case 'disetujui':
+      case 'approved':
         return 'Menjalankan PKL';
-      case 'completed':
       case 'selesai':
+      case 'completed':
         return 'Selesai PKL';
       default:
         return 'Mengajukan';
     }
   }
 
-  bool _hasApprovedApplication() {
+  bool _hasDisetujuiApplication() {
     if (_pklData == null) return false;
     final status = _pklData!['status'].toString().toLowerCase();
-    return status == 'approved' || status == 'disetujui';
+    return status == 'disetujui' || status == 'approved';
   }
 
-  bool _hasRejectedApplication() {
+  bool _hasDitolakApplication() {
     if (_pklData == null) return false;
     final status = _pklData!['status'].toString().toLowerCase();
-    return status == 'rejected' || status == 'ditolak';
+    return status == 'ditolak' || status == 'rejected';
   }
 
   @override
@@ -1691,9 +1691,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                   ),
                                 ),
                                 Text(
-                                  _hasApprovedApplication()
+                                  _hasDisetujuiApplication()
                                       ? '1 Disetujui'
-                                      : (_hasRejectedApplication()
+                                      : (_hasDitolakApplication()
                                           ? '1 Ditolak'
                                           : _pklData != null
                                               ? '1 Menunggu'
@@ -2086,147 +2086,119 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       ],
     );
   }
+Widget _buildPengajuanCard(Map<String, dynamic> pengajuan) {
+  final status = pengajuan['status'];
+  // Gunakan fungsi _translateStatus untuk mendapatkan status dalam Bahasa Indonesia
+  final statusText = _translateStatus(status);
+  final isDisetujui = status.toLowerCase() == 'disetujui';
 
-  Widget _buildPengajuanCard(Map<String, dynamic> pengajuan) {
-    final status = pengajuan['status'];
-    final isApproved = status.toLowerCase() == 'approved' ||
-        status.toLowerCase() == 'disetujui';
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1,
+  return Container(
+    margin: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha:0.05),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
         ),
+      ],
+      border: Border.all(
+        color: Colors.grey[200]!,
+        width: 1,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: _statusColor(status).withValues(alpha:0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: _statusColor(status).withValues(alpha:0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _statusColor(status),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isDisetujui ? Icons.check_circle : Icons.access_time,
+                size: 14,
                 color: _statusColor(status),
-                width: 1,
               ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  isApproved ? Icons.check_circle : Icons.access_time,
-                  size: 14,
+              const SizedBox(width: 4),
+              Text(
+                statusText,
+                style: TextStyle(
                   color: _statusColor(status),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  status.toUpperCase(),
-                  style: TextStyle(
-                    color: _statusColor(status),
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            pengajuan['industri_nama'],
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          pengajuan['industri_nama'],
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
           ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: RichText(
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'Diproses oleh: ',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[700],
-                          ),
-                        ),
-                        TextSpan(
-                          text: pengajuan['diproses_oleh'],
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _statusColor(pengajuan['status']),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                RichText(
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: RichText(
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: 'Pembimbing PKL: ',
+                        text: 'Diproses oleh: ',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[700],
                         ),
                       ),
                       TextSpan(
-                        text: pengajuan['pembimbing_pkl'],
+                        text: pengajuan['diproses_oleh'],
                         style: TextStyle(
                           fontSize: 12,
-                          color: _statusColor(pengajuan['status']),
+                          color: _statusColor(status),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ),
+              RichText(
+                text: TextSpan(
                   children: [
-                    const Text(
-                      'Tanggal Pengajuan',
+                    TextSpan(
+                      text: 'Pembimbing PKL: ',
                       style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey,
+                        fontSize: 12,
+                        color: Colors.grey[700],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      pengajuan['tanggal_permohonan'],
-                      style: const TextStyle(
+                    TextSpan(
+                      text: pengajuan['pembimbing_pkl'],
+                      style: TextStyle(
                         fontSize: 12,
+                        color: _statusColor(status),
                         fontWeight: FontWeight.w500,
-                        color: Colors.black,
                       ),
                     ),
                   ],
@@ -2234,79 +2206,132 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 248, 249, 250),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Catatan Pengajuan:',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey,
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Tanggal Pengajuan',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  pengajuan['catatan'],
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black87,
+                  const SizedBox(height: 2),
+                  Text(
+                    pengajuan['tanggal_permohonan'],
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 248, 249, 250),
+            borderRadius: BorderRadius.circular(8),
           ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _statusColor(pengajuan['status']).withValues(alpha:0.05),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Catatan Kaprog:',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: _statusColor(pengajuan['status']),
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Catatan Pengajuan:',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  pengajuan['kaprog_note'],
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _statusColor(pengajuan['status']),
-                  ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                pengajuan['catatan'],
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.black87,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Diputuskan pada: ${pengajuan['decided_at']}',
-            style: const TextStyle(
-              fontSize: 10,
-              color: Colors.grey,
-            ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _statusColor(status).withValues(alpha:0.05),
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
-      ),
-    );
-  }
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Catatan Kaprog:',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: _statusColor(status),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                pengajuan['kaprog_note'],
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _statusColor(status),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Diputuskan pada: ${pengajuan['decided_at']}',
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.grey,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
+// Fungsi untuk menerjemahkan status ke Bahasa Indonesia
+String _translateStatus(String status) {
+  switch (status.toLowerCase()) {
+    case 'approved':
+      return 'DISETUJUI';
+    case 'rejected':
+      return 'DITOLAK';
+    case 'pending':
+      return 'MENUNGGU';
+    case 'completed':
+      return 'SELESAI';
+    case 'disetujui':
+      return 'DISETUJUI';
+    case 'ditolak':
+      return 'DITOLAK';
+    case 'menunggu':
+      return 'MENUNGGU';
+    case 'selesai':
+      return 'SELESAI';
+    default:
+      return status.toUpperCase();
+  }
+}
+
+// Fungsi untuk mendapatkan warna berdasarkan status
   Widget _buildMenuOptionKiri(String title, IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,

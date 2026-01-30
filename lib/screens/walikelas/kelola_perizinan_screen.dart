@@ -87,7 +87,7 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
                       ),
                       tabs: const [
                         Tab(text: 'SIA (Sakit/Izin/Alpha)'),
-                        Tab(text: 'Permasalahan PKL'),
+                        Tab(text: 'Pindah PKL'),
                       ],
                     ),
                   ),

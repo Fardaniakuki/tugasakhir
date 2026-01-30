@@ -1035,7 +1035,7 @@ class _EditIndustryPageState extends State<EditIndustryPage> {
                     ),
                     Switch(
                       value: _isActive,
-                      activeColor: _primaryColor,
+                      activeThumbColor: _primaryColor,
                       onChanged: (value) {
                         setState(() {
                           _isActive = value;

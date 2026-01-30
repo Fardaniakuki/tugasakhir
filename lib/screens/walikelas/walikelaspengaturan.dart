@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../login/login_screen.dart';
 
 class WaliKelasProfilePage extends StatefulWidget {
@@ -11,110 +14,567 @@ class WaliKelasProfilePage extends StatefulWidget {
 }
 
 class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
-  // Warna-warna sama persis dengan KaprogProfilePage
-  static const Color _primaryColor = Color(0xFF6B1B1B); // Merah marun
-  static const Color _accentColor = Color(0xFF9F0712); // Merah
-  static const Color _lightColor = Color(0xFFF5F5F5); // Abu-abu muda
-  static const Color _textColor = Color(0xFF333333); // Teks gelap
-  static const Color _borderColor = Color(0xFFE0E0E0); // Border abu-abu muda
+  static const Color _primaryColor = Color(0xFF6B1B1B);
+  static const Color _accentColor = Color(0xFF9F0712);
+  static const Color _lightColor = Color(0xFFF5F5F5);
+  static const Color _textColor = Color(0xFF333333);
+  static const Color _borderColor = Color(0xFFE0E0E0);
 
-  Map<String, String> _profileData = {
-    'nama': 'FARDAN', // Nama default
-    'nip': '199001012024001', // NIP default
+  // Data guru yang sedang login
+  Map<String, dynamic> _guruData = {
+    'nama': 'WALI KELAS',
+    'kode_guru': '-',
+    'nip': '-',
+    'no_telp': '-',
+    'kelas_wali': '-',
+    'jurusan': '-',
   };
   
   bool _isLoading = true;
   bool _isEditing = false;
-  final TextEditingController _nameController = TextEditingController();
+  
+  // Controller untuk form edit
+  final TextEditingController _namaController = TextEditingController();
+  final TextEditingController _kodeGuruController = TextEditingController();
+  final TextEditingController _nipController = TextEditingController();
+  final TextEditingController _telpController = TextEditingController();
+  
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
-    _loadProfileData();
+    _loadGuruData();
   }
 
-  Future<void> _loadProfileData() async {
+  Future<void> _loadGuruData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       
-      print('📥 Loading profile data for Wali Kelas...');
+      print('📥 Loading guru data for Wali Kelas...');
       
-      // Ambil dari SharedPreferences atau gunakan data dummy
+      // Debug: print semua keys untuk melihat data apa yang tersimpan
+      final allKeys = prefs.getKeys();
+      print('🔑 SEMUA DATA DI SHAREDPREFERENCES:');
+      for (final key in allKeys) {
+        print('   $key: ${prefs.get(key)}');
+      }
+      
+      // Ambil data dari berbagai kemungkinan key
       final String? userName = prefs.getString('user_name');
-      final String? nama = prefs.getString('nama');
-      final String? nip = prefs.getString('nip');
+      final String? kodeGuru = prefs.getString('kode_guru');
+      final String? userNip = prefs.getString('user_nip');
+      final String? userPhone = prefs.getString('user_phone');
+      final String? guruNama = prefs.getString('guru_nama');
+      final String? guruKode = prefs.getString('guru_kode_guru');
+      final String? guruNip = prefs.getString('guru_nip');
+      final String? guruTelp = prefs.getString('guru_no_telp');
+      final int? guruId = prefs.getInt('guru_id');
       
-      // Jika ada data di SharedPreferences, gunakan itu
-      // Jika tidak, gunakan data dummy
-      final String finalNama = (userName ?? nama ?? 'FARDAN').toUpperCase();
-      final String finalNip = nip ?? '199001012024001';
+      // Prioritaskan data dari guru_* keys (lebih lengkap)
+      final String nama = userName ?? guruNama ?? 'WALI KELAS';
+      final String kode = kodeGuru ?? guruKode ?? '-';
+      final String nip = userNip ?? guruNip ?? '-';
+      final String telp = userPhone ?? guruTelp ?? '-';
       
-      print('   Loaded name: $finalNama');
-      print('   Loaded NIP: $finalNip');
+      // Set controller untuk form edit
+      _namaController.text = nama;
+      _kodeGuruController.text = kode;
+      _nipController.text = nip;
+      _telpController.text = telp;
+      
+      // Ambil data kelas wali
+      final kelasWali = await _fetchKelasWali(guruId);
       
       setState(() {
-        _profileData = {
-          'nama': finalNama,
-          'nip': finalNip,
+        _guruData = {
+          'nama': nama.toUpperCase(),
+          'kode_guru': kode,
+          'nip': nip,
+          'no_telp': telp,
+          'kelas_wali': kelasWali['nama_kelas'] ?? '-',
+          'jurusan': kelasWali['jurusan'] ?? '-',
+          'guru_id': guruId ?? 0,
         };
         _isLoading = false;
       });
       
-      print('✅ Profile loaded: ${_profileData['nama']}');
+      print('\n✅ DATA GURU YANG DIPAKAI:');
+      print('   Nama: ${_guruData['nama']}');
+      print('   Kode: ${_guruData['kode_guru']}');
+      print('   NIP: ${_guruData['nip']}');
+      print('   Telp: ${_guruData['no_telp']}');
+      print('   Kelas Wali: ${_guruData['kelas_wali']}');
+      print('   Jurusan: ${_guruData['jurusan']}');
+      print('   Guru ID: ${_guruData['guru_id']}');
       
     } catch (e) {
-      print('❌ Error loading profile: $e');
+      print('❌ Error loading guru data: $e');
       
-      // Fallback ke data dummy
       setState(() {
-        _profileData = {
-          'nama': 'FARDAN',
-          'nip': '199001012024001',
+        _guruData = {
+          'nama': 'WALI KELAS',
+          'kode_guru': '-',
+          'nip': '-',
+          'no_telp': '-',
+          'kelas_wali': '-',
+          'jurusan': '-',
+          'guru_id': 0,
         };
         _isLoading = false;
       });
     }
   }
 
-  Future<void> _saveProfileData() async {
+  // Fungsi untuk mengambil data kelas yang menjadi wali kelas
+  Future<Map<String, dynamic>> _fetchKelasWali(int? guruId) async {
+    if (guruId == null || guruId == 0) {
+      return {'nama_kelas': '-', 'jurusan': '-'};
+    }
+
     try {
+      await dotenv.load(fileName: '.env');
       final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
       
-      // Simpan data ke SharedPreferences
-      await prefs.setString('nama', _profileData['nama']!);
-      await prefs.setString('user_name', _profileData['nama']!);
-      await prefs.setString('nip', _profileData['nip']!);
+      if (token == null) {
+        return {'nama_kelas': '-', 'jurusan': '-'};
+      }
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
       
-      print('💾 Profile saved: ${_profileData['nama']}');
+      // Ambil semua kelas
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/kelas?limit=100'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['success'] == true && data['data'] != null && data['data'] is Map) {
+          final kelasData = data['data'] as Map<String, dynamic>;
+          final List<dynamic> kelasList = kelasData['data'] ?? [];
+          
+          // Cari kelas yang memiliki wali_kelas_guru_id sesuai dengan guruId
+          final kelasWali = kelasList.firstWhere(
+            (kelas) => kelas['wali_kelas_guru_id'] == guruId,
+            orElse: () => null,
+          );
+          
+          if (kelasWali != null) {
+            final String namaKelas = kelasWali['nama'] ?? '-';
+            final int? jurusanId = kelasWali['jurusan_id'];
+            String jurusan = '-';
+            
+            // Ambil nama jurusan jika ada
+            if (jurusanId != null) {
+              jurusan = await _fetchJurusanName(jurusanId, token);
+            }
+            
+            return {
+              'nama_kelas': namaKelas,
+              'jurusan': jurusan,
+            };
+          }
+        }
+      }
       
+      return {'nama_kelas': '-', 'jurusan': '-'};
     } catch (e) {
-      print('❌ Error saving profile: $e');
+      print('❌ Error fetching kelas wali: $e');
+      return {'nama_kelas': '-', 'jurusan': '-'};
     }
   }
 
-  void _startEditing() {
-    setState(() {
-      _isEditing = true;
-      _nameController.text = _profileData['nama']!;
-    });
-  }
+  // Fungsi untuk mengambil nama jurusan berdasarkan ID
+  Future<String> _fetchJurusanName(int jurusanId, String token) async {
+    try {
+      await dotenv.load(fileName: '.env');
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/jurusan/$jurusanId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
 
-  void _cancelEditing() {
-    setState(() {
-      _isEditing = false;
-      _nameController.clear();
-    });
-  }
-
-  void _saveEditing() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _profileData['nama'] = _nameController.text.toUpperCase();
-        _isEditing = false;
-      });
-      _saveProfileData(); // Simpan ke SharedPreferences
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final jurusanData = data['data'] as Map<String, dynamic>;
+          return jurusanData['nama'] ?? '-';
+        }
+      }
+    } catch (e) {
+      print('❌ Error fetching jurusan: $e');
     }
+    
+    return '-';
+  }
+
+  Future<void> _updateGuruData() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    try {
+      await dotenv.load(fileName: '.env');
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      final guruId = _guruData['guru_id'] ?? 0;
+
+      print('🔍 DEBUG UPDATE GURU DATA:');
+      print('   Guru ID: $guruId');
+      print('   Token exists: ${token != null}');
+
+      if (token == null || guruId == 0) {
+        _showErrorDialog('Token tidak ditemukan atau ID guru tidak valid');
+        return;
+      }
+
+      // Tampilkan loading
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(
+              color: _primaryColor,
+            ),
+          ),
+        );
+      }
+
+      // Data yang akan dikirim
+      final Map<String, dynamic> requestData = {
+        'nama': _namaController.text.trim(),
+        'kode_guru': _kodeGuruController.text.trim(),
+        'nip': _nipController.text.trim(),
+        'no_telp': _telpController.text.trim(),
+        'is_wali_kelas': true,
+        'is_pembimbing': false,
+        'is_kaprog': false,
+        'is_koordinator': false,
+        'is_active': true,
+        'password': '',
+      };
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final url = Uri.parse('$baseUrl/api/guru/$guruId');
+
+      print('🔄 Updating guru data...');
+      print('   URL: $url');
+      print('   Request data: $requestData');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(requestData),
+      );
+
+      // Tutup loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      print('📤 Response status: ${response.statusCode}');
+      print('📤 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        
+        if (data['success'] == true) {
+          // Update data lokal
+          setState(() {
+            _guruData['nama'] = _namaController.text.trim().toUpperCase();
+            _guruData['kode_guru'] = _kodeGuruController.text.trim();
+            _guruData['nip'] = _nipController.text.trim();
+            _guruData['no_telp'] = _telpController.text.trim();
+            _isEditing = false;
+          });
+
+          // Update SharedPreferences
+          await prefs.setString('user_name', _namaController.text.trim());
+          await prefs.setString('kode_guru', _kodeGuruController.text.trim());
+          await prefs.setString('user_nip', _nipController.text.trim());
+          await prefs.setString('user_phone', _telpController.text.trim());
+          await prefs.setString('guru_nama', _namaController.text.trim());
+          await prefs.setString('guru_kode_guru', _kodeGuruController.text.trim());
+          await prefs.setString('guru_nip', _nipController.text.trim());
+          await prefs.setString('guru_no_telp', _telpController.text.trim());
+
+          _showSuccessDialog('Data berhasil diperbarui');
+        } else {
+          final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
+          _showErrorDialog(errorMsg.toString());
+        }
+      } else {
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMsg = errorData['message'] ?? 
+                          errorData['error'] ?? 
+                          'Terjadi kesalahan: ${response.statusCode}';
+          _showErrorDialog(errorMsg.toString());
+        } catch (e) {
+          _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+      _showErrorDialog('Terjadi kesalahan: $e');
+    }
+  }
+
+  void _showSuccessDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text(
+              'Sukses',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: _textColor,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: _primaryColor,
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.error, color: Colors.red),
+            SizedBox(width: 8),
+            Text(
+              'Error',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: _textColor,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: _primaryColor,
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Edit Data Profil',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: _textColor,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Nama
+          TextFormField(
+            controller: _namaController,
+            decoration: InputDecoration(
+              labelText: 'Nama',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _primaryColor, width: 2),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Nama tidak boleh kosong';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          
+          // Kode Guru
+          TextFormField(
+            controller: _kodeGuruController,
+            decoration: InputDecoration(
+              labelText: 'Kode Guru',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _primaryColor, width: 2),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Kode guru tidak boleh kosong';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          
+          // NIP
+          TextFormField(
+            controller: _nipController,
+            decoration: InputDecoration(
+              labelText: 'NIP',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _primaryColor, width: 2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // No Telepon
+          TextFormField(
+            controller: _telpController,
+            decoration: InputDecoration(
+              labelText: 'No. Telepon',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: _primaryColor, width: 2),
+              ),
+            ),
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 20),
+          
+          // Tombol Simpan & Batal
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isEditing = false;
+                    });
+                    // Reset ke data awal
+                    _namaController.text = _guruData['nama'];
+                    _kodeGuruController.text = _guruData['kode_guru'];
+                    _nipController.text = _guruData['nip'];
+                    _telpController.text = _guruData['no_telp'];
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    foregroundColor: _textColor,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Batal'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _updateGuruData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Simpan'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: _borderColor),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
   }
 
   @override
@@ -131,7 +591,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
+                    color: Colors.grey.withValues(alpha:0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -156,6 +616,19 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const Spacer(),
+                  if (!_isLoading && _guruData['guru_id'] != 0 && !_isEditing)
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _isEditing = true;
+                        });
+                      },
+                      icon: const Icon(
+                        Icons.edit,
+                        color: _primaryColor,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -165,180 +638,75 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
                   children: [
-                    // Profile Section dengan Edit Button
+                    // Profile Section
                     Container(
                       margin: const EdgeInsets.only(bottom: 24),
                       child: Column(
                         children: [
-                          Stack(
-                            children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _primaryColor,
-                                  border: Border.all(
-                                    color: _borderColor,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 50,
-                                  color: Colors.white,
-                                ),
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _primaryColor,
+                              border: Border.all(
+                                color: _borderColor,
+                                width: 1,
                               ),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: GestureDetector(
-                                  onTap: _startEditing,
-                                  child: Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: _accentColor,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      Icons.edit,
-                                      size: 16,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
+                            child: const Icon(
+                              Icons.people,
+                              size: 50,
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(height: 16),
                           
-                          if (_isEditing)
-                            // Form Edit Nama
-                            Form(
-                              key: _formKey,
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                                    child: TextFormField(
-                                      controller: _nameController,
+                          _isLoading
+                              ? _buildProfileSkeleton()
+                              : Column(
+                                  children: [
+                                    Text(
+                                      _guruData['nama']!,
                                       style: const TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w700,
                                         color: _textColor,
                                       ),
                                       textAlign: TextAlign.center,
-                                      decoration: InputDecoration(
-                                        hintText: 'Masukkan nama',
-                                        hintStyle: TextStyle(
-                                          color: Colors.grey[400],
-                                        ),
-                                        border: UnderlineInputBorder(
-                                          borderSide: BorderSide(
-                                            color: _primaryColor,
-                                            width: 2,
-                                          ),
-                                        ),
-                                        focusedBorder: UnderlineInputBorder(
-                                          borderSide: BorderSide(
-                                            color: _primaryColor,
-                                            width: 2,
-                                          ),
-                                        ),
-                                      ),
-                                      validator: (value) {
-                                        if (value == null || value.trim().isEmpty) {
-                                          return 'Nama tidak boleh kosong';
-                                        }
-                                        return null;
-                                      },
                                     ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      ElevatedButton(
-                                        onPressed: _saveEditing,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: _primaryColor,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 20,
-                                            vertical: 8,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                        ),
-                                        child: const Text('Simpan'),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      TextButton(
-                                        onPressed: _cancelEditing,
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: Colors.grey,
-                                        ),
-                                        child: const Text('Batal'),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            // Tampilan Normal
-                            _isLoading
-                                ? _buildProfileSkeleton()
-                                : Column(
-                                    children: [
-                                      Text(
-                                        _profileData['nama']!,
-                                        style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w700,
-                                          color: _textColor,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 16, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: _primaryColor.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(
-                                            color: _primaryColor.withOpacity(0.3),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'WALI KELAS',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: _primaryColor,
-                                          ),
+                                    const SizedBox(height: 8),
+                                    // Role badge
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: _primaryColor.withValues(alpha:0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: _primaryColor.withValues(alpha:0.3),
                                         ),
                                       ),
-                                   
-                                    ],
+                                      child: const Text(
+                                        'WALI KELAS',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: _primaryColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                         ],
                       ),
                     ),
 
-                    // Informasi Pribadi Card
+                    // Data Detail Section
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
-                      margin: const EdgeInsets.only(bottom: 20),
+                      margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
@@ -348,7 +716,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.05),
+                            color: Colors.grey.withValues(alpha:0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -357,46 +725,32 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.person_outline,
-                                color: _primaryColor,
-                                size: 20,
+                          if (_isEditing)
+                            _buildEditForm()
+                          else ...[
+                            const Text(
+                              'Data Profil',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: _textColor,
                               ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Informasi Pribadi',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: _textColor,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          const Divider(color: _borderColor),
-                          const SizedBox(height: 16),
+                            ),
+                            const SizedBox(height: 16),
+                            const Divider(color: _borderColor),
+                            const SizedBox(height: 16),
 
-                          // NIP
-                          _buildInfoItem(
-                            icon: Icons.badge_outlined,
-                            label: 'NIP',
-                            value: _isLoading 
-                                ? 'Memuat...'
-                                : (_profileData['nip']!.isNotEmpty 
-                                    ? _profileData['nip']! 
-                                    : 'NIP tidak ditemukan'),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Keterangan Data Dummy
-                          _buildInfoItem(
-                            icon: Icons.info_outline,
-                            label: 'Kelas',
-                            value: 'XII RPL 1',
-                          ),
+                            // Kelas Wali
+                            _buildDetailItem('Kelas Wali', _guruData['kelas_wali']!),
+                            const SizedBox(height: 12),
+                            _buildDetailItem('Jurusan', _guruData['jurusan']!),
+                            const SizedBox(height: 12),
+                            _buildDetailItem('Kode Guru', _guruData['kode_guru']!),
+                            const SizedBox(height: 12),
+                            _buildDetailItem('NIP', _guruData['nip']!),
+                            const SizedBox(height: 12),
+                            _buildDetailItem('No. Telepon', _guruData['no_telp']!),
+                          ],
                         ],
                       ),
                     ),
@@ -415,7 +769,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withOpacity(0.05),
+                            color: Colors.grey.withValues(alpha:0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -455,7 +809,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                       ),
                     ),
 
-                    // Logout Button
+                    // Logout Button dengan jarak
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -488,7 +842,8 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    // TAMBAH JARAK KE BAWAH
+                    const SizedBox(height: 80),
                   ],
                 ),
               ),
@@ -499,45 +854,35 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
     );
   }
 
-  Widget _buildInfoItem({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          color: _primaryColor,
-          size: 22,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey,
-                ),
+  Widget _buildDetailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: _textColor,
               ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: _textColor,
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -560,7 +905,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _primaryColor.withOpacity(0.1),
+                  color: _primaryColor.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -724,24 +1069,6 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
                 color: Colors.grey[700],
               ),
             ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: _primaryColor.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: _primaryColor.withOpacity(0.1),
-                ),
-              ),
-              child: const Text(
-                '⚠️ Mode Data Dummy: Data nama dapat diedit dan akan tersimpan di perangkat Anda',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-            ),
           ],
         ),
         actions: [
@@ -857,11 +1184,28 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
   }
 
   Future<void> _processLogout() async {
-    final prefs = await SharedPreferences.getInstance();
+    print('🔄 Processing logout for Wali Kelas...');
 
-    // Hapus data login (kecuali data dummy jika ingin dipertahankan)
-    await prefs.remove('access_token');
-    await prefs.remove('user_name');
-    // Tidak menghapus 'nama' dan 'nip' agar data dummy tetap ada saat login lagi
+    final prefs = await SharedPreferences.getInstance();
+    final currentUsername = prefs.getString('user_name');
+
+    print('👤 Current username: $currentUsername');
+
+    // Hapus semua data login
+    print('🗑️ Removing all login data...');
+    final allKeys = prefs.getKeys();
+    for (final key in allKeys) {
+      // Hapus semua kecuali notifications
+      if (!key.startsWith('notifications_')) {
+        await prefs.remove(key);
+        print('   Removed: $key');
+      }
+    }
+
+    print('✅ Logout completed successfully');
+    print('   - User: ${currentUsername ?? 'unknown_user'}');
+    print('   - Role: Wali Kelas');
+    print('   - All login data: REMOVED');
+    print('   - Notifications: PRESERVED');
   }
 }

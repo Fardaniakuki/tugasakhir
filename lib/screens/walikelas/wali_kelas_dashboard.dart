@@ -99,8 +99,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       'tanggal_diajukan': '16 Jan 2024',
     },
   ];
-
-  // Data permasalahan - DUMMY DATA DIUPDATE
+// Data permasalahan - DUMMY DATA DIUPDATE
   final List<Map<String, dynamic>> _permasalahanList = [
     {
       'id': 'M001',
@@ -112,7 +111,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       'solusi': 'Dilakukan mediasi dengan HRD',
       'tanggal': '10 Jan 2024',
       'lokasi': 'Tempat PKL',
-      'tingkat': 'Sedang',
       'statusColor': const Color(0xFF4CAF50),
     },
     {
@@ -125,7 +123,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       'solusi': 'Menunggu jadwal pendampingan',
       'tanggal': '12 Jan 2024',
       'lokasi': 'Tempat PKL',
-      'tingkat': 'Ringan',
       'statusColor': const Color(0xFFFF9800),
     },
     {
@@ -138,7 +135,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       'solusi': 'Dicarikan carpool',
       'tanggal': '8 Jan 2024',
       'lokasi': 'Perjalanan ke PKL',
-      'tingkat': 'Berat',
       'statusColor': const Color(0xFF4CAF50),
     },
     {
@@ -151,7 +147,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       'solusi': 'Bimbingan komunikasi',
       'tanggal': '15 Jan 2024',
       'lokasi': 'Tempat PKL',
-      'tingkat': 'Sedang',
       'statusColor': const Color(0xFF4CAF50),
     },
   ];
@@ -879,7 +874,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     final statusColor = masalahData['statusColor'] as Color;
     final kelas = masalahData['kelas'];
     final industri = masalahData['industri'];
-    final tingkat = masalahData['tingkat'];
+    // HAPUS: final tingkat = masalahData['tingkat'];
 
     return GestureDetector(
       onTap: () {
@@ -977,20 +972,41 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 ],
               ),
               const SizedBox(height: 8),
+              // HAPUS bagian yang menampilkan tingkat
+              // Container(
+              //   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              //   decoration: BoxDecoration(
+              //     color: _getTingkatColor(tingkat).withValues(alpha: 0.1),
+              //     borderRadius: BorderRadius.circular(8),
+              //     border: Border.all(
+              //         color: _getTingkatColor(tingkat).withValues(alpha: 0.3),
+              //         width: 1),
+              //   ),
+              //   child: Text(
+              //     '$tingkat • $jenis',
+              //     style: TextStyle(
+              //       color: _getTingkatColor(tingkat),
+              //       fontSize: 12,
+              //       fontWeight: FontWeight.w600,
+              //     ),
+              //     maxLines: 1,
+              //     overflow: TextOverflow.ellipsis,
+              //   ),
+              // ),
+              // TAMBAHKAN ini sebagai pengganti: Container untuk jenis permasalahan saja
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _getTingkatColor(tingkat).withValues(alpha: 0.1),
+                  color: _darkRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: _getTingkatColor(tingkat).withValues(alpha: 0.3),
-                      width: 1),
+                      color: _darkRed.withValues(alpha: 0.3), width: 1),
                 ),
                 child: Text(
-                  '$tingkat • $jenis',
-                  style: TextStyle(
-                    color: _getTingkatColor(tingkat),
+                  jenis,
+                  style: const TextStyle(
+                    color: _darkRed,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1059,19 +1075,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         ),
       ),
     );
-  }
-
-  Color _getTingkatColor(String tingkat) {
-    switch (tingkat.toLowerCase()) {
-      case 'berat':
-        return _red;
-      case 'sedang':
-        return _orange;
-      case 'ringan':
-        return _green;
-      default:
-        return _darkRed;
-    }
   }
 
   void _showSIADetail(Map<String, dynamic> siaData) {
@@ -1626,7 +1629,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     final industri = masalahData['industri'] ?? '';
     final tanggal = masalahData['tanggal'] ?? '-';
     final lokasi = masalahData['lokasi'] ?? 'Tempat PKL';
-    final tingkat = masalahData['tingkat'] ?? 'Sedang';
+    // HAPUS: final tingkat = masalahData['tingkat'] ?? 'Sedang';
     final statusColor = masalahData['statusColor'] as Color;
 
     return Container(
@@ -1757,8 +1760,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                         _detailInfoRow('Jenis Permasalahan', jenis),
                         const SizedBox(height: 12),
                         _detailInfoRow('Tanggal Laporan', tanggal),
-                        const SizedBox(height: 12),
-                        _detailInfoRow('Tingkat', tingkat),
+                        // HAPUS baris ini: _detailInfoRow('Tingkat', tingkat),
                         const SizedBox(height: 12),
                         _detailInfoRow('Lokasi', lokasi),
                         const SizedBox(height: 12),

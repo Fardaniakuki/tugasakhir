@@ -1,67 +1,73 @@
 import 'package:flutter/material.dart';
 
 class RoleSelectionDialog extends StatelessWidget {
-  final Map<String, dynamic> userData; // Data user dari API
+  final Map<String, dynamic> userData;
   final String userName;
   final Function(String) onRoleSelected;
 
-  const RoleSelectionDialog({
+  RoleSelectionDialog({
     super.key,
     required this.userData,
     required this.userName,
     required this.onRoleSelected,
   });
 
-  // Warna utama - sama untuk semua role
-  final Color primaryColor = const Color(0xFF3B060A); // Maroon tua
+  final Color primaryColor = const Color(0xFF3B060A);
 
-  // Mendapatkan list role yang tersedia dari userData
-  List<String> get rolesAvailable {
-    final List<String> roles = [];
-    
-    if (userData['is_koordinator'] == true) roles.add('Koordinator');
-    if (userData['is_pembimbing'] == true) roles.add('Pembimbing');
-    if (userData['is_wali_kelas'] == true) roles.add('Wali Kelas');
-    if (userData['is_kaprog'] == true) roles.add('Kaprog');
-    // Tidak ada role "Guru" sebagai default
-    
+  // PERBAIKAN: Sederhanakan mapping
+  final Map<String, Map<String, dynamic>> roleConfig = {
+    'koordinator': {
+      'key': 'koordinator',
+      'display': 'Koordinator',
+      'icon': Icons.manage_accounts_rounded,
+      'desc': 'Koordinasi program sekolah',
+    },
+    'pembimbing': {
+      'key': 'pembimbing',
+      'display': 'Pembimbing',
+      'icon': Icons.supervisor_account_rounded,
+      'desc': 'Bimbingan siswa PKL',
+    },
+    'wali_kelas': {
+      'key': 'wali_kelas',
+      'display': 'Wali Kelas',
+      'icon': Icons.class_rounded,
+      'desc': 'Kelola kelas dan absensi',
+    },
+    'kaprog': {
+      'key': 'kaprog',
+      'display': 'Kepala Konsentrasi',
+      'icon': Icons.engineering_rounded,
+      'desc': 'Manajemen konsentrasi keahlian',
+    },
+  };
+
+  List<Map<String, dynamic>> get rolesAvailable {
+    final List<Map<String, dynamic>> roles = [];
+
+    if (userData['is_koordinator'] == true) {
+      roles.add(roleConfig['koordinator']!);
+    }
+
+    if (userData['is_pembimbing'] == true) {
+      roles.add(roleConfig['pembimbing']!);
+    }
+
+    if (userData['is_wali_kelas'] == true) {
+      roles.add(roleConfig['wali_kelas']!);
+    }
+
+    if (userData['is_kaprog'] == true) {
+      roles.add(roleConfig['kaprog']!);
+    }
+
     return roles;
-  }
-
-  IconData _getRoleIcon(String role) {
-    switch (role) {
-      case 'Koordinator':
-        return Icons.manage_accounts_rounded;
-      case 'Pembimbing':
-        return Icons.supervisor_account_rounded;
-      case 'Wali Kelas':
-        return Icons.class_rounded;
-      case 'Kaprog':
-        return Icons.engineering_rounded;
-      default:
-        return Icons.person_rounded;
-    }
-  }
-
-  String _getRoleDescription(String role) {
-    switch (role) {
-      case 'Koordinator':
-        return 'Koordinasi program sekolah';
-      case 'Pembimbing':
-        return 'Bimbingan siswa PKL';
-      case 'Wali Kelas':
-        return 'Kelola kelas dan absensi';
-      case 'Kaprog':
-        return 'Manajemen program keahlian';
-      default:
-        return 'Akses umum';
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final availableRoles = rolesAvailable;
-    
+
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
@@ -75,7 +81,7 @@ class RoleSelectionDialog extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 20,
               offset: const Offset(0, 4),
             ),
@@ -84,7 +90,7 @@ class RoleSelectionDialog extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header yang minimalis
+            // Header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.only(
@@ -103,7 +109,7 @@ class RoleSelectionDialog extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Avatar minimal - PUTIH
+                  // Avatar
                   Container(
                     width: 56,
                     height: 56,
@@ -112,7 +118,7 @@ class RoleSelectionDialog extends StatelessWidget {
                       color: Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
+                          color: Colors.black.withOpacity(0.1),
                           blurRadius: 6,
                           offset: const Offset(0, 3),
                         ),
@@ -125,7 +131,7 @@ class RoleSelectionDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Nama user
                   Text(
                     userName,
@@ -138,8 +144,8 @@ class RoleSelectionDialog extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  
-                  // Subtitle - tampilkan jumlah role
+
+                  // Subtitle
                   Text(
                     '${availableRoles.length} peran tersedia',
                     style: const TextStyle(
@@ -151,106 +157,124 @@ class RoleSelectionDialog extends StatelessWidget {
                 ],
               ),
             ),
-            
+
             // Role Selection List
             Padding(
               padding: const EdgeInsets.all(20),
-              child: availableRoles.isEmpty 
-                ? _buildNoRolesAvailable()
-                : Column(
-                    children: availableRoles.map((role) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.pop(context);
-                              onRoleSelected(role);
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.grey[200]!,
-                                  width: 1,
+              child: availableRoles.isEmpty
+                  ? _buildNoRolesAvailable()
+                  : Column(
+                      children: availableRoles.map((roleData) {
+                        final roleKey = roleData['key'] as String;
+                        final displayName = roleData['display'] as String;
+                        final iconData = roleData['icon'] as IconData;
+                        final description = roleData['desc'] as String;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                // DEBUG: Tampilkan log
+                                print('[LOGIN DEBUG] Role selected: $roleKey');
+                                print(
+                                    '[LOGIN DEBUG] Display name: $displayName');
+
+                                // Tutup dialog terlebih dahulu
+                                Navigator.pop(context);
+
+                                // Beri sedikit delay untuk UI stabil
+                                Future.delayed(
+                                    const Duration(milliseconds: 100), () {
+                                  // Kirim role key yang dipilih
+                                  onRoleSelected(roleKey);
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.grey[200]!,
+                                    width: 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.03),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.03),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  // Icon dengan background MAROON SAMA SEMUA
-                                  Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: primaryColor,
-                                      shape: BoxShape.circle,
+                                child: Row(
+                                  children: [
+                                    // Icon
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: primaryColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        iconData,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
                                     ),
-                                    child: Icon(
-                                      _getRoleIcon(role),
-                                      color: Colors.white,
+                                    const SizedBox(width: 14),
+
+                                    // Role Info
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            displayName,
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                              color: primaryColor,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            description,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // Chevron Icon
+                                    Icon(
+                                      Icons.chevron_right_rounded,
                                       size: 20,
+                                      color: primaryColor,
                                     ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  
-                                  // Role Info
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          role,
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: primaryColor,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          _getRoleDescription(role),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  
-                                  // Chevron Icon - warna maroon sama
-                                  Icon(
-                                    Icons.chevron_right_rounded,
-                                    size: 20,
-                                    color: primaryColor,
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                        );
+                      }).toList(),
+                    ),
             ),
-            
-            // Footer dengan tombol tutup
+
+            // Footer
             Container(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 children: [
-                  // Info kecil di atas tombol
+                  // Info
                   Container(
                     margin: const EdgeInsets.only(bottom: 14),
                     padding: const EdgeInsets.all(12),
@@ -281,7 +305,7 @@ class RoleSelectionDialog extends StatelessWidget {
                       ],
                     ),
                   ),
-                  
+
                   // Tombol tutup
                   SizedBox(
                     width: double.infinity,

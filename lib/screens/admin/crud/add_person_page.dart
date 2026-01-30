@@ -254,7 +254,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? primaryColor.withOpacity(0.1)
+                          ? primaryColor.withValues(alpha: 0.1)
                           : Colors.transparent,
                     ),
                     child: Text(
@@ -378,7 +378,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? primaryColor.withOpacity(0.1)
+                          ? primaryColor.withValues(alpha: 0.1)
                           : Colors.transparent,
                     ),
                     child: Text(
@@ -1121,7 +1121,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? primaryColor.withOpacity(0.1)
+                        ? primaryColor.withValues(alpha: 0.1)
                         : Colors.transparent,
                   ),
                   child: Text(
@@ -1208,8 +1208,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
             colorScheme: ColorScheme.light(
               primary: primaryColor,
               onPrimary: Colors.white,
-            ),
-            dialogBackgroundColor: Colors.white,
+            ), dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
           ),
           child: child!,
         );
@@ -1238,7 +1237,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                   top: 60, bottom: 30, left: 20, right: 20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [primaryColor, primaryColor.withOpacity(0.9)],
+                  colors: [primaryColor, primaryColor.withValues(alpha: 0.9)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -1281,7 +1280,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                         borderRadius: BorderRadius.circular(40),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 15,
                             spreadRadius: 2,
                           ),
@@ -1568,7 +1567,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 2,
-                          shadowColor: primaryColor.withOpacity(0.3),
+                          shadowColor: primaryColor.withValues(alpha: 0.3),
                         ),
                         child: const Text(
                           'Simpan Data',
@@ -1619,11 +1618,11 @@ class SuccessPopup extends StatefulWidget {
   final VoidCallback onClose;
 
   const SuccessPopup({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     required this.onClose,
-  }) : super(key: key);
+  });
 
   @override
   State<SuccessPopup> createState() => _SuccessPopupState();
@@ -1698,7 +1697,7 @@ class _SuccessPopupState extends State<SuccessPopup>
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 30,
                     spreadRadius: 5,
                     offset: const Offset(0, 10),
@@ -1713,10 +1712,10 @@ class _SuccessPopupState extends State<SuccessPopup>
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.green.withOpacity(0.3),
+                        color: Colors.green.withValues(alpha: 0.3),
                         width: 2,
                       ),
                     ),
@@ -1796,11 +1795,11 @@ class ErrorPopup extends StatefulWidget {
   final VoidCallback onClose;
 
   const ErrorPopup({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     required this.onClose,
-  }) : super(key: key);
+  });
 
   @override
   State<ErrorPopup> createState() => _ErrorPopupState();
@@ -1868,7 +1867,7 @@ class _ErrorPopupState extends State<ErrorPopup>
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 30,
                     spreadRadius: 5,
                     offset: const Offset(0, 10),
@@ -1883,10 +1882,10 @@ class _ErrorPopupState extends State<ErrorPopup>
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: Colors.red.withOpacity(0.3),
+                        color: Colors.red.withValues(alpha: 0.3),
                         width: 2,
                       ),
                     ),
@@ -1915,9 +1914,9 @@ class _ErrorPopupState extends State<ErrorPopup>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.05),
+                      color: Colors.red.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.withOpacity(0.1)),
+                      border: Border.all(color: Colors.red.withValues(alpha: 0.1)),
                     ),
                     child: Text(
                       widget.message,

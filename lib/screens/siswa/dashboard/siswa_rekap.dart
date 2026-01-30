@@ -83,7 +83,7 @@ class _SiswaRekapState extends State<SiswaRekap>
                       ),
                       tabs: const [
                         Tab(text: 'Izin SIA'),
-                        Tab(text: 'Pengajuan PKL'),
+                        Tab(text: 'Pengajuan Pindah PKL'),
                       ],
                     ),
                   ),
@@ -151,7 +151,7 @@ class _SiswaRekapState extends State<SiswaRekap>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Rekap & Izin',
+                'Izin & Pengajuan',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
