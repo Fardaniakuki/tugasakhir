@@ -1221,7 +1221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                         ),
                                         child: Text(
-                                          'Ganti Role?',
+                                          'Ubah Jenis Akun?',
                                           style: TextStyle(
                                             color: accentColor,
                                             fontSize: 16,

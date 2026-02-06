@@ -27,16 +27,16 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
     'nip': '-',
     'no_telp': '-',
   };
-  
+
   bool _isLoading = true;
   bool _isEditing = false;
-  
+
   // Controller untuk form edit
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _kodeGuruController = TextEditingController();
   final TextEditingController _nipController = TextEditingController();
   final TextEditingController _telpController = TextEditingController();
-  
+
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
@@ -48,16 +48,16 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
   Future<void> _loadGuruData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       print('📥 Loading guru data for Kaprog...');
-      
+
       // Debug: print semua keys untuk melihat data apa yang tersimpan
       final allKeys = prefs.getKeys();
       print('🔑 SEMUA DATA DI SHAREDPREFERENCES:');
       for (final key in allKeys) {
         print('   $key: ${prefs.get(key)}');
       }
-      
+
       // Ambil data dari berbagai kemungkinan key
       final String? userName = prefs.getString('user_name');
       final String? kodeGuru = prefs.getString('kode_guru');
@@ -67,19 +67,19 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
       final String? guruKode = prefs.getString('guru_kode_guru');
       final String? guruNip = prefs.getString('guru_nip');
       final String? guruTelp = prefs.getString('guru_no_telp');
-      
+
       // Prioritaskan data dari guru_* keys (lebih lengkap)
       final String nama = userName ?? guruNama ?? 'KAPROG';
       final String kode = kodeGuru ?? guruKode ?? '-';
       final String nip = userNip ?? guruNip ?? '-';
       final String telp = userPhone ?? guruTelp ?? '-';
-      
+
       // Set controller untuk form edit
       _namaController.text = nama;
       _kodeGuruController.text = kode;
       _nipController.text = nip;
       _telpController.text = telp;
-      
+
       setState(() {
         _guruData = {
           'nama': nama.toUpperCase(),
@@ -89,16 +89,15 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
         };
         _isLoading = false;
       });
-      
+
       print('\n✅ DATA GURU YANG DIPAKAI:');
       print('   Nama: ${_guruData['nama']}');
       print('   Kode: ${_guruData['kode_guru']}');
       print('   NIP: ${_guruData['nip']}');
       print('   Telp: ${_guruData['no_telp']}');
-      
     } catch (e) {
       print('❌ Error loading guru data: $e');
-      
+
       setState(() {
         _guruData = {
           'nama': 'KAPROG',
@@ -118,17 +117,15 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
 
     try {
       await dotenv.load(fileName: '.env');
-      
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      final guruId = prefs.getInt('guru_id') ?? 0;
 
       print('🔍 DEBUG UPDATE GURU DATA:');
-      print('   Guru ID: $guruId');
       print('   Token exists: ${token != null}');
 
-      if (token == null || guruId == 0) {
-        _showErrorDialog('Token tidak ditemukan atau ID guru tidak valid');
+      if (token == null) {
+        _showErrorDialog('Token tidak ditemukan');
         return;
       }
 
@@ -145,22 +142,17 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
         );
       }
 
-      // Data yang akan dikirim
+      // Data yang akan dikirim sesuai dengan dokumentasi API
       final Map<String, dynamic> requestData = {
-        'nama': _namaController.text.trim(),
         'kode_guru': _kodeGuruController.text.trim(),
+        'nama': _namaController.text.trim(),
         'nip': _nipController.text.trim(),
         'no_telp': _telpController.text.trim(),
-        'is_kaprog': true, // Karena ini kaprog
-        'is_wali_kelas': false,
-        'is_pembimbing': false,
-        'is_koordinator': false,
-        'is_active': true,
-        'password': '',
       };
 
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      final url = Uri.parse('$baseUrl/api/guru/$guruId');
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final url = Uri.parse('$baseUrl/api/guru/me');
 
       print('🔄 Updating guru data...');
       print('   URL: $url');
@@ -186,38 +178,46 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
+
         if (data['success'] == true) {
           // Update data lokal
+          final updatedData = data['data'] as Map<String, dynamic>;
+
           setState(() {
-            _guruData['nama'] = _namaController.text.trim().toUpperCase();
-            _guruData['kode_guru'] = _kodeGuruController.text.trim();
-            _guruData['nip'] = _nipController.text.trim();
-            _guruData['no_telp'] = _telpController.text.trim();
+            _guruData['nama'] =
+                (updatedData['nama'] ?? _namaController.text.trim())
+                    .toString()
+                    .toUpperCase();
+            _guruData['kode_guru'] =
+                updatedData['kode_guru'] ?? _kodeGuruController.text.trim();
+            _guruData['nip'] = updatedData['nip'] ?? _nipController.text.trim();
+            _guruData['no_telp'] =
+                updatedData['no_telp'] ?? _telpController.text.trim();
             _isEditing = false;
           });
 
           // Update SharedPreferences
-          await prefs.setString('user_name', _namaController.text.trim());
-          await prefs.setString('kode_guru', _kodeGuruController.text.trim());
-          await prefs.setString('user_nip', _nipController.text.trim());
-          await prefs.setString('user_phone', _telpController.text.trim());
-          await prefs.setString('guru_nama', _namaController.text.trim());
-          await prefs.setString('guru_kode_guru', _kodeGuruController.text.trim());
-          await prefs.setString('guru_nip', _nipController.text.trim());
-          await prefs.setString('guru_no_telp', _telpController.text.trim());
+          await prefs.setString('user_name', _guruData['nama']);
+          await prefs.setString('kode_guru', _guruData['kode_guru']);
+          await prefs.setString('user_nip', _guruData['nip']);
+          await prefs.setString('user_phone', _guruData['no_telp']);
+          await prefs.setString('guru_nama', _guruData['nama']);
+          await prefs.setString('guru_kode_guru', _guruData['kode_guru']);
+          await prefs.setString('guru_nip', _guruData['nip']);
+          await prefs.setString('guru_no_telp', _guruData['no_telp']);
 
           _showSuccessDialog('Data berhasil diperbarui');
         } else {
-          final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
+          final errorMsg =
+              data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
           _showErrorDialog(errorMsg.toString());
         }
       } else {
         try {
           final errorData = jsonDecode(response.body);
-          final errorMsg = errorData['message'] ?? 
-                          errorData['error'] ?? 
-                          'Terjadi kesalahan: ${response.statusCode}';
+          final errorMsg = errorData['message'] ??
+              errorData['error'] ??
+              'Terjadi kesalahan: ${response.statusCode}';
           _showErrorDialog(errorMsg.toString());
         } catch (e) {
           _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
@@ -337,7 +337,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Nama
           TextFormField(
             controller: _namaController,
@@ -360,7 +360,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
             },
           ),
           const SizedBox(height: 12),
-          
+
           // Kode Guru
           TextFormField(
             controller: _kodeGuruController,
@@ -383,7 +383,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
             },
           ),
           const SizedBox(height: 12),
-          
+
           // NIP
           TextFormField(
             controller: _nipController,
@@ -400,7 +400,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // No Telepon
           TextFormField(
             controller: _telpController,
@@ -418,7 +418,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 20),
-          
+
           // Tombol Simpan & Batal
           Row(
             children: [
@@ -484,7 +484,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withValues(alpha:0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -528,7 +528,8 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
 
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
                   children: [
                     // Profile Section
@@ -554,7 +555,6 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          
                           _isLoading
                               ? _buildProfileSkeleton()
                               : Column(
@@ -574,10 +574,12 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 16, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: _primaryColor.withValues(alpha:0.1),
+                                        color: _primaryColor.withValues(
+                                            alpha: 0.1),
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: _primaryColor.withValues(alpha:0.3),
+                                          color: _primaryColor.withValues(
+                                              alpha: 0.3),
                                         ),
                                       ),
                                       child: const Text(
@@ -609,7 +611,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha:0.05),
+                            color: Colors.grey.withValues(alpha: 0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -632,12 +634,13 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                             const SizedBox(height: 16),
                             const Divider(color: _borderColor),
                             const SizedBox(height: 16),
-
-                            _buildDetailItem('Kode Guru', _guruData['kode_guru']!),
+                            _buildDetailItem(
+                                'Kode Guru', _guruData['kode_guru']!),
                             const SizedBox(height: 12),
                             _buildDetailItem('NIP', _guruData['nip']!),
                             const SizedBox(height: 12),
-                            _buildDetailItem('No. Telepon', _guruData['no_telp']!),
+                            _buildDetailItem(
+                                'No. Telepon', _guruData['no_telp']!),
                           ],
                         ],
                       ),
@@ -677,16 +680,14 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                           const SizedBox(height: 16),
                           const Divider(color: _borderColor),
                           const SizedBox(height: 16),
-
                           _buildMenuTile(
                             icon: Icons.help_outline,
                             title: 'Bantuan & Panduan',
                             subtitle: 'Cara menggunakan aplikasi',
-                            onTap: () => _showUnderDevelopment('Bantuan & Panduan', context),
+                            onTap: () => _showUnderDevelopment(
+                                'Bantuan & Panduan', context),
                           ),
-
                           const SizedBox(height: 12),
-
                           _buildMenuTile(
                             icon: Icons.info_outline,
                             title: 'Tentang Aplikasi',
@@ -708,7 +709,8 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
-                            side: const BorderSide(color: _accentColor, width: 1.5),
+                            side: const BorderSide(
+                                color: _accentColor, width: 1.5),
                           ),
                           elevation: 0,
                           shadowColor: Colors.transparent,
@@ -793,7 +795,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha:0.1),
+                  color: _primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(

@@ -25,6 +25,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   int? _kelasId;
   bool _isLoading = true;
   bool _hasToken = false;
+  bool _initialLoading = true; // Tambahkan flag untuk loading awal
 
   Map<String, dynamic>? _pklData;
   List<dynamic> _pklApplications = [];
@@ -393,7 +394,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha:0.1),
+                      color: Colors.black.withOpacity(0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -594,7 +595,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),
@@ -834,7 +835,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _initialLoading = false; // Set initial loading ke false setelah selesai
+        });
       }
     }
   }
@@ -1378,36 +1382,132 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     return status == 'ditolak' || status == 'rejected';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Jika tidak ada token, tampilkan loading screen yang akan redirect
-    if (!_hasToken && _isLoading) {
-      return Scaffold(
-        backgroundColor: const Color.fromARGB(255, 180, 16, 4),
-        body: Center(
+  // ========== SKELETON SCREEN ==========
+  Widget _buildSkeletonScreen() {
+    return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 180, 16, 4),
+      body: SafeArea(
+        child: SingleChildScrollView(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const CircularProgressIndicator(color: Colors.white),
-              const SizedBox(height: 20),
-              Container(
+              // Header skeleton
+              Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 120,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: 180,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Container waktu PKL skeleton
+              Container(
+                margin: const EdgeInsets.only(top: 10, left: 20, right: 20),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: const Text(
-                  'MEMERIKSA LOGIN...',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Color.fromARGB(255, 180, 16, 4),
+                child: _buildTimeSectionSkeleton(),
+              ),
+
+              // Container utama skeleton
+              Container(
+                margin: const EdgeInsets.only(top: 30),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(40),
+                    topRight: Radius.circular(40),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      // Aksi cepat skeleton
+                      _buildQuickActionsSkeleton(),
+                      const SizedBox(height: 30),
+                      
+                      // Judul skeleton
+                      _buildTitleSkeleton(),
+                      const SizedBox(height: 16),
+                      
+                      // Card PKL skeleton
+                      _buildPKLCardSkeleton(),
+                      const SizedBox(height: 30),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Tampilkan skeleton screen saat initial loading
+    if (_initialLoading) {
+      return _buildSkeletonScreen();
+    }
+
+    // Jika tidak ada token, tampilkan loading screen yang akan redirect
+    if (!_hasToken && _isLoading) {
+      return Scaffold(
+        backgroundColor: const Color.fromARGB(255, 180, 16, 4),
+        body: Center(
+          child: _buildSkeletonScreen(),
         ),
       );
     }
@@ -1418,88 +1518,126 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Header dengan notifikasi badge
+              // Header dengan skeleton loading
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Halo, $_namaSiswa!',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Selamat datang di dashboard PKL',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.white.withValues(alpha:0.8),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Stack(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(22),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha:0.1),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: IconButton(
-                            onPressed: _showNotificationsPanel,
-                            icon: const Icon(
-                              Icons.notifications,
-                              size: 24,
-                              color: Color.fromARGB(255, 180, 16, 4),
-                            ),
-                          ),
-                        ),
-                        if (_unreadNotificationCount > 0)
-                          Positioned(
-                            right: 0,
-                            top: 0,
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.white, width: 2),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _unreadNotificationCount > 9
-                                      ? '9+'
-                                      : '$_unreadNotificationCount',
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _isLoading
+                            ? [
+                                Container(
+                                  width: 120,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.8),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  width: 180,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.6),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ]
+                            : [
+                                Text(
+                                  'Halo, $_namaSiswa!',
                                   style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
+                                    fontSize: 24,
                                     fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Selamat datang di dashboard PKL',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white.withOpacity(0.8),
+                                  ),
+                                ),
+                              ],
+                      ),
+                    ),
+                    _isLoading
+                        ? Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(22),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Stack(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(22),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: IconButton(
+                                  onPressed: _showNotificationsPanel,
+                                  icon: const Icon(
+                                    Icons.notifications,
+                                    size: 24,
+                                    color: Color.fromARGB(255, 180, 16, 4),
                                   ),
                                 ),
                               ),
-                            ),
+                              if (_unreadNotificationCount > 0)
+                                Positioned(
+                                  right: 0,
+                                  top: 0,
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                          color: Colors.white, width: 2),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _unreadNotificationCount > 9
+                                            ? '9+'
+                                            : '$_unreadNotificationCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -1514,7 +1652,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha:0.1),
+                      color: Colors.black.withOpacity(0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1909,7 +2047,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2006,7 +2144,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         borderRadius: BorderRadius.circular(19),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.1),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -2086,93 +2224,115 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       ],
     );
   }
-Widget _buildPengajuanCard(Map<String, dynamic> pengajuan) {
-  final status = pengajuan['status'];
-  // Gunakan fungsi _translateStatus untuk mendapatkan status dalam Bahasa Indonesia
-  final statusText = _translateStatus(status);
-  final isDisetujui = status.toLowerCase() == 'disetujui';
 
-  return Container(
-    margin: const EdgeInsets.only(bottom: 16),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha:0.05),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
+  Widget _buildPengajuanCard(Map<String, dynamic> pengajuan) {
+    final status = pengajuan['status'];
+    final statusText = _translateStatus(status);
+    final isDisetujui = status.toLowerCase() == 'disetujui';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.grey[200]!,
+          width: 1,
         ),
-      ],
-      border: Border.all(
-        color: Colors.grey[200]!,
-        width: 1,
       ),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: _statusColor(status).withValues(alpha:0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: _statusColor(status),
-              width: 1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: _statusColor(status).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _statusColor(status),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isDisetujui ? Icons.check_circle : Icons.access_time,
+                  size: 14,
+                  color: _statusColor(status),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    color: _statusColor(status),
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isDisetujui ? Icons.check_circle : Icons.access_time,
-                size: 14,
-                color: _statusColor(status),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                statusText,
-                style: TextStyle(
-                  color: _statusColor(status),
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+          const SizedBox(height: 12),
+          Text(
+            pengajuan['industri_nama'],
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Diproses oleh: ',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        TextSpan(
+                          text: pengajuan['diproses_oleh'],
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _statusColor(status),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          pengajuan['industri_nama'],
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: RichText(
+                RichText(
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: 'Diproses oleh: ',
+                        text: 'Pembimbing PKL: ',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[700],
                         ),
                       ),
                       TextSpan(
-                        text: pengajuan['diproses_oleh'],
+                        text: pengajuan['pembimbing_pkl'],
                         style: TextStyle(
                           fontSize: 12,
                           color: _statusColor(status),
@@ -2182,23 +2342,29 @@ Widget _buildPengajuanCard(Map<String, dynamic> pengajuan) {
                     ],
                   ),
                 ),
-              ),
-              RichText(
-                text: TextSpan(
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextSpan(
-                      text: 'Pembimbing PKL: ',
+                    const Text(
+                      'Tanggal Pengajuan',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
+                        fontSize: 11,
+                        color: Colors.grey,
                       ),
                     ),
-                    TextSpan(
-                      text: pengajuan['pembimbing_pkl'],
-                      style: TextStyle(
+                    const SizedBox(height: 2),
+                    Text(
+                      pengajuan['tanggal_permohonan'],
+                      style: const TextStyle(
                         fontSize: 12,
-                        color: _statusColor(status),
                         fontWeight: FontWeight.w500,
+                        color: Colors.black,
                       ),
                     ),
                   ],
@@ -2206,132 +2372,103 @@ Widget _buildPengajuanCard(Map<String, dynamic> pengajuan) {
               ),
             ],
           ),
-        ),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Tanggal Pengajuan',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    pengajuan['tanggal_permohonan'],
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color.fromARGB(255, 248, 249, 250),
+              borderRadius: BorderRadius.circular(8),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 248, 249, 250),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Catatan Pengajuan:',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.grey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Catatan Pengajuan:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                pengajuan['catatan'],
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.black87,
+                const SizedBox(height: 4),
+                Text(
+                  pengajuan['catatan'],
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black87,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: _statusColor(status).withValues(alpha:0.05),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Catatan Kaprog:',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: _statusColor(status),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _statusColor(status).withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Catatan Kaprog:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: _statusColor(status),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                pengajuan['kaprog_note'],
-                style: TextStyle(
-                  fontSize: 12,
-                  color: _statusColor(status),
+                const SizedBox(height: 4),
+                Text(
+                  pengajuan['kaprog_note'],
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _statusColor(status),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Diputuskan pada: ${pengajuan['decided_at']}',
-          style: const TextStyle(
-            fontSize: 10,
-            color: Colors.grey,
+          const SizedBox(height: 8),
+          Text(
+            'Diputuskan pada: ${pengajuan['decided_at']}',
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+            ),
           ),
-        ),
-      ],
-    ),
-  );
-}
-
-// Fungsi untuk menerjemahkan status ke Bahasa Indonesia
-String _translateStatus(String status) {
-  switch (status.toLowerCase()) {
-    case 'approved':
-      return 'DISETUJUI';
-    case 'rejected':
-      return 'DITOLAK';
-    case 'pending':
-      return 'MENUNGGU';
-    case 'completed':
-      return 'SELESAI';
-    case 'disetujui':
-      return 'DISETUJUI';
-    case 'ditolak':
-      return 'DITOLAK';
-    case 'menunggu':
-      return 'MENUNGGU';
-    case 'selesai':
-      return 'SELESAI';
-    default:
-      return status.toUpperCase();
+        ],
+      ),
+    );
   }
-}
 
-// Fungsi untuk mendapatkan warna berdasarkan status
+  // Fungsi untuk menerjemahkan status ke Bahasa Indonesia
+  String _translateStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'DISETUJUI';
+      case 'rejected':
+        return 'DITOLAK';
+      case 'pending':
+        return 'MENUNGGU';
+      case 'completed':
+        return 'SELESAI';
+      case 'disetujui':
+        return 'DISETUJUI';
+      case 'ditolak':
+        return 'DITOLAK';
+      case 'menunggu':
+        return 'MENUNGGU';
+      case 'selesai':
+        return 'SELESAI';
+      default:
+        return status.toUpperCase();
+    }
+  }
+
   Widget _buildMenuOptionKiri(String title, IconData icon, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -2346,7 +2483,7 @@ String _translateStatus(String status) {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.1),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
                 ),
@@ -2387,7 +2524,7 @@ String _translateStatus(String status) {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.1),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
                 ),

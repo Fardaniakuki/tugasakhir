@@ -119,131 +119,128 @@ class _KoordinatorPengaturanState extends State<KoordinatorPengaturan> {
       });
     }
   }
-Future<void> _updateGuruData() async {
-  if (!_formKey.currentState!.validate()) {
-    return;
-  }
 
-  try {
-    await dotenv.load(fileName: '.env');
-    
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    
-    // COBA DUA KEMUNGKINAN ID
-    final int? guruId = prefs.getInt('guru_id');
-    final int? userId = prefs.getInt('user_id');
-    
-    print('🔍 DEBUG IDs:');
-    print('   Guru ID from prefs: $guruId');
-    print('   User ID from prefs: $userId');
-    print('   Guru ID from state: ${_guruData['guru_id']}');
-    print('   User ID from state: ${_guruData['user_id']}');
-
-    // Prioritaskan ID dari data state
-    final int targetId = _guruData['guru_id'] ?? 
-                        _guruData['user_id'] ?? 
-                        guruId ?? 
-                        userId ?? 0;
-
-    if (token == null || targetId == 0) {
-      _showErrorDialog('Token tidak ditemukan atau ID tidak valid');
+  Future<void> _updateGuruData() async {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Tampilkan loading
-    if (context.mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(
-            color: _primaryColor,
+    try {
+      await dotenv.load(fileName: '.env');
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      print('🔍 DEBUG UPDATE GURU DATA:');
+      print('   Token exists: ${token != null}');
+
+      if (token == null) {
+        _showErrorDialog('Token tidak ditemukan');
+        return;
+      }
+
+      // Tampilkan loading
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(
+              color: _primaryColor,
+            ),
           ),
-        ),
+        );
+      }
+
+      // Data yang akan dikirim sesuai dengan dokumentasi API
+      final Map<String, dynamic> requestData = {
+        'kode_guru': _kodeGuruController.text.trim(),
+        'nama': _namaController.text.trim(),
+        'nip': _nipController.text.trim(),
+        'no_telp': _telpController.text.trim(),
+      };
+
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final url = Uri.parse('$baseUrl/api/guru/me');
+
+      print('🔄 Updating guru data...');
+      print('   URL: $url');
+      print('   Request data: $requestData');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(requestData),
       );
-    }
 
-    // **Coba tanpa field boolean jika tidak perlu**
-    final Map<String, dynamic> requestData = {
-      'nama': _namaController.text.trim(),
-      'kode_guru': _kodeGuruController.text.trim(),
-      'nip': _nipController.text.trim(),
-      'no_telp': _telpController.text.trim(),
-    };
+      // Tutup loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
 
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-    final url = Uri.parse('$baseUrl/api/guru/$targetId');
+      print('📤 Response status: ${response.statusCode}');
+      print('📤 Response body: ${response.body}');
 
-    print('🔄 Updating guru data...');
-    print('   URL: $url');
-    print('   Using ID: $targetId');
-    print('   Request data: $requestData');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
-    final response = await http.put(
-      url,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode(requestData),
-    );
+        if (data['success'] == true) {
+          // Update data lokal
+          final updatedData = data['data'] as Map<String, dynamic>;
 
-    // Tutup loading dialog
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
+          setState(() {
+            _guruData['nama'] =
+                (updatedData['nama'] ?? _namaController.text.trim())
+                    .toString()
+                    .toUpperCase();
+            _guruData['kode_guru'] =
+                updatedData['kode_guru'] ?? _kodeGuruController.text.trim();
+            _guruData['nip'] = updatedData['nip'] ?? _nipController.text.trim();
+            _guruData['no_telp'] =
+                updatedData['no_telp'] ?? _telpController.text.trim();
+            _isEditing = false;
+          });
 
-    print('📤 Response status: ${response.statusCode}');
-    print('📤 Response body: ${response.body}');
+          // Update SharedPreferences
+          await prefs.setString('user_name', _guruData['nama']);
+          await prefs.setString('kode_guru', _guruData['kode_guru']);
+          await prefs.setString('user_nip', _guruData['nip']);
+          await prefs.setString('user_phone', _guruData['no_telp']);
+          await prefs.setString('guru_nama', _guruData['nama']);
+          await prefs.setString('guru_kode_guru', _guruData['kode_guru']);
+          await prefs.setString('guru_nip', _guruData['nip']);
+          await prefs.setString('guru_no_telp', _guruData['no_telp']);
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      
-      if (data['success'] == true) {
-        // Update berhasil
-        setState(() {
-          _guruData['nama'] = _namaController.text.trim().toUpperCase();
-          _guruData['kode_guru'] = _kodeGuruController.text.trim();
-          _guruData['nip'] = _nipController.text.trim();
-          _guruData['no_telp'] = _telpController.text.trim();
-          _isEditing = false;
-        });
-
-        // Update SharedPreferences
-        await prefs.setString('user_name', _namaController.text.trim());
-        await prefs.setString('kode_guru', _kodeGuruController.text.trim());
-        await prefs.setString('user_nip', _nipController.text.trim());
-        await prefs.setString('user_phone', _telpController.text.trim());
-        await prefs.setString('guru_nama', _namaController.text.trim());
-        await prefs.setString('guru_kode_guru', _kodeGuruController.text.trim());
-        await prefs.setString('guru_nip', _nipController.text.trim());
-        await prefs.setString('guru_no_telp', _telpController.text.trim());
-
-        _showSuccessDialog('Data berhasil diperbarui');
+          _showSuccessDialog('Data berhasil diperbarui');
+        } else {
+          final errorMsg =
+              data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
+          _showErrorDialog(errorMsg.toString());
+        }
       } else {
-        final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
-        _showErrorDialog(errorMsg.toString());
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMsg = errorData['message'] ??
+              errorData['error'] ??
+              'Terjadi kesalahan: ${response.statusCode}';
+          _showErrorDialog(errorMsg.toString());
+        } catch (e) {
+          _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
+        }
       }
-    } else {
-      try {
-        final errorData = jsonDecode(response.body);
-        final errorMsg = errorData['message'] ?? 
-                        errorData['error'] ?? 
-                        'Terjadi kesalahan: ${response.statusCode}';
-        _showErrorDialog(errorMsg.toString());
-      } catch (e) {
-        _showErrorDialog('Terjadi kesalahan: ${response.statusCode} - ${response.body}');
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
       }
+      _showErrorDialog('Terjadi kesalahan: $e');
     }
-  } catch (e) {
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
-    _showErrorDialog('Terjadi kesalahan: $e');
   }
-}
+
   void _showSuccessDialog(String message) {
     showDialog(
       context: context,
@@ -497,7 +494,7 @@ Future<void> _updateGuruData() async {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withValues(alpha:0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -579,10 +576,12 @@ Future<void> _updateGuruData() async {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 16, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: _primaryColor.withValues(alpha:0.1),
+                                        color: _primaryColor.withValues(
+                                            alpha: 0.1),
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: _primaryColor.withValues(alpha:0.3),
+                                          color: _primaryColor.withValues(
+                                              alpha: 0.3),
                                         ),
                                       ),
                                       child: const Text(
@@ -614,7 +613,7 @@ Future<void> _updateGuruData() async {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha:0.05),
+                            color: Colors.grey.withValues(alpha: 0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -663,7 +662,7 @@ Future<void> _updateGuruData() async {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha:0.05),
+                            color: Colors.grey.withValues(alpha: 0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -798,7 +797,7 @@ Future<void> _updateGuruData() async {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha:0.1),
+                  color: _primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -866,7 +865,6 @@ Future<void> _updateGuruData() async {
       ],
     );
   }
-
 
   void _showUnderDevelopment(String featureName, BuildContext context) {
     showDialog(

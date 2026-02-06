@@ -25,12 +25,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
   static const Color _textPrimary = Color(0xFF2C3E50);
   static const Color _textSecondary = Color(0xFF7F8C8D);
 
-  // Logo settings - NEW: Added logo configuration
-  static const String _logoUrl = 'https://upload.wikimedia.org/wikipedia/commons/7/74/Coat_of_arms_of_East_Java.svg';
-  static const double _logoHeight = 55.0; // Reduced height
-  static const double _logoWidth = 55.0;  // Reduced width
-  static const EdgeInsets _logoMargin = EdgeInsets.only(right: 30.0); // Move logo to the right
-
   // Tab Controller
   late TabController _tabController;
 
@@ -114,6 +108,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
       }
     });
   }
+
+  // Function to get headers with auth token
 
   // Function to launch URL
   Future<void> _launchUrl(String urlString) async {
@@ -259,7 +255,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
       const String apiBaseUrl = 'https://sertif.gedanggoreng.com';
       const String endpoint = '$apiBaseUrl/api/v1/letters/surat-tugas';
 
-      // NEW: Updated school_info with new logo settings
       final Map<String, dynamic> requestData = {
         'nomor_surat': '800/123/SMK.2/${DateTime.now().year}',
         'tanggal_surat': _formatDate(DateTime.now()),
@@ -276,10 +271,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
           'telepon': '(0341) 4345127',
           'email': 'smkn2singosari@yahoo.co.id',
           'website': 'www.smkn2singosari.sch.id',
-          'logo_url': _logoUrl, // NEW: Using constant logo URL
-          'logo_height': _logoHeight, // NEW: Added logo height
-          'logo_width': _logoWidth, // NEW: Added logo width
-          'logo_margin_right': _logoMargin.right, // NEW: Added logo margin
+          'logo_url':
+              'https://upload.wikimedia.org/wikipedia/commons/7/74/Coat_of_arms_of_East_Java.svg',
         },
         'penandatangan': {
           'instansi': 'SMK Negeri 2 Singosari',
@@ -437,13 +430,13 @@ class _KoordinatorDataState extends State<KoordinatorData>
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _hasErrorGuru
-            ? _accentColor.withOpacity(0.1)
-            : _successColor.withOpacity(0.1),
+            ? _accentColor.withValues(alpha: 0.1)
+            : _successColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: _hasErrorGuru
-              ? _accentColor.withOpacity(0.3)
-              : _successColor.withOpacity(0.3),
+              ? _accentColor.withValues(alpha: 0.3)
+              : _successColor.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -480,7 +473,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -503,7 +496,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        _primaryColor.withOpacity(0.9),
+                        _primaryColor.withValues(alpha: 0.9),
                         _primaryColor,
                       ],
                       begin: Alignment.topLeft,
@@ -788,7 +781,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
           .map((siswa) => {'nama': siswa['nama']})
           .toList();
 
-      // NEW: Updated school_info with new logo settings
       final Map<String, dynamic> requestData = {
         'nama_perusahaan': _selectedIndustri!,
         'school_info': {
@@ -796,10 +788,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
           'alamat_jalan': 'Jalan Perusahaan No. 20',
           'kab_kota': 'Kab. Malang',
           'kode_pos': '65153',
-          'logo_url': _logoUrl, // NEW: Using constant logo URL
-          'logo_height': _logoHeight, // NEW: Added logo height
-          'logo_width': _logoWidth, // NEW: Added logo width
-          'logo_margin_right': _logoMargin.right, // NEW: Added logo margin
+          'logo_url':
+              'https://upload.wikimedia.org/wikipedia/commons/7/74/Coat_of_arms_of_East_Java.svg',
           'provinsi': 'Jawa Timur',
           'telefon': '(0341) 458823'
         },
@@ -878,13 +868,13 @@ class _KoordinatorDataState extends State<KoordinatorData>
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _hasErrorSiswa
-            ? _accentColor.withOpacity(0.1)
-            : _successColor.withOpacity(0.1),
+            ? _accentColor.withValues(alpha: 0.1)
+            : _successColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: _hasErrorSiswa
-              ? _accentColor.withOpacity(0.3)
-              : _successColor.withOpacity(0.3),
+              ? _accentColor.withValues(alpha: 0.3)
+              : _successColor.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -928,7 +918,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -946,7 +936,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isSelected ? _primaryColor : _primaryColor.withOpacity(0.1),
+                  color: isSelected ? _primaryColor : _primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -977,7 +967,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: _successColor.withOpacity(0.1),
+                            color: _successColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -1057,7 +1047,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: _primaryColor.withOpacity(0.1),
+                color: _primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
@@ -1095,9 +1085,9 @@ class _KoordinatorDataState extends State<KoordinatorData>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: _successColor.withOpacity(0.1),
+                color: _successColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _successColor.withOpacity(0.3)),
+                border: Border.all(color: _successColor.withValues(alpha: 0.3)),
               ),
               child: const Text(
                 'Approved',
@@ -1128,7 +1118,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 15,
             offset: const Offset(0, 4),
           ),
@@ -1147,9 +1137,9 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: _primaryColor.withOpacity(0.05),
+                      color: _primaryColor.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _primaryColor.withOpacity(0.2)),
+                      border: Border.all(color: _primaryColor.withValues(alpha: 0.2)),
                     ),
                     child: Column(
                       children: [
@@ -1159,7 +1149,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: _primaryColor.withOpacity(0.1),
+                                color: _primaryColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Icon(
@@ -1238,7 +1228,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _selectedSiswaIds.length == selectedStudents.length
                                       ? _accentColor
-                                      : _primaryColor.withOpacity(0.1),
+                                      : _primaryColor.withValues(alpha: 0.1),
                                   foregroundColor: _selectedSiswaIds.length == selectedStudents.length
                                       ? Colors.white
                                       : _primaryColor,
@@ -1315,9 +1305,9 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _infoColor.withOpacity(0.05),
+                      color: _infoColor.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _infoColor.withOpacity(0.2)),
+                      border: Border.all(color: _infoColor.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       children: [
@@ -1377,7 +1367,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
               ),
@@ -1390,7 +1380,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [_primaryColor, _primaryColor.withOpacity(0.8)],
+                    colors: [_primaryColor, _primaryColor.withValues(alpha: 0.8)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -1405,7 +1395,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1432,7 +1422,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                         ],
@@ -1460,7 +1450,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: _primaryColor.withOpacity(0.1),
+                              color: _primaryColor.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -1513,7 +1503,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: _infoColor.withOpacity(0.1),
+                              color: _infoColor.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -1576,7 +1566,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _textSecondary.withOpacity(0.3)),
+                          side: BorderSide(color: _textSecondary.withValues(alpha: 0.3)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -1650,7 +1640,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
               ),
@@ -1663,7 +1653,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [_primaryColor, _primaryColor.withOpacity(0.8)],
+                    colors: [_primaryColor, _primaryColor.withValues(alpha: 0.8)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -1678,7 +1668,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                       width: 50,
                       height: 50,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1705,7 +1695,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                         ],
@@ -1733,7 +1723,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: _primaryColor.withOpacity(0.1),
+                              color: _primaryColor.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -1791,7 +1781,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: _infoColor.withOpacity(0.1),
+                                  color: _infoColor.withValues(alpha: 0.1),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
@@ -1834,10 +1824,10 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
-                              color: _successColor.withOpacity(0.1),
+                              color: _successColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                               border:
-                                  Border.all(color: _successColor.withOpacity(0.3)),
+                                  Border.all(color: _successColor.withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               children: [
@@ -1876,7 +1866,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _textSecondary.withOpacity(0.3)),
+                          side: BorderSide(color: _textSecondary.withValues(alpha: 0.3)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -1983,7 +1973,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 15,
                         offset: const Offset(0, 4),
                       ),
@@ -2023,7 +2013,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: _primaryColor.withOpacity(0.1),
+                              color: _primaryColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -2053,7 +2043,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 15,
                         offset: const Offset(0, 4),
                       ),
@@ -2109,7 +2099,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                               backgroundColor: _selectedGuruIds.length ==
                                       _guruPembimbing.length
                                   ? _accentColor
-                                  : _primaryColor.withOpacity(0.1),
+                                  : _primaryColor.withValues(alpha: 0.1),
                               foregroundColor: _selectedGuruIds.length ==
                                       _guruPembimbing.length
                                   ? Colors.white
@@ -2192,7 +2182,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                                 children: [
                                   Icon(
                                     Icons.group_off,
-                                    color: _textSecondary.withOpacity(0.3),
+                                    color: _textSecondary.withValues(alpha: 0.3),
                                     size: 80,
                                   ),
                                   const SizedBox(height: 20),
@@ -2212,7 +2202,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                                       'Belum ada guru yang terdaftar sebagai pembimbing PKL',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
-                                        color: _textSecondary.withOpacity(0.7),
+                                        color: _textSecondary.withValues(alpha: 0.7),
                                         fontSize: 14,
                                       ),
                                     ),
@@ -2246,7 +2236,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 15,
                           offset: const Offset(0, 4),
                         ),
@@ -2286,7 +2276,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: _primaryColor.withOpacity(0.1),
+                                color: _primaryColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -2322,7 +2312,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 15,
                             offset: const Offset(0, 4),
                           ),
@@ -2382,7 +2372,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 15,
                             offset: const Offset(0, 4),
                           ),
@@ -2406,7 +2396,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: _successColor.withOpacity(0.1),
+                                  color: _successColor.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(

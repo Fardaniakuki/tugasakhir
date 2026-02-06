@@ -153,7 +153,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
 
   // Warna tema
   static const Color _primaryRed = Color(0xFF6B1B1B);
-  static const Color _bgSoft = Color(0xFFF6EEEE);
+  static const Color _bgSoft = const Color(0xFF6B1B1B);
   static const Color _secondaryColor = Colors.white;
   static const Color _borderOrange = Color(0xFFFFB74D);
   static const Color _orange = Color(0xFFFF9800);

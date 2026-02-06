@@ -1,5 +1,20 @@
 import 'package:flutter/material.dart';
 
+// Definisi Warna Tema Professional
+class RekapTheme {
+  static const Color primaryRed = Color(0xFF9f0712);
+  static const Color background = Color(0xFFF8F9FA); // Putih tulang / abu sangat muda
+  static const Color surface = Colors.white;
+  static const Color textDark = Color(0xFF2D3748);
+  static const Color textGrey = Color(0xFF718096);
+  static const Color border = Color(0xFFE2E8F0);
+  
+  static const Color green = Color(0xFF38A169);
+  static const Color orange = Color(0xFFDD6B20);
+  static const Color red = Color(0xFFE53E3E);
+  static const Color blue = Color(0xFF3182CE);
+}
+
 class SiswaRekap extends StatefulWidget {
   const SiswaRekap({super.key, required void Function() onQuickActionPressed, required Future<void> Function() onAjukanIjin});
 
@@ -10,20 +25,7 @@ class SiswaRekap extends StatefulWidget {
 class _SiswaRekapState extends State<SiswaRekap> 
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   
-  // Warna tema siswa yang serius
-  final Color _primaryRed = const Color(0xFF9f0712); // Merah siswa
-  final Color _bgSoft = const Color(0xFFF5F5F5); // Background soft
-  final Color _secondaryColor = Colors.white;
-  final Color _textPrimary = const Color(0xFF333333); // Teks gelap
-  final Color _textSecondary = const Color(0xFF666666); // Teks abu-abu
-  final Color _borderColor = const Color(0xFFE0E0E0);
-  final Color _green = const Color(0xFF4CAF50); // Hijau untuk disetujui
-  final Color _orange = const Color(0xFFFF9800); // Oranye untuk menunggu
-  final Color _red = const Color(0xFFF44336); // Merah untuk ditolak
-  final Color _blue = const Color(0xFF2196F3); // Biru untuk info
-  
   late TabController _tabController;
-  int _selectedTabIndex = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -32,11 +34,6 @@ class _SiswaRekapState extends State<SiswaRekap>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() {
-        _selectedTabIndex = _tabController.index;
-      });
-    });
   }
 
   @override
@@ -49,129 +46,46 @@ class _SiswaRekapState extends State<SiswaRekap>
   Widget build(BuildContext context) {
     super.build(context);
     
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: _bgSoft,
-        body: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverAppBar(
-                expandedHeight: 160.0,
-                backgroundColor: _bgSoft,
-                pinned: true,
-                floating: true,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: _headerCard(),
-                ),
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(48.0),
-                  child: Container(
-                    color: Colors.white,
-                    child: TabBar(
-                      controller: _tabController,
-                      indicatorColor: _primaryRed,
-                      labelColor: _primaryRed,
-                      unselectedLabelColor: Colors.grey,
-                      labelStyle: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                      unselectedLabelStyle: const TextStyle(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                      ),
-                      tabs: const [
-                        Tab(text: 'Izin SIA'),
-                        Tab(text: 'Pengajuan Pindah PKL'),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ];
-          },
-          body: TabBarView(
-            controller: _tabController,
-            children: [
-              // TAB 1: Izin SIA (Sakit/Izin/Alpha)
-              SiswaSiaContent(
-                primaryRed: _primaryRed,
-                bgSoft: _bgSoft,
-                secondaryColor: _secondaryColor,
-                textPrimary: _textPrimary,
-                textSecondary: _textSecondary,
-                borderColor: _borderColor,
-                green: _green,
-                orange: _orange,
-                red: _red,
-                blue: _blue,
-              ),
-              
-              // TAB 2: Pengajuan PKL
-              SiswaPengajuanPklContent(
-                primaryRed: _primaryRed,
-                bgSoft: _bgSoft,
-                secondaryColor: _secondaryColor,
-                textPrimary: _textPrimary,
-                textSecondary: _textSecondary,
-                borderColor: _borderColor,
-                green: _green,
-                orange: _orange,
-                red: _red,
-                blue: _blue,
-              ),
-            ],
+    return Scaffold(
+      backgroundColor: RekapTheme.background,
+      appBar: AppBar(
+        backgroundColor: RekapTheme.surface,
+        elevation: 0,
+        title: const Text(
+          'Rekapitulasi',
+          style: TextStyle(
+            color: RekapTheme.textDark, 
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        centerTitle: false,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: RekapTheme.border)),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              labelColor: RekapTheme.primaryRed,
+              unselectedLabelColor: RekapTheme.textGrey,
+              indicatorColor: RekapTheme.primaryRed,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              tabs: const [
+                Tab(text: 'Riwayat Izin (SIA)'),
+                Tab(text: 'Riwayat PKL'),
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _headerCard() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 40, 16, 0),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Izin & Pengajuan',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: _primaryRed,
-                ),
-              ),
-           
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _selectedTabIndex == 0 
-              ? 'Kelola izin sakit, izin, dan alpha'
-              : 'Kelola pengajuan dan pindah PKL',
-            style: TextStyle(
-              fontSize: 16,
-              color: _textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          SiswaSiaContent(),
+          SiswaPengajuanPklContent(),
         ],
       ),
     );
@@ -183,36 +97,14 @@ class _SiswaRekapState extends State<SiswaRekap>
 // ==============================================
 
 class SiswaSiaContent extends StatefulWidget {
-  final Color primaryRed;
-  final Color bgSoft;
-  final Color secondaryColor;
-  final Color textPrimary;
-  final Color textSecondary;
-  final Color borderColor;
-  final Color green;
-  final Color orange;
-  final Color red;
-  final Color blue;
-
-  const SiswaSiaContent({
-    super.key,
-    required this.primaryRed,
-    required this.bgSoft,
-    required this.secondaryColor,
-    required this.textPrimary,
-    required this.textSecondary,
-    required this.borderColor,
-    required this.green,
-    required this.orange,
-    required this.red,
-    required this.blue,
-  });
+  const SiswaSiaContent({super.key});
 
   @override
   State<SiswaSiaContent> createState() => _SiswaSiaContentState();
 }
 
 class _SiswaSiaContentState extends State<SiswaSiaContent> {
+  // Mock Data
   final List<Map<String, dynamic>> _siaData = [
     {
       'id': 'SIA001',
@@ -221,11 +113,9 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
       'durasi': '1 hari',
       'alasan': 'Keperluan keluarga penting',
       'status': 'Disetujui',
-      'statusColor': Colors.green,
+      'statusColor': RekapTheme.green,
       'tanggal_ajukan': '22 Jan 2024',
-      'dokumen': 'Surat Keterangan.pdf',
       'is_ditolak': false,
-      'alasan_tolak': null,
     },
     {
       'id': 'SIA002',
@@ -234,11 +124,9 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
       'durasi': '2 hari',
       'alasan': 'Demam dan flu berat',
       'status': 'Disetujui',
-      'statusColor': Colors.green,
+      'statusColor': RekapTheme.green,
       'tanggal_ajukan': '17 Jan 2024',
-      'dokumen': 'Surat Dokter.pdf',
       'is_ditolak': false,
-      'alasan_tolak': null,
     },
     {
       'id': 'SIA003',
@@ -247,11 +135,9 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
       'durasi': '1 hari',
       'alasan': 'Mengikuti seminar',
       'status': 'Menunggu',
-      'statusColor': Colors.orange,
+      'statusColor': RekapTheme.orange,
       'tanggal_ajukan': '14 Jan 2024',
-      'dokumen': 'Undangan Seminar.pdf',
       'is_ditolak': false,
-      'alasan_tolak': null,
     },
     {
       'id': 'SIA004',
@@ -260,9 +146,8 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
       'durasi': '1 hari',
       'alasan': 'Tidak ada keterangan',
       'status': 'Ditolak',
-      'statusColor': Colors.red,
+      'statusColor': RekapTheme.red,
       'tanggal_ajukan': '11 Jan 2024',
-      'dokumen': null,
       'is_ditolak': true,
       'alasan_tolak': 'Tidak ada surat keterangan',
     },
@@ -271,9 +156,6 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
   String _filterStatus = 'Semua';
   final List<String> _statusOptions = ['Semua', 'Disetujui', 'Menunggu', 'Ditolak'];
 
-
-
-
   @override
   Widget build(BuildContext context) {
     final filteredData = _siaData.where((item) {
@@ -281,373 +163,226 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
       return item['status'] == _filterStatus;
     }).toList();
 
-    final totalIzin = _siaData.where((item) => item['jenis'] == 'Izin').length;
-    final totalSakit = _siaData.where((item) => item['jenis'] == 'Sakit').length;
-    final totalAlpha = _siaData.where((item) => item['jenis'] == 'Alpha').length;
-
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 20),
-          
-          
-          // Statistik
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: widget.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha:0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
+          // 1. Summary Cards
+          Row(
+            children: [
+              Expanded(child: _buildSummaryCard('Total Izin', _siaData.length.toString(), Icons.folder_copy_outlined, RekapTheme.blue)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildSummaryCard('Disetujui', _siaData.where((e) => e['status'] == 'Disetujui').length.toString(), Icons.check_circle_outline, RekapTheme.green)),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // 2. Filter
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatItem('Total', _siaData.length.toString(), Icons.list_alt, widget.primaryRed),
-                _buildStatItem('Izin', totalIzin.toString(), Icons.person_pin_circle, widget.blue),
-                _buildStatItem('Sakit', totalSakit.toString(), Icons.healing, widget.orange),
-                _buildStatItem('Alpha', totalAlpha.toString(), Icons.warning, widget.red),
-              ],
+              children: _statusOptions.map((status) => _buildFilterChip(status)).toList(),
             ),
           ),
-          
           const SizedBox(height: 20),
-          
-          // Filter Status
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: widget.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha:0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+
+          // 3. List Data
+          if (filteredData.isEmpty)
+            _buildEmptyState()
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filteredData.length,
+              separatorBuilder: (ctx, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                return _buildSiaCard(filteredData[index]);
+              },
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Status Izin',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF333333),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _statusOptions.map((status) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _filterStatus = status;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _filterStatus == status ? widget.primaryRed : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: widget.primaryRed),
-                            ),
-                            child: Text(
-                              status,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: _filterStatus == status ? Colors.white : widget.primaryRed,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 20),
-          
-          // Daftar Izin
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: widget.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha:0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Riwayat Izin',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: widget.primaryRed,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: widget.primaryRed.withValues(alpha:0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: widget.primaryRed.withValues(alpha:0.3)),
-                      ),
-                      child: Text(
-                        '${filteredData.length} izin',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: widget.primaryRed,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 16),
-                
-                if (filteredData.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(40),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.inbox,
-                          size: 48,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _filterStatus == 'Semua'
-                            ? 'Belum ada riwayat izin'
-                            : 'Tidak ada izin dengan status "$_filterStatus"',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  ...filteredData.map((data) => _buildIzinCard(data)),
-              ],
-            ),
-          ),
-          
           const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
+  Widget _buildFilterChip(String status) {
+    final bool isSelected = _filterStatus == status;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: () => setState(() => _filterStatus = status),
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: color.withValues(alpha:0.1),
-            shape: BoxShape.circle,
+            color: isSelected ? RekapTheme.primaryRed : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isSelected ? RekapTheme.primaryRed : RekapTheme.border,
+            ),
+            boxShadow: isSelected 
+              ? [BoxShadow(color: RekapTheme.primaryRed.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2))]
+              : [],
           ),
-          child: Icon(icon, size: 20, color: color),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
-        ),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
+          child: Text(
+            status,
+            style: TextStyle(
+              color: isSelected ? Colors.white : RekapTheme.textGrey,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildIzinCard(Map<String, dynamic> data) {
+  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey[200]!),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: RekapTheme.border),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
+              Text(title, style: const TextStyle(fontSize: 12, color: RekapTheme.textGrey)),
+            ],
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: data['statusColor'].withValues(alpha:0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: data['statusColor'].withValues(alpha:0.3)),
-                  ),
-                  child: Icon(
-                    data['jenis'] == 'Sakit' ? Icons.healing :
-                    data['jenis'] == 'Alpha' ? Icons.warning : Icons.person_pin_circle,
-                    color: data['statusColor'],
-                    size: 24,
-                  ),
+    );
+  }
+
+  Widget _buildSiaCard(Map<String, dynamic> data) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: RekapTheme.border),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Card
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: RekapTheme.background,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data['jenis'],
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Tanggal: ${data['tanggal']} • ${data['durasi']}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: data['statusColor'].withValues(alpha:0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: data['statusColor'].withValues(alpha:0.3)),
-                  ),
-                  child: Text(
-                    data['status'],
-                    style: TextStyle(
-                      color: data['statusColor'],
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                child: Row(
+                  children: [
+                    Icon(
+                      data['jenis'] == 'Sakit' ? Icons.medical_services_outlined : 
+                      data['jenis'] == 'Alpha' ? Icons.warning_amber_rounded : Icons.assignment_outlined,
+                      size: 14,
+                      color: RekapTheme.textDark,
                     ),
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.note, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Alasan: ${data['alasan']}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
+                    const SizedBox(width: 6),
+                    Text(
+                      data['jenis'],
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: RekapTheme.textDark),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
-            
-            const SizedBox(height: 8),
-            
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Text(
-                  'Diajukan: ${data['tanggal_ajukan']}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-            
-            if (data['is_ditolak'] && data['alasan_tolak'] != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.close, size: 16, color: Colors.red[600]),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Alasan ditolak: ${data['alasan_tolak']}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.red[600],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
               ),
+              _buildStatusBadge(data['status'], data['statusColor']),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // Content
+          Text(
+            '${data['tanggal']} (${data['durasi']})',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: RekapTheme.textDark),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            data['alasan'],
+            style: const TextStyle(color: RekapTheme.textGrey, fontSize: 13),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          
+          // Divider if rejected
+          if (data['is_ditolak'] == true) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Divider(height: 1, color: RekapTheme.border),
+            ),
+            Row(
+              children: [
+                const Icon(Icons.info_outline, size: 14, color: RekapTheme.red),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Alasan Ditolak: ${data['alasan_tolak']}',
+                    style: const TextStyle(color: RekapTheme.red, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String status, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Text(
+        status,
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 40),
+        child: Column(
+          children: [
+            Icon(Icons.filter_list_off, size: 48, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              'Tidak ada data ditemukan',
+              style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500),
+            ),
           ],
         ),
       ),
@@ -660,36 +395,14 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
 // ==============================================
 
 class SiswaPengajuanPklContent extends StatefulWidget {
-  final Color primaryRed;
-  final Color bgSoft;
-  final Color secondaryColor;
-  final Color textPrimary;
-  final Color textSecondary;
-  final Color borderColor;
-  final Color green;
-  final Color orange;
-  final Color red;
-  final Color blue;
-
-  const SiswaPengajuanPklContent({
-    super.key,
-    required this.primaryRed,
-    required this.bgSoft,
-    required this.secondaryColor,
-    required this.textPrimary,
-    required this.textSecondary,
-    required this.borderColor,
-    required this.green,
-    required this.orange,
-    required this.red,
-    required this.blue,
-  });
+  const SiswaPengajuanPklContent({super.key});
 
   @override
   State<SiswaPengajuanPklContent> createState() => _SiswaPengajuanPklContentState();
 }
 
 class _SiswaPengajuanPklContentState extends State<SiswaPengajuanPklContent> {
+  // Mock Data
   final List<Map<String, dynamic>> _pengajuanData = [
     {
       'id': 'PKL001',
@@ -698,28 +411,20 @@ class _SiswaPengajuanPklContentState extends State<SiswaPengajuanPklContent> {
       'alamat': 'Jl. Sudirman No. 123, Jakarta',
       'tanggal_ajukan': '15 Jan 2024',
       'status': 'Disetujui',
-      'statusColor': Colors.green,
-      'guru_pembimbing': 'Dr. Budi Santoso, M.Kom.',
+      'statusColor': RekapTheme.green,
+      'guru_pembimbing': 'Dr. Budi Santoso',
       'tanggal_mulai': '1 Feb 2024',
-      'durasi': '3 bulan',
       'is_ditolak': false,
-      'alasan_tolak': null,
     },
     {
       'id': 'PKL002',
       'jenis': 'Pindah PKL',
       'industri': 'CV. Digital Solusi',
       'alamat': 'Jl. Thamrin No. 45, Jakarta',
-      'industri_asal': 'PT. Jaringan Nusantara',
       'tanggal_ajukan': '14 Jan 2024',
       'status': 'Menunggu',
-      'statusColor': Colors.orange,
-      'guru_pembimbing': null,
-      'tanggal_mulai': null,
-      'durasi': null,
+      'statusColor': RekapTheme.orange,
       'is_ditolak': false,
-      'alasan_tolak': null,
-      'alasan_pindah': 'Lebih sesuai dengan jurusan',
     },
     {
       'id': 'PKL003',
@@ -728,437 +433,198 @@ class _SiswaPengajuanPklContentState extends State<SiswaPengajuanPklContent> {
       'alamat': 'Jl. Gatot Subroto No. 67, Jakarta',
       'tanggal_ajukan': '13 Jan 2024',
       'status': 'Ditolak',
-      'statusColor': Colors.red,
-      'guru_pembimbing': null,
-      'tanggal_mulai': null,
-      'durasi': null,
+      'statusColor': RekapTheme.red,
       'is_ditolak': true,
       'alasan_tolak': 'Kuota industri sudah penuh',
     },
   ];
 
-  String _filterStatus = 'Semua';
-  final List<String> _statusOptions = ['Semua', 'Disetujui', 'Menunggu', 'Ditolak'];
-
-
-
   @override
   Widget build(BuildContext context) {
-    final filteredData = _pengajuanData.where((item) {
-      if (_filterStatus == 'Semua') return true;
-      return item['status'] == _filterStatus;
-    }).toList();
-
-    final totalDisetujui = _pengajuanData.where((item) => item['status'] == 'Disetujui').length;
-    final totalMenunggu = _pengajuanData.where((item) => item['status'] == 'Menunggu').length;
-    final totalDitolak = _pengajuanData.where((item) => item['status'] == 'Ditolak').length;
-
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          
-          const SizedBox(height: 20),
-          
-          // Statistik
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: widget.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha:0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildStatItem('Total', _pengajuanData.length.toString(), Icons.list_alt, widget.primaryRed),
-                _buildStatItem('Disetujui', totalDisetujui.toString(), Icons.check_circle, widget.green),
-                _buildStatItem('Menunggu', totalMenunggu.toString(), Icons.access_time, widget.orange),
-                _buildStatItem('Ditolak', totalDitolak.toString(), Icons.close, widget.red),
-              ],
-            ),
+          // 1. Stats Row
+          Row(
+            children: [
+              Expanded(child: _buildSummaryCard('Total', _pengajuanData.length.toString(), Icons.assignment, RekapTheme.primaryRed)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildSummaryCard('Disetujui', _pengajuanData.where((e) => e['status'] == 'Disetujui').length.toString(), Icons.check_circle, RekapTheme.green)),
+            ],
           ),
-          
-          const SizedBox(height: 20),
-          
-          // Filter Status
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: widget.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha:0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Status Pengajuan',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF333333),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _statusOptions.map((status) {
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _filterStatus = status;
-                            });
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _filterStatus == status ? widget.primaryRed : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: widget.primaryRed),
-                            ),
-                            child: Text(
-                              status,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: _filterStatus == status ? Colors.white : widget.primaryRed,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 24),
+
+          // 2. Section Title
+          const Row(
+            children: [
+              Text('Riwayat Pengajuan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
+            ],
           ),
-          
-          const SizedBox(height: 20),
-          
-          // Daftar Pengajuan
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: widget.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha:0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Riwayat Pengajuan',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: widget.primaryRed,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: widget.primaryRed.withValues(alpha:0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: widget.primaryRed.withValues(alpha:0.3)),
-                      ),
-                      child: Text(
-                        '${filteredData.length} pengajuan',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: widget.primaryRed,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 16),
-                
-                if (filteredData.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(40),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[200]!),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(
-                          Icons.inbox,
-                          size: 48,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _filterStatus == 'Semua'
-                            ? 'Belum ada riwayat pengajuan'
-                            : 'Tidak ada pengajuan dengan status "$_filterStatus"',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  ...filteredData.map((data) => _buildPengajuanCard(data)),
-              ],
-            ),
+          const SizedBox(height: 12),
+
+          // 3. List
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _pengajuanData.length,
+            separatorBuilder: (ctx, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              return _buildPklCard(_pengajuanData[index]);
+            },
           ),
-          
-          const SizedBox(height: 40),
+           const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
-    return Column(
+  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: RekapTheme.border),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
+              Icon(icon, color: color.withOpacity(0.5), size: 24),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(title, style: const TextStyle(fontSize: 12, color: RekapTheme.textGrey, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPklCard(Map<String, dynamic> data) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: RekapTheme.border),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: RekapTheme.background,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.business_rounded, color: RekapTheme.textDark, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      data['industri'],
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: RekapTheme.textDark),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      data['jenis'],
+                      style: const TextStyle(color: RekapTheme.textGrey, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              _buildStatusBadge(data['status'], data['statusColor']),
+            ],
+          ),
+          
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, color: RekapTheme.border),
+          ),
+          
+          // Details
+          _buildInfoRow(Icons.location_on_outlined, data['alamat']),
+          if (data['guru_pembimbing'] != null) ...[
+            const SizedBox(height: 8),
+            _buildInfoRow(Icons.person_outline, 'Pembimbing: ${data['guru_pembimbing']}'),
+          ],
+          const SizedBox(height: 8),
+          _buildInfoRow(Icons.calendar_today_outlined, 'Diajukan: ${data['tanggal_ajukan']}'),
+
+          // Rejected Info
+          if (data['is_ditolak'] == true) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: RekapTheme.red.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: RekapTheme.red.withOpacity(0.1)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 16, color: RekapTheme.red),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Alasan: ${data['alasan_tolak']}',
+                      style: const TextStyle(color: RekapTheme.red, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha:0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 20, color: color),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
-        ),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
+        Icon(icon, size: 14, color: RekapTheme.textGrey),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, color: RekapTheme.textDark),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPengajuanCard(Map<String, dynamic> data) {
+  Widget _buildStatusBadge(String status, Color color) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: data['statusColor'].withValues(alpha:0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: data['statusColor'].withValues(alpha:0.3)),
-                  ),
-                  child: Icon(
-                    data['jenis'] == 'Pindah PKL' ? Icons.swap_horiz : Icons.apartment,
-                    color: data['statusColor'],
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        data['jenis'],
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        data['industri'],
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: data['statusColor'].withValues(alpha:0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: data['statusColor'].withValues(alpha:0.3)),
-                  ),
-                  child: Text(
-                    data['status'],
-                    style: TextStyle(
-                      color: data['statusColor'],
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 16),
-            
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    data['alamat'],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 8),
-            
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Text(
-                  'Diajukan: ${data['tanggal_ajukan']}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-            
-            if (data['guru_pembimbing'] != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.person, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Pembimbing: ${data['guru_pembimbing']}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            
-            if (data['tanggal_mulai'] != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.date_range, size: 16, color: Colors.grey[600]),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Mulai: ${data['tanggal_mulai']} • ${data['durasi']}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            
-            if (data['is_ditolak'] && data['alasan_tolak'] != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.close, size: 16, color: Colors.red[600]),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Alasan ditolak: ${data['alasan_tolak']}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.red[600],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-          ],
-        ),
+      child: Text(
+        status,
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
       ),
     );
   }

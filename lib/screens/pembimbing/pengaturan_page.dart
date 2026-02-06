@@ -110,127 +110,119 @@ class _PengaturanPageState extends State<PengaturanPage> {
       });
     }
   }
+Future<void> _updateGuruData() async {
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
 
-  Future<void> _updateGuruData() async {
-    if (!_formKey.currentState!.validate()) {
+  try {
+    await dotenv.load(fileName: '.env');
+    
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    print('🔍 DEBUG UPDATE GURU DATA:');
+    print('   Token exists: ${token != null}');
+
+    if (token == null) {
+      _showErrorDialog('Token tidak ditemukan');
       return;
     }
 
-    try {
-      await dotenv.load(fileName: '.env');
-      
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      final guruId = prefs.getInt('guru_id') ?? 0;
-
-      print('🔍 DEBUG UPDATE GURU DATA:');
-      print('   Guru ID: $guruId');
-      print('   Token exists: ${token != null}');
-
-      if (token == null || guruId == 0) {
-        _showErrorDialog('Token tidak ditemukan atau ID guru tidak valid');
-        return;
-      }
-
-      // Tampilkan loading
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(
-              color: _primaryColor,
-            ),
+    // Tampilkan loading
+    if (context.mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            color: _primaryColor,
           ),
-        );
-      }
-
-      // Data yang akan dikirim
-      final Map<String, dynamic> requestData = {
-        'nama': _namaController.text.trim(),
-        'kode_guru': _kodeGuruController.text.trim(),
-        'nip': _nipController.text.trim(),
-        'no_telp': _telpController.text.trim(),
-        'is_pembimbing': true, // Karena ini pembimbing
-        'is_wali_kelas': false,
-        'is_kaprog': false,
-        'is_koordinator': false,
-        'is_active': true,
-        'password': '',
-      };
-
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      final url = Uri.parse('$baseUrl/api/guru/$guruId');
-
-      print('🔄 Updating guru data...');
-      print('   URL: $url');
-      print('   Request data: $requestData');
-
-      final response = await http.put(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(requestData),
+        ),
       );
-
-      // Tutup loading dialog
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
-
-      print('📤 Response status: ${response.statusCode}');
-      print('📤 Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        
-        if (data['success'] == true) {
-          // Update data lokal
-          setState(() {
-            _guruData['nama'] = _namaController.text.trim().toUpperCase();
-            _guruData['kode_guru'] = _kodeGuruController.text.trim();
-            _guruData['nip'] = _nipController.text.trim();
-            _guruData['no_telp'] = _telpController.text.trim();
-            _isEditing = false;
-          });
-
-          // Update SharedPreferences
-          await prefs.setString('user_name', _namaController.text.trim());
-          await prefs.setString('kode_guru', _kodeGuruController.text.trim());
-          await prefs.setString('user_nip', _nipController.text.trim());
-          await prefs.setString('user_phone', _telpController.text.trim());
-          await prefs.setString('guru_nama', _namaController.text.trim());
-          await prefs.setString('guru_kode_guru', _kodeGuruController.text.trim());
-          await prefs.setString('guru_nip', _nipController.text.trim());
-          await prefs.setString('guru_no_telp', _telpController.text.trim());
-
-          _showSuccessDialog('Data berhasil diperbarui');
-        } else {
-          final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
-          _showErrorDialog(errorMsg.toString());
-        }
-      } else {
-        try {
-          final errorData = jsonDecode(response.body);
-          final errorMsg = errorData['message'] ?? 
-                          errorData['error'] ?? 
-                          'Terjadi kesalahan: ${response.statusCode}';
-          _showErrorDialog(errorMsg.toString());
-        } catch (e) {
-          _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context);
-      }
-      _showErrorDialog('Terjadi kesalahan: $e');
     }
-  }
 
+    // Data yang akan dikirim sesuai dengan dokumentasi API
+    final Map<String, dynamic> requestData = {
+      'kode_guru': _kodeGuruController.text.trim(),
+      'nama': _namaController.text.trim(),
+      'nip': _nipController.text.trim(),
+      'no_telp': _telpController.text.trim(),
+    };
+
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+    final url = Uri.parse('$baseUrl/api/guru/me');
+
+    print('🔄 Updating guru data...');
+    print('   URL: $url');
+    print('   Request data: $requestData');
+
+    final response = await http.put(
+      url,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode(requestData),
+    );
+
+    // Tutup loading dialog
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+
+    print('📤 Response status: ${response.statusCode}');
+    print('📤 Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      
+      if (data['success'] == true) {
+        // Update data lokal
+        final updatedData = data['data'] as Map<String, dynamic>;
+        
+        setState(() {
+          _guruData['nama'] = (updatedData['nama'] ?? _namaController.text.trim()).toString().toUpperCase();
+          _guruData['kode_guru'] = updatedData['kode_guru'] ?? _kodeGuruController.text.trim();
+          _guruData['nip'] = updatedData['nip'] ?? _nipController.text.trim();
+          _guruData['no_telp'] = updatedData['no_telp'] ?? _telpController.text.trim();
+          _isEditing = false;
+        });
+
+        // Update SharedPreferences
+        await prefs.setString('user_name', _guruData['nama']);
+        await prefs.setString('kode_guru', _guruData['kode_guru']);
+        await prefs.setString('user_nip', _guruData['nip']);
+        await prefs.setString('user_phone', _guruData['no_telp']);
+        await prefs.setString('guru_nama', _guruData['nama']);
+        await prefs.setString('guru_kode_guru', _guruData['kode_guru']);
+        await prefs.setString('guru_nip', _guruData['nip']);
+        await prefs.setString('guru_no_telp', _guruData['no_telp']);
+
+        _showSuccessDialog('Data berhasil diperbarui');
+      } else {
+        final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
+        _showErrorDialog(errorMsg.toString());
+      }
+    } else {
+      try {
+        final errorData = jsonDecode(response.body);
+        final errorMsg = errorData['message'] ?? 
+                        errorData['error'] ?? 
+                        'Terjadi kesalahan: ${response.statusCode}';
+        _showErrorDialog(errorMsg.toString());
+      } catch (e) {
+        _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
+      }
+    }
+  } catch (e) {
+    if (context.mounted) {
+      Navigator.pop(context);
+    }
+    _showErrorDialog('Terjadi kesalahan: $e');
+  }
+}
   void _showSuccessDialog(String message) {
     showDialog(
       context: context,

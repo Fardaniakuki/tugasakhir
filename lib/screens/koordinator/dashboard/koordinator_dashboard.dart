@@ -28,7 +28,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
 
   // Warna profesional (sama dengan kaprog)
   final Color _primaryRed = const Color(0xFF6B1B1B);
-  final Color _bgSoft = const Color(0xFFF6EEEE);
+  final Color _bgSoft = const Color(0xFF6B1B1B);
   final Color _borderOrange = const Color(0xFFFFB74D);
   final Color _orange = const Color(0xFFFF9800);
   final Color _green = const Color(0xFF4CAF50);

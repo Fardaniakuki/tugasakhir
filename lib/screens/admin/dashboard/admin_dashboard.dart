@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import 'dashboard_service.dart';
 import 'stat_grid.dart';
 import '../crud/add_person_page.dart';
@@ -10,19 +8,17 @@ import 'api_service.dart';
 
 class AdminDashboard extends StatefulWidget {
   final Function(String)? onNavigateToData;
-  
+
   const AdminDashboard({super.key, this.onNavigateToData});
 
   @override
   State<AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminDashboardState extends State<AdminDashboard> 
+class _AdminDashboardState extends State<AdminDashboard>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
-  
   final DashboardService _service = DashboardService();
-  final ApiService _apiService = ApiService();
-  
+
   Map<String, dynamic>? _dashboardData;
   Map<String, dynamic>? _sekolahData;
   bool _isLoading = true;
@@ -31,17 +27,17 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   // WARNA BARU SESUAI AdminData
   final Color _primaryColor = const Color(0xFF3B060A);
-  
+
   // Gradasi untuk tombol dan aksen (SAMA PERSIS DENGAN AdminData)
   static const LinearGradient _primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF3B060A),    // Maroon gelap
-      Color(0xFF5B1A1A),    // Maroon sedang
+      Color(0xFF3B060A), // Maroon gelap
+      Color(0xFF5B1A1A), // Maroon sedang
     ],
   );
-  
+
   // Warna untuk setiap jenis data (konsisten dengan AdminData)
   final Map<String, Color> _typeColors = {
     'Murid': const Color(0xFF3B060A),
@@ -130,7 +126,7 @@ class _AdminDashboardState extends State<AdminDashboard>
           }
         });
       }
-      
+
       _service.setCacheData('dashboard', data);
     } catch (e) {
       debugPrint('Error fetching dashboard: $e');
@@ -149,9 +145,9 @@ class _AdminDashboardState extends State<AdminDashboard>
           _isLoadingSekolah = true;
         });
       }
-      
+
       final response = await ApiService.get('/sekolah');
-      
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (mounted) {
@@ -183,8 +179,9 @@ class _AdminDashboardState extends State<AdminDashboard>
 
     try {
       final sekolahId = _sekolahData!['id'];
-      final response = await ApiService.put('/sekolah/$sekolahId', _sekolahData!);
-      
+      final response =
+          await ApiService.put('/sekolah/$sekolahId', _sekolahData!);
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (mounted) {
@@ -195,7 +192,8 @@ class _AdminDashboardState extends State<AdminDashboard>
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(data['message'] ?? 'Data sekolah berhasil diperbarui'),
+            content:
+                Text(data['message'] ?? 'Data sekolah berhasil diperbarui'),
             backgroundColor: Colors.green,
           ),
         );
@@ -240,7 +238,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         _isLoading = true;
       });
     }
-    
+
     await _fetchDashboardData();
     await _loadSekolahData();
   }
@@ -301,7 +299,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                           width: 1,
                         ),
                       ),
-                      child: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                      child: const Icon(Icons.add_rounded,
+                          color: Colors.white, size: 20),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
@@ -315,7 +314,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      icon:
+                          const Icon(Icons.close_rounded, color: Colors.white),
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
@@ -326,11 +326,16 @@ class _AdminDashboardState extends State<AdminDashboard>
                   ],
                 ),
               ),
-              _buildAddTile(Icons.school, 'Tambah Murid', 'Siswa', _typeColors['Murid']!),
-              _buildAddTile(Icons.person, 'Tambah Guru', 'Guru', _typeColors['Guru']!),
-              _buildAddTile(Icons.category, 'Tambah Jurusan', 'Jurusan', _typeColors['Jurusan']!),
-              _buildAddTile(Icons.business, 'Tambah Industri', 'Industri', _typeColors['Industri']!),
-              _buildAddTile(Icons.class_, 'Tambah Kelas', 'Kelas', _typeColors['Kelas']!),
+              _buildAddTile(
+                  Icons.school, 'Tambah Murid', 'Siswa', _typeColors['Murid']!),
+              _buildAddTile(
+                  Icons.person, 'Tambah Guru', 'Guru', _typeColors['Guru']!),
+              _buildAddTile(Icons.category, 'Tambah Jurusan', 'Jurusan',
+                  _typeColors['Jurusan']!),
+              _buildAddTile(Icons.business, 'Tambah Industri', 'Industri',
+                  _typeColors['Industri']!),
+              _buildAddTile(
+                  Icons.class_, 'Tambah Kelas', 'Kelas', _typeColors['Kelas']!),
               const SizedBox(height: 20),
             ],
           ),
@@ -339,7 +344,8 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  ListTile _buildAddTile(IconData icon, String title, String type, Color color) {
+  ListTile _buildAddTile(
+      IconData icon, String title, String type, Color color) {
     return ListTile(
       leading: Container(
         width: 40,
@@ -372,7 +378,8 @@ class _AdminDashboardState extends State<AdminDashboard>
           ),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: Colors.white),
+        child: const Icon(Icons.arrow_forward_ios_rounded,
+            size: 12, color: Colors.white),
       ),
       onTap: () {
         Navigator.pop(context);
@@ -500,9 +507,10 @@ class _AdminDashboardState extends State<AdminDashboard>
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Logo sekolah
-          if (_sekolahData!['logo_url'] != null && _sekolahData!['logo_url'].isNotEmpty)
+          if (_sekolahData!['logo_url'] != null &&
+              _sekolahData!['logo_url'].isNotEmpty)
             Center(
               child: Container(
                 width: 80,
@@ -523,23 +531,24 @@ class _AdminDashboardState extends State<AdminDashboard>
                           gradient: _primaryGradient,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(Icons.school, color: Colors.white, size: 40),
+                        child: const Icon(Icons.school,
+                            color: Colors.white, size: 40),
                       );
                     },
                   ),
                 ),
               ),
             ),
-          
+
           // Info sekolah
           _buildInfoRow('NPSN', _sekolahData!['npsn'] ?? '-'),
           _buildInfoRow('Nama Sekolah', _sekolahData!['nama_sekolah'] ?? '-'),
           _buildInfoRow('Jenis Sekolah', _sekolahData!['jenis_sekolah'] ?? '-'),
           _buildInfoRow('Akreditasi', _sekolahData!['akreditasi'] ?? '-'),
-          
+
           const SizedBox(height: 8),
           const Divider(height: 20),
-          
+
           // Alamat
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -592,17 +601,19 @@ class _AdminDashboardState extends State<AdminDashboard>
               ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Kontak
-          _buildContactRow(Icons.phone_rounded, _sekolahData!['nomor_telepon'] ?? '-'),
+          _buildContactRow(
+              Icons.phone_rounded, _sekolahData!['nomor_telepon'] ?? '-'),
           _buildContactRow(Icons.email_rounded, _sekolahData!['email'] ?? '-'),
-          _buildContactRow(Icons.language_rounded, _sekolahData!['website'] ?? '-'),
-          
+          _buildContactRow(
+              Icons.language_rounded, _sekolahData!['website'] ?? '-'),
+
           const SizedBox(height: 12),
           const Divider(height: 20),
-          
+
           // Kepala Sekolah
           Row(
             children: [
@@ -788,164 +799,341 @@ class _AdminDashboardState extends State<AdminDashboard>
     if (_sekolahData == null) return;
 
     final formKey = GlobalKey<FormState>();
-    Map<String, dynamic> editedData = Map.from(_sekolahData!);
+    final Map<String, dynamic> editedData = Map.from(_sekolahData!);
+
+    // Group fields into categories
+    final List<Map<String, dynamic>> fieldGroups = [
+      {
+        'title': 'Informasi Umum',
+        'fields': [
+          {
+            'key': 'npsn',
+            'label': 'NPSN',
+            'icon': Icons.numbers,
+            'required': true,
+          },
+          {
+            'key': 'nama_sekolah',
+            'label': 'Nama Sekolah',
+            'icon': Icons.school,
+            'required': true,
+          },
+          {
+            'key': 'jenis_sekolah',
+            'label': 'Jenis Sekolah',
+            'icon': Icons.category,
+            'required': false,
+          },
+          {
+            'key': 'akreditasi',
+            'label': 'Akreditasi',
+            'icon': Icons.grade,
+            'required': false,
+          },
+        ]
+      },
+      {
+        'title': 'Alamat',
+        'fields': [
+          {
+            'key': 'jalan',
+            'label': 'Jalan',
+            'icon': Icons.location_on,
+            'required': false,
+          },
+          {
+            'key': 'kelurahan',
+            'label': 'Kelurahan',
+            'icon': Icons.location_city,
+            'required': false,
+          },
+          {
+            'key': 'kecamatan',
+            'label': 'Kecamatan',
+            'icon': Icons.map,
+            'required': false,
+          },
+          {
+            'key': 'kabupaten_kota',
+            'label': 'Kabupaten/Kota',
+            'icon': Icons.location_city,
+            'required': false,
+          },
+          {
+            'key': 'provinsi',
+            'label': 'Provinsi',
+            'icon': Icons.public,
+            'required': false,
+          },
+          {
+            'key': 'kode_pos',
+            'label': 'Kode Pos',
+            'icon': Icons.numbers,
+            'required': false,
+          },
+        ]
+      },
+      {
+        'title': 'Kontak',
+        'fields': [
+          {
+            'key': 'nomor_telepon',
+            'label': 'Nomor Telepon',
+            'icon': Icons.phone,
+            'required': false,
+          },
+          {
+            'key': 'email',
+            'label': 'Email',
+            'icon': Icons.email,
+            'required': false,
+          },
+          {
+            'key': 'website',
+            'label': 'Website',
+            'icon': Icons.language,
+            'required': false,
+          },
+          {
+            'key': 'kepala_sekolah',
+            'label': 'Kepala Sekolah',
+            'icon': Icons.person,
+            'required': false,
+          },
+          {
+            'key': 'nip_kepala_sekolah',
+            'label': 'NIP Kepala Sekolah',
+            'icon': Icons.badge,
+            'required': false,
+          },
+        ]
+      },
+    ];
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.edit_rounded, color: _primaryColor),
-              const SizedBox(width: 12),
-              const Text('Edit Profil Sekolah'),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTextField(
-                    'NPSN',
-                    editedData['npsn'] ?? '',
-                    (value) => editedData['npsn'] = value,
-                    required: true,
-                  ),
-                  _buildTextField(
-                    'Nama Sekolah',
-                    editedData['nama_sekolah'] ?? '',
-                    (value) => editedData['nama_sekolah'] = value,
-                    required: true,
-                  ),
-                  _buildTextField(
-                    'Jenis Sekolah',
-                    editedData['jenis_sekolah'] ?? '',
-                    (value) => editedData['jenis_sekolah'] = value,
-                  ),
-                  _buildTextField(
-                    'Akreditasi',
-                    editedData['akreditasi'] ?? '',
-                    (value) => editedData['akreditasi'] = value,
-                  ),
-                  _buildTextField(
-                    'Jalan',
-                    editedData['jalan'] ?? '',
-                    (value) => editedData['jalan'] = value,
-                  ),
-                  _buildTextField(
-                    'Kelurahan',
-                    editedData['kelurahan'] ?? '',
-                    (value) => editedData['kelurahan'] = value,
-                  ),
-                  _buildTextField(
-                    'Kecamatan',
-                    editedData['kecamatan'] ?? '',
-                    (value) => editedData['kecamatan'] = value,
-                  ),
-                  _buildTextField(
-                    'Kabupaten/Kota',
-                    editedData['kabupaten_kota'] ?? '',
-                    (value) => editedData['kabupaten_kota'] = value,
-                  ),
-                  _buildTextField(
-                    'Provinsi',
-                    editedData['provinsi'] ?? '',
-                    (value) => editedData['provinsi'] = value,
-                  ),
-                  _buildTextField(
-                    'Kode Pos',
-                    editedData['kode_pos'] ?? '',
-                    (value) => editedData['kode_pos'] = value,
-                  ),
-                  _buildTextField(
-                    'Nomor Telepon',
-                    editedData['nomor_telepon'] ?? '',
-                    (value) => editedData['nomor_telepon'] = value,
-                  ),
-                  _buildTextField(
-                    'Email',
-                    editedData['email'] ?? '',
-                    (value) => editedData['email'] = value,
-                  ),
-                  _buildTextField(
-                    'Website',
-                    editedData['website'] ?? '',
-                    (value) => editedData['website'] = value,
-                  ),
-                  _buildTextField(
-                    'Kepala Sekolah',
-                    editedData['kepala_sekolah'] ?? '',
-                    (value) => editedData['kepala_sekolah'] = value,
-                  ),
-                  _buildTextField(
-                    'NIP Kepala Sekolah',
-                    editedData['nip_kepala_sekolah'] ?? '',
-                    (value) => editedData['nip_kepala_sekolah'] = value,
-                  ),
-                ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              backgroundColor: Colors.white, // Background putih untuk dialog
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (formKey.currentState!.validate()) {
-                  Navigator.pop(context);
-                  setState(() {
-                    _sekolahData = editedData;
-                  });
-                  await _updateSekolahData();
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primaryColor,
-                foregroundColor: Colors.white,
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.8,
+                ),
+                color: Colors.white, // Background putih untuk container
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: _primaryColor,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.edit, color: Colors.white, size: 24),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              'Edit Profil Sekolah',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Colors.white),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Content - Background putih
+                    Expanded(
+                      child: Container(
+                        color: Colors.white, // Background putih untuk content
+                        child: Form(
+                          key: formKey,
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (var group in fieldGroups) ...[
+                                  // Group title
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        bottom: 12, top: 8),
+                                    child: Text(
+                                      group['title'],
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Fields in this group
+                                  for (var field in group['fields']) ...[
+                                    _buildTextField(
+                                      label: field['label'],
+                                      initialValue: _sekolahData![field['key']]
+                                              ?.toString() ??
+                                          '',
+                                      icon: field['icon'],
+                                      isRequired: field['required'],
+                                      onChanged: (value) =>
+                                          editedData[field['key']] = value,
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Footer buttons - Background putih
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white, // Background putih
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(16),
+                        ),
+                        border: Border(
+                          top: BorderSide(color: Colors.grey[300]!),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                side: BorderSide(color: Colors.grey[400]!),
+                              ),
+                              child: Text(
+                                'Batal',
+                                style: TextStyle(color: Colors.grey[700]),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                if (formKey.currentState!.validate()) {
+                                  Navigator.pop(context);
+                                  setState(() {
+                                    _sekolahData = editedData;
+                                  });
+                                  await _updateSekolahData();
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _primaryColor,
+                                foregroundColor: Colors.white,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text('Simpan'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: const Text('Simpan'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildTextField(String label, String initialValue, 
-      Function(String) onChanged, {bool required = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
-        initialValue: initialValue,
-        decoration: InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 14,
+  Widget _buildTextField({
+    required String label,
+    required String initialValue,
+    required IconData icon,
+    required bool isRequired,
+    required Function(String) onChanged,
+  }) {
+    final controller = TextEditingController(text: initialValue);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
           ),
         ),
-        onChanged: onChanged,
-        validator: (value) {
-          if (required && (value == null || value.isEmpty)) {
-            return '$label wajib diisi';
-          }
-          return null;
-        },
-      ),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: label,
+            prefixIcon: Icon(icon, size: 20, color: Colors.grey[600]),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[400]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[400]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: _primaryColor, width: 1.5),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+            filled: true,
+            fillColor: Colors.white, // Background putih untuk text field
+          ),
+          style: const TextStyle(fontSize: 14),
+          onChanged: onChanged,
+          validator: (value) {
+            if (isRequired && (value == null || value.isEmpty)) {
+              return '$label wajib diisi';
+            }
+            return null;
+          },
+        ),
+      ],
     );
   }
 
-  // ... (kode-kode sebelumnya seperti _buildLoading, _buildSimpleDistributionChart, 
-  // _buildQuickStats, dll tetap sama)
-
-  // SIMPLE SKELETON LOADING
   Widget _buildLoading() {
     return ListView(
       shrinkWrap: true,
@@ -953,7 +1141,7 @@ class _AdminDashboardState extends State<AdminDashboard>
       padding: EdgeInsets.zero,
       children: [
         const SizedBox(height: 24),
-        
+
         // Stat Grid Skeleton
         _buildSkeletonContainer(
           child: Column(
@@ -976,7 +1164,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                 ],
               ),
               const SizedBox(height: 20),
-              
+
               // Grid
               GridView.count(
                 shrinkWrap: true,
@@ -990,14 +1178,14 @@ class _AdminDashboardState extends State<AdminDashboard>
             ],
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Sekolah Info Skeleton
         _buildSekolahSkeleton(),
-        
+
         const SizedBox(height: 16),
-        
+
         // Chart Skeleton
         _buildSkeletonContainer(
           child: Column(
@@ -1019,13 +1207,14 @@ class _AdminDashboardState extends State<AdminDashboard>
                 ],
               ),
               const SizedBox(height: 20),
-              _buildSkeletonLine(width: double.infinity, height: 200, borderRadius: 8),
+              _buildSkeletonLine(
+                  width: double.infinity, height: 200, borderRadius: 8),
             ],
           ),
         ),
-        
+
         const SizedBox(height: 16),
-        
+
         // Quick Stats Skeleton
         _buildSkeletonContainer(
           child: Column(
@@ -1067,13 +1256,14 @@ class _AdminDashboardState extends State<AdminDashboard>
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: List.generate(3, (index) => _buildMiniStatSkeleton()),
+                  children:
+                      List.generate(3, (index) => _buildMiniStatSkeleton()),
                 ),
               ),
             ],
           ),
         ),
-        
+
         const SizedBox(height: 20),
       ],
     );
@@ -1214,39 +1404,43 @@ class _AdminDashboardState extends State<AdminDashboard>
     final jurusanCount = _dashboardData!['total_jurusan'] ?? 0;
     final industriCount = _dashboardData!['total_industri'] ?? 0;
 
-    final maxValue = [siswaCount, guruCount, kelasCount, jurusanCount, industriCount]
-        .reduce((a, b) => a > b ? a : b)
-        .toDouble();
+    final maxValue = [
+      siswaCount,
+      guruCount,
+      kelasCount,
+      jurusanCount,
+      industriCount
+    ].reduce((a, b) => a > b ? a : b).toDouble();
 
     // Data untuk bar chart dengan warna dan icon yang sesuai
     final List<ChartData> chartData = [
       ChartData(
-        'Murid', 
-        siswaCount.toDouble(), 
+        'Murid',
+        siswaCount.toDouble(),
         _typeIcons['Murid']!,
         _typeColors['Murid']!,
       ),
       ChartData(
-        'Guru', 
-        guruCount.toDouble(), 
+        'Guru',
+        guruCount.toDouble(),
         _typeIcons['Guru']!,
         _typeColors['Guru']!,
       ),
       ChartData(
-        'Kelas', 
-        kelasCount.toDouble(), 
+        'Kelas',
+        kelasCount.toDouble(),
         _typeIcons['Kelas']!,
         _typeColors['Kelas']!,
       ),
       ChartData(
-        'Jurusan', 
-        jurusanCount.toDouble(), 
+        'Jurusan',
+        jurusanCount.toDouble(),
         _typeIcons['Jurusan']!,
         _typeColors['Jurusan']!,
       ),
       ChartData(
-        'Industri', 
-        industriCount.toDouble(), 
+        'Industri',
+        industriCount.toDouble(),
         _typeIcons['Industri']!,
         _typeColors['Industri']!,
       ),
@@ -1299,17 +1493,18 @@ class _AdminDashboardState extends State<AdminDashboard>
             ],
           ),
           const SizedBox(height: 20),
-          
+
           // Legend dengan Icon
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Wrap(
               spacing: 12,
               runSpacing: 8,
-              children: chartData.map((data) => _buildChartLegend(data)).toList(),
+              children:
+                  chartData.map((data) => _buildChartLegend(data)).toList(),
             ),
           ),
-          
+
           SizedBox(
             height: 200,
             child: BarChart(
@@ -1484,7 +1679,8 @@ class _AdminDashboardState extends State<AdminDashboard>
                   gradient: _primaryGradient,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.trending_up_rounded, color: Colors.white),
+                child:
+                    const Icon(Icons.trending_up_rounded, color: Colors.white),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -1502,16 +1698,18 @@ class _AdminDashboardState extends State<AdminDashboard>
           const SizedBox(height: 20),
           Row(
             children: [
-              Expanded(child: _buildStatItem(
-                'Rata Murid/Kelas', 
-                _calculateAverageStudentsPerClass(), 
+              Expanded(
+                  child: _buildStatItem(
+                'Rata Murid/Kelas',
+                _calculateAverageStudentsPerClass(),
                 Icons.people_rounded,
                 _typeColors['Murid']!,
               )),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatItem(
-                'Rasio Guru:Murid', 
-                _calculateTeacherStudentRatio(), 
+              Expanded(
+                  child: _buildStatItem(
+                'Rasio Guru:Murid',
+                _calculateTeacherStudentRatio(),
                 Icons.balance_rounded,
                 _typeColors['Guru']!,
               )),
@@ -1538,9 +1736,12 @@ class _AdminDashboardState extends State<AdminDashboard>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildMiniStat('Murid', siswaCount, Icons.school_rounded, _typeColors['Murid']!),
-                _buildMiniStat('Guru', guruCount, Icons.person_rounded, _typeColors['Guru']!),
-                _buildMiniStat('Kelas', kelasCount, Icons.class_rounded, _typeColors['Kelas']!),
+                _buildMiniStat('Murid', siswaCount, Icons.school_rounded,
+                    _typeColors['Murid']!),
+                _buildMiniStat('Guru', guruCount, Icons.person_rounded,
+                    _typeColors['Guru']!),
+                _buildMiniStat('Kelas', kelasCount, Icons.class_rounded,
+                    _typeColors['Kelas']!),
               ],
             ),
           ),
@@ -1549,7 +1750,8 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  Widget _buildStatItem(String title, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1656,7 +1858,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     if (_dashboardData == null) return '-';
     final siswaCount = _dashboardData!['total_siswa'] ?? 0;
     final kelasCount = _dashboardData!['total_kelas'] ?? 0;
-    
+
     if (kelasCount == 0) return '0';
     final average = (siswaCount / kelasCount).round();
     return average.toString();
@@ -1666,7 +1868,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     if (_dashboardData == null) return '-';
     final siswaCount = _dashboardData!['total_siswa'] ?? 0;
     final guruCount = _dashboardData!['total_guru'] ?? 0;
-    
+
     if (guruCount == 0) return '-';
     final ratio = (siswaCount / guruCount).round();
     return '1:$ratio';
@@ -1796,13 +1998,14 @@ class _AdminDashboardState extends State<AdminDashboard>
                       shape: BoxShape.circle,
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                      icon: const Icon(Icons.refresh_rounded,
+                          color: Colors.white),
                       onPressed: _refreshData,
                     ),
                   ),
                 ],
               ),
-              
+
               // Konten utama dalam container putih
               SliverToBoxAdapter(
                 child: Container(
@@ -1841,19 +2044,18 @@ class _AdminDashboardState extends State<AdminDashboard>
                                   onBoxTap: _handleStatBoxTap,
                                   typeColors: const {},
                                 ),
-                                
+
                                 // INFO SEKOLAH
                                 _buildSekolahInfo(),
-                                
+
                                 const SizedBox(height: 16),
-                                
+
                                 // CHART SEDERHANA & STATISTIK
                                 _buildSimpleDistributionChart(),
                                 _buildQuickStats(),
-                                
+
                                 const SizedBox(height: 20),
-                              ]
-                              else
+                              ] else
                                 _buildError(),
                             ],
                           ),

@@ -28,7 +28,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
 
   // Warna tema
   final Color _primaryRed = const Color(0xFF6B1B1B);
-  final Color _bgColor = Colors.white;
+  final Color _bgColor = const Color(0xFF6B1B1B);
   static const Color _borderColor = Color(0xFFE5E5E5);
   static const Color _orange = Color(0xFFFF9800);
   static const Color _green = Color(0xFF4CAF50);
