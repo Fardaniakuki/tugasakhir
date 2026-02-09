@@ -4,9 +4,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'dashboard_service.dart';
 import 'stat_grid.dart';
 import '../crud/add_person_page.dart';
+import 'tahun_ajaran_page.dart'; // IMPORT TAHUN AJARAN
 import 'api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart'; // Tambahkan import ini
+import 'package:intl/intl.dart';
 
 class AdminDashboard extends StatefulWidget {
   final Function(String)? onNavigateToData;
@@ -47,6 +48,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     'Jurusan': const Color(0xFF8B2A2D),
     'Industri': const Color(0xFFCD5C5C),
     'Kelas': const Color(0xFFF08080),
+    'Tahun Ajaran': const Color(0xFF9C27B0), // Warna baru untuk Tahun Ajaran
   };
 
   // Icon untuk setiap jenis data (SAMA DENGAN AdminData)
@@ -56,6 +58,7 @@ class _AdminDashboardState extends State<AdminDashboard>
     'Jurusan': Icons.category,
     'Industri': Icons.business,
     'Kelas': Icons.class_,
+    'Tahun Ajaran': Icons.calendar_today, // Icon untuk Tahun Ajaran
   };
 
   @override
@@ -175,247 +178,236 @@ class _AdminDashboardState extends State<AdminDashboard>
       }
     }
   }
-Future<void> _updateSekolahData() async {
-  if (_sekolahData == null) return;
 
-  try {
-    // AMBIL TOKEN DARI SHAREDPREFERENCES
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    
-    if (token == null) {
-      if (!mounted) return;
-      _showErrorSnackbar('Token tidak ditemukan. Silakan login kembali.');
-      return;
-    }
+  Future<void> _updateSekolahData() async {
+    if (_sekolahData == null) return;
 
-    final sekolahId = _sekolahData!['id'];
-    
-    // GUNAKAN ApiService.put DENGAN HEADERS YANG SUDAH MENYERTAKAN TOKEN
-    final response = await ApiService.put(
-      '/sekolah/$sekolahId',
-      _sekolahData!,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      if (mounted) {
-        setState(() {
-          _sekolahData = data['data'];
-        });
-      }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
       
-      // TAMPILKAN POPUP SUKSES YANG LEBIH ELEGAN
-      if (mounted) {
-        await _showSuccessDialog(data['message'] ?? 'Data sekolah berhasil diperbarui');
+      if (token == null) {
+        if (!mounted) return;
+        _showErrorSnackbar('Token tidak ditemukan. Silakan login kembali.');
+        return;
       }
+
+      final sekolahId = _sekolahData!['id'];
       
-    } else if (response.statusCode == 401) {
-      // Token expired atau tidak valid
+      final response = await ApiService.put(
+        '/sekolah/$sekolahId',
+        _sekolahData!,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            _sekolahData = data['data'];
+          });
+        }
+        
+        if (mounted) {
+          await _showSuccessDialog(data['message'] ?? 'Data sekolah berhasil diperbarui');
+        }
+        
+      } else if (response.statusCode == 401) {
+        if (!mounted) return;
+        _showErrorSnackbar('Sesi telah berakhir. Silakan login kembali.');
+      } else {
+        final errorData = jsonDecode(response.body);
+        final errorMessage = errorData['message'] ?? 'Gagal memperbarui data sekolah';
+        if (!mounted) return;
+        _showErrorSnackbar('$errorMessage (Kode: ${response.statusCode})');
+      }
+    } catch (e) {
+      debugPrint('Error updating sekolah data: $e');
       if (!mounted) return;
-      _showErrorSnackbar('Sesi telah berakhir. Silakan login kembali.');
-      // Optionally: navigate to login page
-      // Navigator.pushReplacementNamed(context, '/login');
-    } else {
-      final errorData = jsonDecode(response.body);
-      final errorMessage = errorData['message'] ?? 'Gagal memperbarui data sekolah';
-      if (!mounted) return;
-      _showErrorSnackbar('$errorMessage (Kode: ${response.statusCode})');
+      _showErrorSnackbar('Terjadi kesalahan: ${e.toString()}');
     }
-  } catch (e) {
-    debugPrint('Error updating sekolah data: $e');
-    if (!mounted) return;
-    _showErrorSnackbar('Terjadi kesalahan: ${e.toString()}');
   }
-}
 
-// Method untuk menampilkan dialog sukses yang elegan
-Future<void> _showSuccessDialog(String message) async {
-  return showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) {
-      return Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        elevation: 0,
-        child: Container(
-          padding: const EdgeInsets.all(30),
-          decoration: BoxDecoration(
-            color: Colors.white,
+  Future<void> _showSuccessDialog(String message) async {
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.white,
-                const Color(0xFF3B060A).withValues(alpha:0.03),
+          ),
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(30),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.white,
+                  const Color(0xFF3B060A).withOpacity(0.03),
+                ],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF34A853),
+                        Color(0xFF2E8B57),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF34A853).withOpacity(0.3),
+                        blurRadius: 15,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                Text(
+                  'Berhasil!',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: _primaryColor,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                
+                const SizedBox(height: 12),
+                
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey[700],
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 28),
+                
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: _primaryColor,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                      shadowColor: _primaryColor.withOpacity(0.3),
+                    ),
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 8),
+                
+                Text(
+                  'Diperbarui: ${DateFormat('HH:mm:ss').format(DateTime.now())}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                  ),
+                ),
               ],
             ),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Ikon sukses dengan animasi
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF34A853), // Hijau sukses
-                      Color(0xFF2E8B57), // Hijau lebih gelap
-                    ],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF34A853).withValues(alpha:0.3),
-                      blurRadius: 15,
-                      spreadRadius: 2,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Colors.white,
-                  size: 40,
-                ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Pesan sukses
-              Text(
-                'Berhasil!',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: _primaryColor,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Detail pesan
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey[700],
-                    height: 1.4,
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 28),
-              
-              // Tombol OK dengan gradient
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: _primaryColor,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                    shadowColor: _primaryColor.withValues(alpha:0.3),
-                  ),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 8),
-              
-              // Waktu update
-              Text(
-                'Diperbarui: ${DateFormat('HH:mm:ss').format(DateTime.now())}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 
-// Method untuk menampilkan snackbar error yang konsisten
-void _showErrorSnackbar(String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.error_outline_rounded,
-              color: Colors.red[700],
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                color: Colors.red[700],
+                size: 16,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.red[700],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'Tutup',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
       ),
-      backgroundColor: Colors.red[700],
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      margin: const EdgeInsets.all(16),
-      duration: const Duration(seconds: 4),
-      action: SnackBarAction(
-        label: 'Tutup',
-        textColor: Colors.white,
-        onPressed: () {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        },
-      ),
-    ),
-  );
-}
+    );
+  }
+
   Future<void> _refreshSilently() async {
     try {
       final data = await _service.fetchDashboardData(forceRefresh: true);
@@ -444,155 +436,248 @@ void _showErrorSnackbar(String message) {
   void _handleStatBoxTap(String type) {
     widget.onNavigateToData?.call(type);
   }
-
-  void _showAddOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+void _showAddOptions() {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.white,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(20),
+        topRight: Radius.circular(20),
       ),
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF3B060A),
-                      Color(0xFF5B1A1A),
-                      Color(0xFF8B2A2D),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withAlpha(30),
-                            Colors.white.withAlpha(10),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.white.withAlpha(20),
-                          width: 1,
-                        ),
-                      ),
-                      child: const Icon(Icons.add_rounded,
-                          color: Colors.white, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Text(
-                        'Tambah Data Baru',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon:
-                          const Icon(Icons.close_rounded, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 40,
-                        minHeight: 40,
-                      ),
-                    ),
-                  ],
+    ),
+    builder: (BuildContext context) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: const Text(
+                'Tambah Data Baru',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3B060A), // Gunakan warna primer dashboard
                 ),
               ),
-              _buildAddTile(
-                  Icons.school, 'Tambah Murid', 'Siswa', _typeColors['Murid']!),
-              _buildAddTile(
-                  Icons.person, 'Tambah Guru', 'Guru', _typeColors['Guru']!),
-              _buildAddTile(Icons.category, 'Tambah Jurusan', 'Jurusan',
-                  _typeColors['Jurusan']!),
-              _buildAddTile(Icons.business, 'Tambah Industri', 'Industri',
-                  _typeColors['Industri']!),
-              _buildAddTile(
-                  Icons.class_, 'Tambah Kelas', 'Kelas', _typeColors['Kelas']!),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
+            ),
+            
+            // TAMBAHKAN TAHUN AJARAN
+            _buildAddTile(
+              Icons.calendar_today,
+              'Tambah Tahun Ajaran',
+              'TahunAjaran',
+              const Color(0xFF3B060A), // Warna primer
+            ),
+            
+            _buildAddTile(
+              Icons.school,
+              'Tambah Murid',
+              'Siswa',
+              const Color(0xFF3B060A),
+            ),
+            _buildAddTile(
+              Icons.person,
+              'Tambah Guru',
+              'Guru',
+              const Color(0xFF3B060A),
+            ),
+            _buildAddTile(
+              Icons.category,
+              'Tambah Jurusan',
+              'Jurusan',
+              const Color(0xFF3B060A),
+            ),
+            _buildAddTile(
+              Icons.business,
+              'Tambah Industri',
+              'Industri',
+              const Color(0xFF3B060A),
+            ),
+            _buildAddTile(
+              Icons.class_,
+              'Tambah Kelas',
+              'Kelas',
+              const Color(0xFF3B060A),
+            ),
+            
+            // Jika ingin menambahkan opsi import Excel seperti di AdminMain
+            const Divider(height: 20),
+            
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B060A).withAlpha(25),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.person_add, color: Color(0xFF3B060A)),
+              ),
+              title: const Text(
+                'Tambah Siswa via Excel',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              subtitle: const Text('Import data dari file Excel'),
+              trailing:
+                  const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+              onTap: () {
+                Navigator.pop(context);
+                _showExcelImportOption();
+              },
+            ),
+            
+            const SizedBox(height: 20),
+          ],
+        ),
+      );
+    },
+  );
+}
 
-  ListTile _buildAddTile(
-      IconData icon, String title, String type, Color color) {
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [color, color.withAlpha(204)], // 0.8 opacity
-          ),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: Colors.white), // ICON PUTIH
+// Fungsi untuk menampilkan opsi import Excel (jika dibutuhkan)
+void _showExcelImportOption() {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.only(
+        topLeft: Radius.circular(20),
+        topRight: Radius.circular(20),
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: color,
+    ),
+    builder: (BuildContext context) {
+      return SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: const Text(
+                'Tambah Siswa',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF3B060A),
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B060A).withAlpha(25),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.person_add, color: Color(0xFF3B060A)),
+              ),
+              title: const Text(
+                'Tambah Manual',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              subtitle: const Text('Tambah data siswa satu per satu'),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateToAddPersonPage('Siswa');
+              },
+            ),
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B060A).withAlpha(25),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.upload_file, color: Color(0xFF3B060A)),
+              ),
+              title: const Text(
+                'Import Excel',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              subtitle: const Text('Upload file Excel untuk import data'),
+              onTap: () {
+                Navigator.pop(context);
+                // Panggil fungsi untuk import Excel di sini
+                _showExcelImportDialog();
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
         ),
-      ),
-      trailing: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [color, color.withAlpha(204)],
-          ),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: const Icon(Icons.arrow_forward_ios_rounded,
-            size: 12, color: Colors.white),
-      ),
-      onTap: () {
-        Navigator.pop(context);
-        _navigateToAddPersonPage(type);
-      },
-    );
-  }
+      );
+    },
+  );
+}
 
+// Ganti fungsi _buildAddTile yang lama dengan ini:
+ListTile _buildAddTile(
+    IconData icon, String title, String type, Color color) {
+  return ListTile(
+    leading: Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: color.withAlpha(25),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(icon, color: color),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(
+        fontWeight: FontWeight.w500,
+        color: Colors.black87,
+      ),
+    ),
+    trailing:
+        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+    onTap: () {
+      Navigator.pop(context);
+      _navigateToAddPersonPage(type);
+    },
+  );
+}
+
+// Tambahkan fungsi untuk Excel import dialog
+void _showExcelImportDialog() {
+  // Implementasi dialog import Excel di sini
+  // Sesuaikan dengan kode yang ada di AdminMain jika perlu
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Import Excel'),
+      content: const Text('Fitur import Excel akan segera tersedia.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+}
+
+  // PERBAIKAN: Menambahkan navigasi untuk Tahun Ajaran
   void _navigateToAddPersonPage(String jenisData) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddPersonPage(jenisData: jenisData),
-      ),
-    );
+    if (jenisData == 'TahunAjaran') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const TahunAjaranPage(),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddPersonPage(jenisData: jenisData),
+        ),
+      );
+    }
   }
 
   // Widget untuk menampilkan dan mengedit data sekolah
@@ -609,13 +694,13 @@ void _showErrorSnackbar(String message) {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withValues(alpha:0.1),
+              color: Colors.grey.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
           border: Border.all(
-            color: Colors.grey.withValues(alpha:0.1),
+            color: Colors.grey.withOpacity(0.1),
             width: 1,
           ),
         ),
@@ -630,8 +715,8 @@ void _showErrorSnackbar(String message) {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    _primaryColor.withAlpha(10),
-                    _primaryColor.withAlpha(5),
+                    _primaryColor.withOpacity(0.1),
+                    _primaryColor.withOpacity(0.05),
                   ],
                 ),
                 shape: BoxShape.circle,
@@ -662,13 +747,13 @@ void _showErrorSnackbar(String message) {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha:0.1),
+            color: Colors.grey.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withValues(alpha:0.1),
+          color: Colors.grey.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -862,13 +947,13 @@ void _showErrorSnackbar(String message) {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha:0.1),
+            color: Colors.grey.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withValues(alpha:0.1),
+          color: Colors.grey.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -999,7 +1084,6 @@ void _showErrorSnackbar(String message) {
     final formKey = GlobalKey<FormState>();
     final Map<String, dynamic> editedData = Map.from(_sekolahData!);
 
-    // Group fields into categories
     final List<Map<String, dynamic>> fieldGroups = [
       {
         'title': 'Informasi Umum',
@@ -1114,7 +1198,7 @@ void _showErrorSnackbar(String message) {
         return StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
-              backgroundColor: Colors.white, // Background putih untuk dialog
+              backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -1122,11 +1206,10 @@ void _showErrorSnackbar(String message) {
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.8,
                 ),
-                color: Colors.white, // Background putih untuk container
+                color: Colors.white,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Header
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -1158,10 +1241,9 @@ void _showErrorSnackbar(String message) {
                       ),
                     ),
 
-                    // Content - Background putih
                     Expanded(
                       child: Container(
-                        color: Colors.white, // Background putih untuk content
+                        color: Colors.white,
                         child: Form(
                           key: formKey,
                           child: SingleChildScrollView(
@@ -1170,7 +1252,6 @@ void _showErrorSnackbar(String message) {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 for (var group in fieldGroups) ...[
-                                  // Group title
                                   Padding(
                                     padding: const EdgeInsets.only(
                                         bottom: 12, top: 8),
@@ -1184,7 +1265,6 @@ void _showErrorSnackbar(String message) {
                                     ),
                                   ),
 
-                                  // Fields in this group
                                   for (var field in group['fields']) ...[
                                     _buildTextField(
                                       label: field['label'],
@@ -1206,11 +1286,10 @@ void _showErrorSnackbar(String message) {
                       ),
                     ),
 
-                    // Footer buttons - Background putih
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white, // Background putih
+                        color: Colors.white,
                         borderRadius: const BorderRadius.only(
                           bottomLeft: Radius.circular(16),
                           bottomRight: Radius.circular(16),
@@ -1317,7 +1396,7 @@ void _showErrorSnackbar(String message) {
             contentPadding:
                 const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
             filled: true,
-            fillColor: Colors.white, // Background putih untuk text field
+            fillColor: Colors.white,
           ),
           style: const TextStyle(fontSize: 14),
           onChanged: onChanged,
@@ -1340,12 +1419,10 @@ void _showErrorSnackbar(String message) {
       children: [
         const SizedBox(height: 24),
 
-        // Stat Grid Skeleton
         _buildSkeletonContainer(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -1363,7 +1440,6 @@ void _showErrorSnackbar(String message) {
               ),
               const SizedBox(height: 20),
 
-              // Grid
               GridView.count(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -1379,12 +1455,10 @@ void _showErrorSnackbar(String message) {
 
         const SizedBox(height: 16),
 
-        // Sekolah Info Skeleton
         _buildSekolahSkeleton(),
 
         const SizedBox(height: 16),
 
-        // Chart Skeleton
         _buildSkeletonContainer(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1413,7 +1487,6 @@ void _showErrorSnackbar(String message) {
 
         const SizedBox(height: 16),
 
-        // Quick Stats Skeleton
         _buildSkeletonContainer(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1445,10 +1518,10 @@ void _showErrorSnackbar(String message) {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _primaryColor.withAlpha(5),
+                  color: _primaryColor.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _primaryColor.withAlpha(15),
+                    color: _primaryColor.withOpacity(0.15),
                     width: 1,
                   ),
                 ),
@@ -1475,13 +1548,13 @@ void _showErrorSnackbar(String message) {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha:0.1),
+            color: Colors.grey.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withValues(alpha:0.1),
+          color: Colors.grey.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -1522,10 +1595,10 @@ void _showErrorSnackbar(String message) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _primaryColor.withAlpha(5),
+        color: _primaryColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: _primaryColor.withAlpha(10),
+          color: _primaryColor.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -1610,7 +1683,6 @@ void _showErrorSnackbar(String message) {
       industriCount
     ].reduce((a, b) => a > b ? a : b).toDouble();
 
-    // Data untuk bar chart dengan warna dan icon yang sesuai
     final List<ChartData> chartData = [
       ChartData(
         'Murid',
@@ -1652,13 +1724,13 @@ void _showErrorSnackbar(String message) {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha:0.1),
+            color: Colors.grey.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withValues(alpha:0.1),
+          color: Colors.grey.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -1692,7 +1764,6 @@ void _showErrorSnackbar(String message) {
           ),
           const SizedBox(height: 20),
 
-          // Legend dengan Icon
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Wrap(
@@ -1738,8 +1809,8 @@ void _showErrorSnackbar(String message) {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                        );
-                      },
+                          );
+                        },
                     ),
                   ),
                   leftTitles: AxisTitles(
@@ -1780,7 +1851,7 @@ void _showErrorSnackbar(String message) {
                           end: Alignment.topCenter,
                           colors: [
                             data.color,
-                            data.color.withAlpha(178), // 0.7 opacity
+                            data.color.withOpacity(0.7),
                           ],
                         ),
                         width: 20,
@@ -1801,10 +1872,10 @@ void _showErrorSnackbar(String message) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: data.color.withAlpha(10),
+        color: data.color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: data.color.withAlpha(20),
+          color: data.color.withOpacity(0.2),
           width: 1,
         ),
       ),
@@ -1818,7 +1889,7 @@ void _showErrorSnackbar(String message) {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [data.color, data.color.withAlpha(204)],
+                colors: [data.color, data.color.withOpacity(0.8)],
               ),
               shape: BoxShape.circle,
             ),
@@ -1854,13 +1925,13 @@ void _showErrorSnackbar(String message) {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha:0.1),
+            color: Colors.grey.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.1),
+          color: Colors.grey.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -1921,13 +1992,13 @@ void _showErrorSnackbar(String message) {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _primaryColor.withAlpha(10),
-                  _primaryColor.withAlpha(5),
+                  _primaryColor.withOpacity(0.1),
+                  _primaryColor.withOpacity(0.05),
                 ],
               ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _primaryColor.withAlpha(15),
+                color: _primaryColor.withOpacity(0.15),
                 width: 1,
               ),
             ),
@@ -1957,13 +2028,13 @@ void _showErrorSnackbar(String message) {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            color.withAlpha(10),
-            color.withAlpha(5),
+            color.withOpacity(0.1),
+            color.withOpacity(0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withAlpha(15),
+          color: color.withOpacity(0.15),
           width: 1,
         ),
       ),
@@ -1978,7 +2049,7 @@ void _showErrorSnackbar(String message) {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [color, color.withAlpha(204)],
+                colors: [color, color.withOpacity(0.8)],
               ),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -2018,12 +2089,12 @@ void _showErrorSnackbar(String message) {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [color, color.withAlpha(204)],
+              colors: [color, color.withOpacity(0.8)],
             ),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: color.withAlpha(76), // 0.3 opacity
+                color: color.withOpacity(0.3),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -2044,7 +2115,7 @@ void _showErrorSnackbar(String message) {
           title,
           style: TextStyle(
             fontSize: 11,
-            color: color.withAlpha(204), // 0.8 opacity
+            color: color.withOpacity(0.8),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -2079,7 +2150,7 @@ void _showErrorSnackbar(String message) {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.grey.withValues(alpha:0.1),
+          color: Colors.grey.withOpacity(0.1),
           width: 1,
         ),
       ),
@@ -2094,8 +2165,8 @@ void _showErrorSnackbar(String message) {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _primaryColor.withAlpha(10),
-                  _primaryColor.withAlpha(5),
+                  _primaryColor.withOpacity(0.1),
+                  _primaryColor.withOpacity(0.05),
                 ],
               ),
               shape: BoxShape.circle,
@@ -2128,20 +2199,12 @@ void _showErrorSnackbar(String message) {
             onPressed: _refreshData,
             style: ElevatedButton.styleFrom(
               foregroundColor: Colors.white,
+              backgroundColor: _primaryColor,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
               elevation: 2,
-            ).copyWith(
-              backgroundColor: WidgetStateProperty.resolveWith<Color>(
-                (Set<WidgetState> states) {
-                  if (states.contains(WidgetState.pressed)) {
-                    return const Color(0xFF5B1A1A);
-                  }
-                  return _primaryColor;
-                },
-              ),
             ),
             child: const Text('Coba Lagi'),
           ),
@@ -2162,7 +2225,6 @@ void _showErrorSnackbar(String message) {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              // Header dengan warna maroon yang ikut discroll
               SliverAppBar(
                 backgroundColor: _primaryColor,
                 expandedHeight: 63,
@@ -2189,8 +2251,8 @@ void _showErrorSnackbar(String message) {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Colors.white.withAlpha(51), // 0.2 opacity
-                          Colors.white.withAlpha(25), // 0.1 opacity
+                          Colors.white.withOpacity(0.2),
+                          Colors.white.withOpacity(0.1),
                         ],
                       ),
                       shape: BoxShape.circle,
@@ -2204,7 +2266,6 @@ void _showErrorSnackbar(String message) {
                 ],
               ),
 
-              // Konten utama dalam container putih
               SliverToBoxAdapter(
                 child: Container(
                   decoration: BoxDecoration(
@@ -2215,7 +2276,7 @@ void _showErrorSnackbar(String message) {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withAlpha(13), // 0.05 opacity
+                        color: Colors.black.withOpacity(0.05),
                         blurRadius: 20,
                         offset: const Offset(0, -10),
                       ),
@@ -2235,7 +2296,6 @@ void _showErrorSnackbar(String message) {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               if (_dashboardData != null) ...[
-                                // StatGrid dengan warna yang konsisten
                                 StatGrid(
                                   data: _dashboardData!,
                                   onAddPressed: _showAddOptions,
@@ -2243,12 +2303,10 @@ void _showErrorSnackbar(String message) {
                                   typeColors: const {},
                                 ),
 
-                                // INFO SEKOLAH
                                 _buildSekolahInfo(),
 
                                 const SizedBox(height: 16),
 
-                                // CHART SEDERHANA & STATISTIK
                                 _buildSimpleDistributionChart(),
                                 _buildQuickStats(),
 

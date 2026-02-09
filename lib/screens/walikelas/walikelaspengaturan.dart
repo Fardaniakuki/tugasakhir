@@ -670,7 +670,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Edit Data Profil',
+            'Ubah Data Profil',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,

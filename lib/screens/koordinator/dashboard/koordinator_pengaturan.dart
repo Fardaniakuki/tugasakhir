@@ -233,7 +233,7 @@ class _KoordinatorPengaturanState extends State<KoordinatorPengaturan> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Edit Data Profil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _textColor, decoration: TextDecoration.underline)),
+          const Text('Ubah Data Profil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _textColor, decoration: TextDecoration.underline)),
           const SizedBox(height: 16),
           
           TextFormField(

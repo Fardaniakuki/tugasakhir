@@ -215,7 +215,7 @@ class __KaprogBottomBarState extends State<_KaprogBottomBar> {
             index: 0,
             icon: Icons.dashboard_outlined,
             activeIcon: Icons.dashboard,
-            label: 'Dashboard',
+            label: 'Beranda',
           ),
 
           // Menu 2: Data Bukti Diterima PKL

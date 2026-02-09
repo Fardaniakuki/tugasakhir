@@ -268,7 +268,7 @@ class __PembimbingBottomBarState extends State<_PembimbingBottomBar> {
             index: 0,
             icon: Icons.home_outlined,
             activeIcon: Icons.home_filled,
-            label: 'Dashboard',
+            label: 'Beranda',
           ),
 
           // Menu 2: Upload

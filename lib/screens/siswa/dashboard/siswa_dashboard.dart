@@ -1559,7 +1559,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Selamat datang di dashboard PKL',
+                                  'Selamat datang di beranda PKL',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.white.withValues(alpha:0.8),

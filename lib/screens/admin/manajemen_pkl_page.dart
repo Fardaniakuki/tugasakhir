@@ -840,24 +840,27 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
         return _primaryColor;
     }
   }
+// PERBAIKAN: Dialog detail permohonan dengan scroll yang tepat
+Future<void> _showApplicationDetailDialog(Map<String, dynamic> item) async {
+  final application = item['application'] as Map<String, dynamic>;
+  final status = application['status'] as String;
+  final noteController = TextEditingController(text: application['kaprog_note'] ?? '');
+  
+  final Color statusColor = _getStatusColor(status);
+  final String statusText = _getStatusText(status);
+  final String siswaNama = item['siswa_username'] ?? 'Siswa';
 
-  // PERBAIKAN: Dialog detail permohonan dengan tema baru
-  Future<void> _showApplicationDetailDialog(Map<String, dynamic> item) async {
-    final application = item['application'] as Map<String, dynamic>;
-    final status = application['status'] as String;
-    final noteController = TextEditingController(text: application['kaprog_note'] ?? '');
-    
-    final Color statusColor = _getStatusColor(status);
-    final String statusText = _getStatusText(status);
-    final String siswaNama = item['siswa_username'] ?? 'Siswa';
-
-    await showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.all(24),
+  await showDialog(
+    context: context,
+    barrierColor: Colors.black.withValues(alpha: 0.5),
+    builder: (context) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -873,9 +876,10 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // HEADER
+                // HEADER - FIXED HEIGHT
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  height: 85,
+                  padding: const EdgeInsets.all(16),
                   decoration: const BoxDecoration(
                     gradient: _primaryGradient,
                     borderRadius: BorderRadius.only(
@@ -886,11 +890,11 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
                   child: Row(
                     children: [
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 50,
+                        height: 50,
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Icon(Icons.request_page, color: Colors.white, size: 24),
                       ),
@@ -898,14 +902,17 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Text(
                               'Detail Permohonan PKL',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: 20,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w700,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -914,6 +921,8 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
                                 color: Colors.white.withValues(alpha: 0.9),
                                 fontSize: 14,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -922,10 +931,10 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
                   ),
                 ),
 
-                // CONTENT
-                Padding(
-                  padding: const EdgeInsets.all(24),
+                // CONTENT - SCROLLABLE
+                Expanded(
                   child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -974,7 +983,7 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
                         
                         // Catatan Kaprog (hanya untuk status Pending)
                         if (status == 'Pending') ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 20),
                           Text(
                             'Catatan Kaprog',
                             style: TextStyle(
@@ -987,6 +996,7 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
                           TextField(
                             controller: noteController,
                             maxLines: 3,
+                            minLines: 3,
                             decoration: InputDecoration(
                               hintText: 'Masukkan catatan (opsional)',
                               hintStyle: const TextStyle(color: Colors.grey),
@@ -998,6 +1008,7 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide(color: _primaryColor, width: 2),
                               ),
+                              contentPadding: const EdgeInsets.all(12),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -1007,7 +1018,7 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
                   ),
                 ),
 
-                // BUTTONS
+                // BUTTONS - FIXED HEIGHT
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -1095,11 +1106,11 @@ class ManajemenPklPageState extends State<ManajemenPklPage> {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
-
+        ),
+      );
+    },
+  );
+}
   // PERBAIKAN: Dialog edit kuota dengan tema baru
   Future<void> _showQuotaEditDialog(Map<String, dynamic> item) async {
     final quotaController = TextEditingController(

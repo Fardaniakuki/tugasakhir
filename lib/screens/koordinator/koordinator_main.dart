@@ -233,7 +233,7 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
             index: 0,
             icon: Icons.dashboard_outlined,
             activeIcon: Icons.dashboard,
-            label: 'Dashboard',
+            label: 'Beranda',
           ),
 
           // Menu 2: Jadwal

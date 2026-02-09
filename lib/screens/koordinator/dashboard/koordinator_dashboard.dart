@@ -71,9 +71,9 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
     try {
       await Future.wait([
         _loadProfileData(),
-        _fetchApplications('Pending')
+        _fetchApplications('Menunggu')
             .then((value) => _pendingApplications = value),
-        _fetchApplications('Approved')
+        _fetchApplications('Disetujui')
             .then((value) => _approvedApplications = value),
         _fetchIndustries(),
         _fetchTeachers(),
@@ -109,6 +109,42 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
     }
   }
 
+  // Fungsi untuk mengkonversi status ke bahasa Inggris untuk API
+  String _translateStatusToEnglish(String indonesianStatus) {
+    switch (indonesianStatus) {
+      case 'Menunggu':
+        return 'Pending';
+      case 'Disetujui':
+        return 'Approved';
+      case 'Aktif':
+        return 'Active';
+      case 'Ditolak':
+        return 'Rejected';
+      case 'Selesai':
+        return 'Completed';
+      default:
+        return indonesianStatus;
+    }
+  }
+
+  // Fungsi untuk mengkonversi status ke bahasa Indonesia untuk UI
+  String _translateStatus(String englishStatus) {
+    switch (englishStatus) {
+      case 'Pending':
+        return 'Menunggu';
+      case 'Approved':
+        return 'Disetujui';
+      case 'Active':
+        return 'Aktif';
+      case 'Rejected':
+        return 'Ditolak';
+      case 'Completed':
+        return 'Selesai';
+      default:
+        return englishStatus;
+    }
+  }
+
   Future<List<dynamic>> _fetchApplications(String status) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
@@ -119,9 +155,12 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
     }
 
     try {
+      // Konversi status ke bahasa Inggris untuk API
+      final String englishStatus = _translateStatusToEnglish(status);
+      
       final response = await http.get(
         Uri.parse(
-            '${dotenv.env['API_BASE_URL']}/api/pkl/applications?status=$status'),
+            '${dotenv.env['API_BASE_URL']}/api/pkl/applications?status=$englishStatus'),
         headers: {'Authorization': 'Bearer $token'},
       );
 
@@ -252,16 +291,17 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
             final appData = app['application'] ?? {};
             final pembimbingId = appData['pembimbing_guru_id'];
             final status = appData['status'] ?? '';
+            final String indonesianStatus = _translateStatus(status);
 
             if (pembimbingId != null && pembimbingId == teacherId) {
               studentsList.add({
                 'nama': app['siswa_username'] ?? 'Siswa',
                 'kelas': app['kelas_nama'] ?? '-',
                 'industri': app['industri_nama'] ?? 'Industri',
-                'status': status,
+                'status': indonesianStatus,
               });
 
-              if (status == 'Approved' || status == 'Active') {
+              if (indonesianStatus == 'Disetujui' || indonesianStatus == 'Aktif') {
                 approvedStudentsCount++;
               }
             }
@@ -334,7 +374,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
             'kelas': app['kelas_nama'] ?? '-',
             'industri': app['industri_nama'] ?? 'Industri',
             'pembimbing': pembimbingName,
-            'status': appData['status'] ?? 'Approved',
+            'status': _translateStatus(appData['status'] ?? 'Disetujui'),
             'tanggal_mulai': appData['tanggal_mulai'] ?? '-',
             'tanggal_selesai': appData['tanggal_selesai'] ?? '-',
             'application_id': appData['id'],
@@ -349,7 +389,6 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
       print('Error fetching PKL students: $e');
     }
   }
-
 
   void _navigateToPengaturan() {
     Navigator.push(
@@ -393,7 +432,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: _primaryRed.withValues(alpha: 0.1),
+                        color: _primaryRed.withValues(alpha:0.1),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
@@ -602,6 +641,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
       ),
     );
   }
+
 // ============= DIALOG DETAIL PEMBIMBING =============
 void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
   final students = teacherData['students'] ?? [];
@@ -630,7 +670,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: _primaryRed.withValues(alpha: 0.1),
+                      color: _primaryRed.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Icon(
@@ -691,7 +731,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
                     _simpleDetailItem('Nama', teacherData['nama'] ?? 'Guru'),
                     _simpleDetailItem('NIP', teacherData['nip'] ?? '-'),
                     _simpleDetailItem('No. HP', teacherData['no_telp'] ?? '-'),
-                    _simpleDetailItem('Kode Guru', teacherData['kode_guru'] ?? '-')    
+                    _simpleDetailItem('Kode Guru', teacherData['kode_guru'] ?? '-'),
                   ],
                 ),
               ),
@@ -724,7 +764,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: _primaryRed.withValues(alpha: 0.1),
+                            color: _primaryRed.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -738,220 +778,218 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                    if (students.isNotEmpty) ...[
-                      ..._buildSimpleStudentList(students),
-                      const SizedBox(height: 8),
-                      if (students.length > 3)
-                        Text(
-                          '${students.length - 3} siswa lainnya...',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                            fontStyle: FontStyle.italic,
+                      if (students.isNotEmpty) ...[
+                        ..._buildSimpleStudentList(students),
+                        const SizedBox(height: 8),
+                        if (students.length > 3)
+                          Text(
+                            '${students.length - 3} siswa lainnya...',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontStyle: FontStyle.italic,
+                            ),
                           ),
-                        ),
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[200]!),
-                        ),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(
-                                Icons.people_outline,
-                                size: 36,
-                                color: Colors.grey[400],
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Belum ada siswa yang dibimbing',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 12,
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.people_outline,
+                                  size: 36,
+                                  color: Colors.grey[400],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Belum ada siswa yang dibimbing',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              // Action Button
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _primaryRed,
-                        side: const BorderSide(color: Color(0xFF6B1B1B)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                // Action Button
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _primaryRed,
+                          side: const BorderSide(color: Color(0xFF6B1B1B)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text(
-                        'TUTUP',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                        child: const Text(
+                          'TUTUP',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-Widget _simpleDetailItem(String label, String value) {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            '$label:',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey[700],
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-List<Widget> _buildSimpleStudentList(List<dynamic> students) {
-  // Ambil hanya 3 siswa pertama untuk tampilan
-  final displayStudents = students.length > 3 ? students.sublist(0, 3) : students;
-  
-  return displayStudents.map<Widget>((student) {
-    final namaSiswa = student['nama'] ?? 'Siswa';
-    final kelas = student['kelas'] ?? '-';
-    final industri = student['industri'] ?? 'Industri';
-    final status = student['status'] ?? 'Pending';
-
-    Color statusColor;
-    String statusText;
-
-    switch (status) {
-      case 'Approved':
-      case 'Active':
-        statusColor = _green;
-        statusText = 'Aktif';
-        break;
-      case 'Completed':
-        statusColor = Colors.blue;
-        statusText = 'Selesai';
-        break;
-      case 'Rejected':
-        statusColor = _red;
-        statusText = 'Ditolak';
-        break;
-      default:
-        statusColor = Colors.orange;
-        statusText = 'Menunggu';
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: _primaryRed.withValues(alpha: 0.1),
-            radius: 18,
-            child: Text(
-              namaSiswa.substring(0, 1).toUpperCase(),
-              style: TextStyle(
-                color: _primaryRed,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  namaSiswa,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$kelas • $industri',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 11,
-                  ),
+                  ],
                 ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-            ),
+        ),
+      ),
+    );
+  }
+
+  Widget _simpleDetailItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
             child: Text(
-              statusText,
+              '$label:',
               style: TextStyle(
-                color: statusColor,
-                fontSize: 10,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
         ],
       ),
     );
-  }).toList();
-}
+  }
 
+  List<Widget> _buildSimpleStudentList(List<dynamic> students) {
+    // Ambil hanya 3 siswa pertama untuk tampilan
+    final displayStudents = students.length > 3 ? students.sublist(0, 3) : students;
+    
+    return displayStudents.map<Widget>((student) {
+      final namaSiswa = student['nama'] ?? 'Siswa';
+      final kelas = student['kelas'] ?? '-';
+      final industri = student['industri'] ?? 'Industri';
+      final status = student['status'] ?? 'Menunggu';
 
+      Color statusColor;
+      String statusText;
+
+      switch (status) {
+        case 'Disetujui':
+        case 'Aktif':
+          statusColor = _green;
+          statusText = 'Aktif';
+          break;
+        case 'Selesai':
+          statusColor = Colors.blue;
+          statusText = 'Selesai';
+          break;
+        case 'Ditolak':
+          statusColor = _red;
+          statusText = 'Ditolak';
+          break;
+        default:
+          statusColor = Colors.orange;
+          statusText = 'Menunggu';
+      }
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: _primaryRed.withValues(alpha:0.1),
+              radius: 18,
+              child: Text(
+                namaSiswa.substring(0, 1).toUpperCase(),
+                style: TextStyle(
+                  color: _primaryRed,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    namaSiswa,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$kelas • $industri',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha:0.1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: statusColor.withValues(alpha:0.3)),
+              ),
+              child: Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+  }
 
   @override
   void dispose() {
@@ -961,7 +999,6 @@ List<Widget> _buildSimpleStudentList(List<dynamic> students) {
 
   @override
   Widget build(BuildContext context) {
-   
     return Scaffold(
       backgroundColor: _bgSoft,
       body: _isLoading ? _buildSkeleton() : _content(),
@@ -1279,7 +1316,7 @@ List<Widget> _buildSimpleStudentList(List<dynamic> students) {
                 children: [
                   IconButton(
                     onPressed: () {
-                      
+                      // Aksi notifikasi
                     },
                     icon: const Icon(
                       Icons.notifications_none,
@@ -1436,7 +1473,7 @@ List<Widget> _buildSimpleStudentList(List<dynamic> students) {
         Expanded(
           child: _PengajuanChip(
             count: '${_approvedApplications.length}',
-            label: 'Aktif',
+            label: 'Disetujui',
             color: _green,
           ),
         ),
@@ -1691,16 +1728,16 @@ List<Widget> _buildSimpleStudentList(List<dynamic> students) {
     String statusText;
 
     switch (status) {
-      case 'Approved':
-      case 'Active':
+      case 'Disetujui':
+      case 'Aktif':
         statusColor = _green;
         statusText = 'Aktif';
         break;
-      case 'Completed':
+      case 'Selesai':
         statusColor = Colors.blue;
         statusText = 'Selesai';
         break;
-      case 'Rejected':
+      case 'Ditolak':
         statusColor = _red;
         statusText = 'Ditolak';
         break;

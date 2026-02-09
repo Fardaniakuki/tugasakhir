@@ -59,7 +59,7 @@ class _SiswaRekapState extends State<SiswaRekap> with SingleTickerProviderStateM
               indicatorColor: RekapTheme.primaryRed,
               indicatorWeight: 3,
               labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              tabs: const [Tab(text: 'Riwayat Izin (SIA)'), Tab(text: 'Riwayat Pindah')],
+              tabs: const [Tab(text: 'Riwayat Izin Dan Sakit'), Tab(text: 'Riwayat Pindah')],
             ),
           ),
         ),

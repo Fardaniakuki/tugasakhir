@@ -1753,7 +1753,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Dashboard\nKepala Konsentrasi Keahlian',
+                'Beranda\nKepala Konsentrasi Keahlian',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,

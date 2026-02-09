@@ -200,7 +200,7 @@ class __WalikelasBottomBarState extends State<_WalikelasBottomBar> {
             index: 0,
             icon: Icons.dashboard_outlined,
             activeIcon: Icons.dashboard,
-            label: 'Dashboard',
+            label: 'Beranda',
           ),
 
           // Menu 2: SIA

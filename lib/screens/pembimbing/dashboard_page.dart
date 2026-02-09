@@ -119,7 +119,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
 
     try {
       final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/guru/siswa'),
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/guru/tasks'),
         headers: {
           'Authorization': 'Bearer $token',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -129,53 +129,58 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final List<dynamic> rawStudents = data['data'] ?? [];
+        final List<dynamic> rawData = data['data'] ?? [];
         final List<Map<String, dynamic>> processedStudents = [];
+        final Set<String> uniqueStudents = {}; // Untuk mencegah duplikasi
 
-        for (var siswa in rawStudents) {
-          final tanggalMulaiStr = siswa['tanggal_mulai'];
-          final tanggalSelesaiStr = siswa['tanggal_selesai'];
-          final status = _getStudentStatus(tanggalMulaiStr, tanggalSelesaiStr);
-          final hariBerjalan =
-              _calculateDaysRunning(tanggalMulaiStr, tanggalSelesaiStr);
+        // Proses data dari API baru
+        for (var industriData in rawData) {
+          final industri = industriData['industri'] ?? {};
+          final List<dynamic> rawStudents = industriData['siswa'] ?? [];
+          
+          for (var siswa in rawStudents) {
+            final siswaKey = '${siswa['id']}_${industri['id']}';
+            
+            // Cegah duplikasi siswa
+            if (uniqueStudents.contains(siswaKey)) {
+              continue;
+            }
+            uniqueStudents.add(siswaKey);
 
-          String kelasNama = '-';
-          String jurusanNama = '-';
-          if (siswa['kelas_id'] != null) {
-            final kelasData = await _fetchKelasDetail(siswa['kelas_id']);
-            if (kelasData != null) {
-              kelasNama = kelasData['nama'] ?? '-';
-              if (kelasData['jurusan_id'] != null) {
-                final jurusanData =
-                    await _fetchJurusanDetail(kelasData['jurusan_id']);
-                if (jurusanData != null)
-                  jurusanNama = jurusanData['nama'] ?? '-';
+            // Get class name from the response
+            final String kelasNama = siswa['kelas'] ?? '-';
+            String jurusanNama = '-';
+
+            // Try to extract jurusan from kelas name if possible
+            if (kelasNama.contains(' ')) {
+              final parts = kelasNama.split(' ');
+              if (parts.length > 1) {
+                // Asumsi bagian terakhir adalah jurusan/konsentrasi
+                jurusanNama = parts.last;
               }
             }
-          }
 
-          processedStudents.add({
-            'nama': siswa['siswa_nama'] ?? siswa['siswa_username'] ?? 'Siswa',
-            'nis': siswa['nis'] ?? '-',
-            'kelas': kelasNama,
-            'jurusan': jurusanNama,
-            'industri': siswa['industri_nama'] ?? 'Industri',
-            'status': status,
-            'hari_berjalan': hariBerjalan,
-            'tanggal_mulai': tanggalMulaiStr,
-            'tanggal_selesai': tanggalSelesaiStr,
-            'industri_id': siswa['industri_id'],
-            'application_id': siswa['application_id'],
-            'siswa_id': siswa['siswa_id'],
-            'siswa_username': siswa['siswa_username'],
-            'kelas_id': siswa['kelas_id'],
-          });
+            processedStudents.add({
+              'nama': siswa['nama'] ?? siswa['username'] ?? 'Siswa',
+              'nis': siswa['nisn'] ?? '-',
+              'kelas': kelasNama,
+              'jurusan': jurusanNama,
+              'industri': industri['nama'] ?? 'Industri',
+              'industri_alamat': industri['alamat'] ?? '-',
+              'jenis_industri': industri['jenis_industri'] ?? '-',
+              'industri_id': industri['id'],
+              'siswa_id': siswa['id'],
+              'siswa_username': siswa['username'],
+            });
+          }
         }
 
         setState(() => _myStudents = processedStudents);
-        print('✅ Loaded ${processedStudents.length} students');
+        print('✅ Loaded ${processedStudents.length} students from tasks API');
       } else if (response.statusCode == 401) {
         _redirectToLogin();
+      } else {
+        print('Error fetching students: ${response.statusCode}');
       }
     } catch (e) {
       print('Error fetching my students: $e');
@@ -188,8 +193,9 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
     if (token == null) return;
 
     try {
+      // Gunakan endpoint tasks untuk mendapatkan data industri juga
       final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/guru/industri'),
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/guru/tasks'),
         headers: {
           'Authorization': 'Bearer $token',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -199,19 +205,36 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final List<dynamic> rawIndustri = data['data'] ?? [];
+        final List<dynamic> rawData = data['data'] ?? [];
         final List<Map<String, dynamic>> processedIndustri = [];
+        final Set<int> uniqueIndustri = {}; // Untuk mencegah duplikasi
 
-        for (var industri in rawIndustri) {
+        for (var industriData in rawData) {
+          final industri = industriData['industri'] ?? {};
+          final industriId = industri['id'];
+          
+          // Cegah duplikasi industri
+          if (uniqueIndustri.contains(industriId)) {
+            continue;
+          }
+          uniqueIndustri.add(industriId);
+
+          final jumlahSiswa = industriData['siswa_count'] ?? 
+                             (industriData['siswa'] != null ? 
+                              (industriData['siswa'] as List).length : 0);
+
           processedIndustri.add({
-            'industri_id': industri['industri_id'],
-            'industri_nama': industri['industri_nama'] ?? 'Industri',
-            'jumlah_siswa': industri['jumlah_siswa'] ?? 0,
+            'industri_id': industriId,
+            'industri_nama': industri['nama'] ?? 'Industri',
+            'alamat': industri['alamat'] ?? '-',
+            'jenis_industri': industri['jenis_industri'] ?? '-',
+            'jumlah_siswa': jumlahSiswa,
+            'tasks': industriData['tasks'] ?? [],
           });
         }
 
         setState(() => _industriList = processedIndustri);
-        print('✅ Loaded ${_industriList.length} industri');
+        print('✅ Loaded ${_industriList.length} industri from tasks API');
       }
     } catch (e) {
       print('Error fetching industri data: $e');
@@ -251,11 +274,12 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
           setState(() => _izinData = processedData);
           print('✅ Loaded ${_izinData.length} izin records');
         } else {
+          // Fallback dummy data jika API kosong
           _izinData = [
             {
               'id': 1,
               'siswa_id': 78,
-              'siswa_nama': 'Ahmad Rizki',
+              'siswa_nama': 'zeze',
               'tanggal': '2024-03-15',
               'jenis': 'Sakit',
               'keterangan': 'Demam tinggi, ada surat dokter',
@@ -264,7 +288,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
             {
               'id': 2,
               'siswa_id': 190,
-              'siswa_nama': 'Siti Nurhaliza',
+              'siswa_nama': 'nurani',
               'tanggal': '2024-03-14',
               'jenis': 'Izin',
               'keterangan': 'Menghadiri acara keluarga penting',
@@ -276,63 +300,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
     } catch (e) {
       print('Error fetching izin data: $e');
     }
-  }
-
-  Future<Map<String, dynamic>?> _fetchKelasDetail(int kelasId) async {
-    if (_kelasCache.containsKey(kelasId)) return {'nama': _kelasCache[kelasId]};
-
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if (token == null) return null;
-
-    try {
-      final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/kelas/$kelasId'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true && data['data'] != null) {
-          final kelasData = data['data'] as Map<String, dynamic>;
-          if (kelasData['nama'] != null)
-            _kelasCache[kelasId] = kelasData['nama'];
-          return kelasData;
-        }
-      }
-    } catch (e) {
-      print('Error fetching kelas detail: $e');
-    }
-    return null;
-  }
-
-  Future<Map<String, dynamic>?> _fetchJurusanDetail(int jurusanId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if (token == null) return null;
-
-    try {
-      final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/jurusan/$jurusanId'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data['success'] == true && data['data'] != null) {
-          return data['data'] as Map<String, dynamic>;
-        }
-      }
-    } catch (e) {
-      print('Error fetching jurusan detail: $e');
-    }
-    return null;
   }
 
   Future<Map<String, dynamic>?> _fetchSiswaDetail(int siswaId) async {
@@ -360,45 +327,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
       print('Error fetching siswa detail: $e');
     }
     return null;
-  }
-
-  String _getStudentStatus(String? tanggalMulaiStr, String? tanggalSelesaiStr) {
-    if (tanggalMulaiStr == null || tanggalSelesaiStr == null)
-      return 'Tidak diketahui';
-    try {
-      final now = DateTime.now();
-      final tanggalMulai = DateTime.parse(tanggalMulaiStr);
-      final tanggalSelesai = DateTime.parse(tanggalSelesaiStr);
-      if (now.isBefore(tanggalMulai))
-        return 'Akan datang';
-      else if (now.isAfter(tanggalSelesai))
-        return 'Selesai';
-      else
-        return 'Aktif';
-    } catch (e) {
-      return 'Tidak diketahui';
-    }
-  }
-
-  int _calculateDaysRunning(
-      String? tanggalMulaiStr, String? tanggalSelesaiStr) {
-    if (tanggalMulaiStr == null || tanggalSelesaiStr == null) return 0;
-    try {
-      final now = DateTime.now();
-      final tanggalMulai = DateTime.parse(tanggalMulaiStr);
-      final tanggalSelesai = DateTime.parse(tanggalSelesaiStr);
-      if (now.isBefore(tanggalMulai))
-        return 0;
-      else if (now.isAfter(tanggalSelesai)) {
-        final totalDays = tanggalSelesai.difference(tanggalMulai).inDays;
-        return totalDays > 0 ? totalDays : 0;
-      } else {
-        final daysRunning = now.difference(tanggalMulai).inDays;
-        return daysRunning > 0 ? daysRunning : 0;
-      }
-    } catch (e) {
-      return 0;
-    }
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -512,14 +440,14 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
         border: Border.all(color: _borderColor),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 16,
               offset: const Offset(0, 6))
         ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text('Dashboard Pembimbing',
+          const Text('Beranda Pembimbing',
               style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
@@ -538,10 +466,10 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                      color: _primaryRed.withOpacity(0.1),
+                      color: _primaryRed.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: _primaryRed.withOpacity(0.3), width: 1.5)),
+                          color: _primaryRed.withValues(alpha: 0.3), width: 1.5)),
                   child:
                       Icon(Icons.person_outline, color: _primaryRed, size: 22)),
               onSelected: (value) => value == 'logout'
@@ -608,7 +536,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
             border: Border.all(color: _borderColor),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 18,
                   offset: const Offset(0, 8))
             ],
@@ -639,10 +567,10 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
           decoration: BoxDecoration(
             color: _primaryRed,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _primaryRed.withOpacity(0.8), width: 1),
+            border: Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
             boxShadow: [
               BoxShadow(
-                  color: _primaryRed.withOpacity(0.3),
+                  color: _primaryRed.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4))
             ],
@@ -651,7 +579,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
             Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.school, color: Colors.white, size: 28)),
             const SizedBox(width: 14),
@@ -665,7 +593,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20)),
                 child: Text('${_myStudents.length}',
                     style: const TextStyle(
@@ -709,7 +637,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
         border: Border.all(color: _borderColor, width: 1.5),
         boxShadow: [
           BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 6,
               offset: const Offset(0, 3))
         ],
@@ -718,10 +646,10 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
         Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-                color: _primaryRed.withOpacity(0.1),
+                color: _primaryRed.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
                 border:
-                    Border.all(color: _primaryRed.withOpacity(0.2), width: 1)),
+                    Border.all(color: _primaryRed.withValues(alpha: 0.2), width: 1)),
             child: Icon(icon, color: _primaryRed, size: 20)),
         const SizedBox(width: 8),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -746,7 +674,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
             border: Border.all(color: _borderColor, width: 1),
             boxShadow: [
               BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
+                  color: Colors.grey.withValues(alpha: 0.1),
                   blurRadius: 8,
                   offset: const Offset(0, 4))
             ]),
@@ -779,7 +707,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 topLeft: Radius.circular(40), topRight: Radius.circular(40)),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, -10))
             ]),
@@ -823,10 +751,10 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                        color: _primaryRed.withOpacity(0.1),
+                        color: _primaryRed.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: _primaryRed.withOpacity(0.2), width: 1)),
+                            color: _primaryRed.withValues(alpha: 0.2), width: 1)),
                     child: Text('Lihat Semua',
                         style: TextStyle(
                             fontWeight: FontWeight.w600,
@@ -836,8 +764,9 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
   }
 
   Widget _siswaList() {
-    if (_myStudents.isEmpty)
+    if (_myStudents.isEmpty) {
       return _emptyList('Belum ada siswa bimbingan', Icons.person_outline);
+    }
     return SizedBox(
         height: 218,
         child: Column(children: [
@@ -867,8 +796,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
   }
 
   Widget _siswaCard(Map<String, dynamic> siswa) {
-    final hariBerjalan = siswa['hari_berjalan'] ?? 0;
-    final status = siswa['status'] ?? 'Tidak diketahui';
     return GestureDetector(
         onTap: () async => await _showSiswaDetail(siswa),
         child: Container(
@@ -878,7 +805,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
               border: Border.all(color: _borderColor, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.08),
+                    color: Colors.black.withValues(alpha: 0.08),
                     blurRadius: 12,
                     offset: const Offset(0, 6))
               ]),
@@ -890,10 +817,10 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                      color: _primaryRed.withOpacity(0.1),
+                      color: _primaryRed.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color: _primaryRed.withOpacity(0.3), width: 1.5)),
+                          color: _primaryRed.withValues(alpha: 0.3), width: 1.5)),
                   child: Icon(Icons.school, color: _primaryRed, size: 26)),
               const SizedBox(width: 16),
               Expanded(
@@ -935,15 +862,15 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                    color: _green.withOpacity(0.1),
+                    color: _green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                     border:
-                        Border.all(color: _green.withOpacity(0.3), width: 1)),
+                        Border.all(color: _green.withValues(alpha: 0.3), width: 1)),
                 child: Row(children: [
-                  const Icon(Icons.calendar_today, color: _green, size: 18),
+                  const Icon(Icons.business, color: _green, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
-                      child: Text('Menjalankan PKL: $hariBerjalan hari',
+                      child: Text(siswa['jenis_industri'] ?? 'Industri',
                           style: const TextStyle(
                               color: _green,
                               fontWeight: FontWeight.w700,
@@ -954,11 +881,11 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                    color: _green.withOpacity(0.1),
+                    color: _blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8)),
-                child: Text(status,
+                child: Text('${siswa['kelas']} • ${siswa['nis']}',
                     style: const TextStyle(
-                        color: _green,
+                        color: _blue,
                         fontSize: 12,
                         fontWeight: FontWeight.w600))),
           ]),
@@ -966,8 +893,9 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
   }
 
   Widget _izinListWidget() {
-    if (_izinData.isEmpty)
+    if (_izinData.isEmpty) {
       return _emptyList('Belum ada data perizinan', Icons.event_note);
+    }
 
     final pendingIzin = _izinData
         .where((item) =>
@@ -997,7 +925,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
         (izin['status']?.toString().toLowerCase() ?? '') == 'pending';
 
     // Format tanggal
-    String formattedDate = _formatDate(tanggal);
+    final String formattedDate = _formatDate(tanggal);
     // Warna untuk jenis izin
     final jenisColor = jenis.toLowerCase() == 'sakit' ? _orange : Colors.blue;
 
@@ -1008,13 +936,13 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isPending
-              ? _orange.withOpacity(0.2)
-              : statusColor.withOpacity(0.1),
+              ? _orange.withValues(alpha: 0.2)
+              : statusColor.withValues(alpha: 0.1),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -1038,7 +966,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: jenisColor.withOpacity(0.08),
+                          color: jenisColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
@@ -1076,7 +1004,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.08),
+                    color: statusColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -1113,7 +1041,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: jenisColor.withOpacity(0.1),
+                    color: jenisColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -1140,7 +1068,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 const SizedBox(width: 10),
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.calendar_month,
                       size: 13,
                       color: _textSecondary,
@@ -1172,7 +1100,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.note_outlined,
                       size: 14,
                       color: _textSecondary,
@@ -1202,13 +1130,13 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _orange.withOpacity(0.08),
+                  color: _orange.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: _orange.withOpacity(0.15),
+                    color: _orange.withValues(alpha: 0.15),
                   ),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
@@ -1216,7 +1144,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                       size: 12,
                       color: _orange,
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: 6),
                     Text(
                       'Menunggu persetujuan',
                       style: TextStyle(
@@ -1270,8 +1198,9 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
   }
 
   Widget _industriListWidget() {
-    if (_industriList.isEmpty)
+    if (_industriList.isEmpty) {
       return _emptyList('Belum ada data industri', Icons.business);
+    }
     final displayIndustri = _industriList.take(2).toList();
     return Column(
         children: displayIndustri
@@ -1291,7 +1220,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
               border: Border.all(color: _borderColor, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 8,
                     offset: const Offset(0, 4))
               ]),
@@ -1304,7 +1233,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                       Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                              color: _primaryRed.withOpacity(0.1),
+                              color: _primaryRed.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12)),
                           child: Icon(Icons.business,
                               color: _primaryRed, size: 24)),
@@ -1329,7 +1258,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                              color: _blue.withOpacity(0.1),
+                              color: _blue.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12)),
                           child: Row(children: [
                             const Icon(Icons.people, size: 14, color: _blue),
@@ -1371,7 +1300,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
             border: Border.all(color: _borderColor, width: 1.5),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 12,
                   offset: const Offset(0, 6))
             ]),
@@ -1444,11 +1373,11 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                                     width: 60,
                                     height: 60,
                                     decoration: BoxDecoration(
-                                        color: _primaryRed.withOpacity(0.1),
+                                        color: _primaryRed.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(14),
                                         border: Border.all(
                                             color:
-                                                _primaryRed.withOpacity(0.3))),
+                                                _primaryRed.withValues(alpha: 0.3))),
                                     child: Icon(Icons.school,
                                         color: _primaryRed, size: 28)),
                                 const SizedBox(width: 16),
@@ -1501,19 +1430,13 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(color: _borderColor)),
                               child: Column(children: [
-                                _infoRow('Status PKL',
-                                    siswa['status'] ?? 'Tidak diketahui'),
-                                const SizedBox(height: 12),
                                 _infoRow('Industri', siswa['industri'] ?? '-'),
                                 const SizedBox(height: 12),
-                                _infoRow('Tanggal Mulai',
-                                    siswa['tanggal_mulai'] ?? '-'),
+                                _infoRow('Alamat Industri',
+                                    siswa['industri_alamat'] ?? '-'),
                                 const SizedBox(height: 12),
-                                _infoRow('Tanggal Selesai',
-                                    siswa['tanggal_selesai'] ?? '-'),
-                                const SizedBox(height: 12),
-                                _infoRow('Hari Berjalan',
-                                    '${siswa['hari_berjalan'] ?? 0} hari'),
+                                _infoRow('Jenis Industri',
+                                    siswa['jenis_industri'] ?? '-'),
                               ])),
                           if (detailSiswa != null) ...[
                             const SizedBox(height: 24),
@@ -1779,7 +1702,7 @@ class _StatisticChip extends StatelessWidget {
             border: Border.all(color: const Color(0xFFE5E5E5), width: 1),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 8,
                   offset: const Offset(0, 4))
             ]),
@@ -1845,28 +1768,12 @@ class SiswaDataScreen extends StatelessWidget {
                               width: 1,
                               color: const Color(0xFFE5E5E5)),
                           Column(children: [
-                            Text(
-                                '${students.where((s) => s['status'] == 'Aktif').length}',
+                            Text('${students.length}',
                                 style: const TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.w800,
                                     color: Colors.green)),
-                            const Text('Siswa Aktif',
-                                style: TextStyle(
-                                    fontSize: 12, color: Color(0xFF666666)))
-                          ]),
-                          Container(
-                              height: 40,
-                              width: 1,
-                              color: const Color(0xFFE5E5E5)),
-                          Column(children: [
-                            Text(
-                                '${students.where((s) => s['status'] == 'Selesai').length}',
-                                style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.blue)),
-                            const Text('Selesai',
+                            const Text('Semua Siswa',
                                 style: TextStyle(
                                     fontSize: 12, color: Color(0xFF666666)))
                           ]),
@@ -1874,14 +1781,10 @@ class SiswaDataScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 Column(
                     children: students.map((siswa) {
-                  final status = siswa['status'] ?? 'Tidak diketahui';
-                  Color statusColor = Colors.green;
-                  if (status == 'Selesai')
-                    statusColor = Colors.blue;
-                  else if (status == 'Akan datang') statusColor = Colors.orange;
                   String kelasJurusan = siswa['kelas'] ?? '-';
-                  if (siswa['jurusan'] != null && siswa['jurusan'] != '-')
+                  if (siswa['jurusan'] != null && siswa['jurusan'] != '-') {
                     kelasJurusan = '${siswa['kelas']} • ${siswa['jurusan']}';
+                  }
                   return Container(
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
@@ -1890,7 +1793,7 @@ class SiswaDataScreen extends StatelessWidget {
                           border: Border.all(color: const Color(0xFFE5E5E5)),
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4))
                           ]),
@@ -1903,7 +1806,7 @@ class SiswaDataScreen extends StatelessWidget {
                                   CircleAvatar(
                                       radius: 24,
                                       backgroundColor: const Color(0xFF6B1B1B)
-                                          .withOpacity(0.1),
+                                          .withValues(alpha: 0.1),
                                       child: const Icon(Icons.school,
                                           color: Color(0xFF6B1B1B), size: 24)),
                                   const SizedBox(width: 12),
@@ -1923,18 +1826,6 @@ class SiswaDataScreen extends StatelessWidget {
                                                 color: Color(0xFF666666),
                                                 fontSize: 13)),
                                       ])),
-                                  Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                          color: statusColor.withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
-                                      child: Text(status,
-                                          style: TextStyle(
-                                              color: statusColor,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600))),
                                 ]),
                                 const SizedBox(height: 12),
                                 Row(children: [
@@ -1956,16 +1847,15 @@ class SiswaDataScreen extends StatelessWidget {
                                         MainAxisAlignment.spaceBetween,
                                     children: [
                                       Row(children: [
-                                        const Icon(Icons.calendar_today,
+                                        const Icon(Icons.business,
                                             size: 16, color: Color(0xFF666666)),
                                         const SizedBox(width: 6),
-                                        Text('${siswa['hari_berjalan']} hari',
+                                        Text(siswa['jenis_industri'] ?? '-',
                                             style: const TextStyle(
                                                 color: Color(0xFF666666),
                                                 fontSize: 13))
                                       ]),
-                                      Text(
-                                          '${siswa['tanggal_mulai'] ?? '-'} s/d ${siswa['tanggal_selesai'] ?? '-'}',
+                                      Text(siswa['industri_alamat'] ?? '-',
                                           style: const TextStyle(
                                               color: Color(0xFF6B1B1B),
                                               fontSize: 12,
@@ -2047,7 +1937,7 @@ class IndustriDataScreen extends StatelessWidget {
                           border: Border.all(color: const Color(0xFFE5E5E5)),
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4))
                           ]),
@@ -2060,7 +1950,7 @@ class IndustriDataScreen extends StatelessWidget {
                                   CircleAvatar(
                                       radius: 24,
                                       backgroundColor: const Color(0xFF6B1B1B)
-                                          .withOpacity(0.1),
+                                          .withValues(alpha: 0.1),
                                       child: const Icon(Icons.business,
                                           color: Color(0xFF6B1B1B), size: 24)),
                                   const SizedBox(width: 12),
@@ -2085,7 +1975,7 @@ class IndustriDataScreen extends StatelessWidget {
                                           horizontal: 10, vertical: 5),
                                       decoration: BoxDecoration(
                                           color: const Color(0xFF6B1B1B)
-                                              .withOpacity(0.1),
+                                              .withValues(alpha: 0.1),
                                           borderRadius:
                                               BorderRadius.circular(12)),
                                       child: Row(children: [
