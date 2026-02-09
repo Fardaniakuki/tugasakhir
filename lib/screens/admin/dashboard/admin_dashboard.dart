@@ -5,6 +5,8 @@ import 'dashboard_service.dart';
 import 'stat_grid.dart';
 import '../crud/add_person_page.dart';
 import 'api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart'; // Tambahkan import ini
 
 class AdminDashboard extends StatefulWidget {
   final Function(String)? onNavigateToData;
@@ -173,51 +175,247 @@ class _AdminDashboardState extends State<AdminDashboard>
       }
     }
   }
+Future<void> _updateSekolahData() async {
+  if (_sekolahData == null) return;
 
-  Future<void> _updateSekolahData() async {
-    if (_sekolahData == null) return;
-
-    try {
-      final sekolahId = _sekolahData!['id'];
-      final response =
-          await ApiService.put('/sekolah/$sekolahId', _sekolahData!);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _sekolahData = data['data'];
-          });
-        }
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text(data['message'] ?? 'Data sekolah berhasil diperbarui'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal memperbarui data sekolah'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error updating sekolah data: $e');
+  try {
+    // AMBIL TOKEN DARI SHAREDPREFERENCES
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    
+    if (token == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
+      _showErrorSnackbar('Token tidak ditemukan. Silakan login kembali.');
+      return;
+    }
+
+    final sekolahId = _sekolahData!['id'];
+    
+    // GUNAKAN ApiService.put DENGAN HEADERS YANG SUDAH MENYERTAKAN TOKEN
+    final response = await ApiService.put(
+      '/sekolah/$sekolahId',
+      _sekolahData!,
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      if (mounted) {
+        setState(() {
+          _sekolahData = data['data'];
+        });
+      }
+      
+      // TAMPILKAN POPUP SUKSES YANG LEBIH ELEGAN
+      if (mounted) {
+        await _showSuccessDialog(data['message'] ?? 'Data sekolah berhasil diperbarui');
+      }
+      
+    } else if (response.statusCode == 401) {
+      // Token expired atau tidak valid
+      if (!mounted) return;
+      _showErrorSnackbar('Sesi telah berakhir. Silakan login kembali.');
+      // Optionally: navigate to login page
+      // Navigator.pushReplacementNamed(context, '/login');
+    } else {
+      final errorData = jsonDecode(response.body);
+      final errorMessage = errorData['message'] ?? 'Gagal memperbarui data sekolah';
+      if (!mounted) return;
+      _showErrorSnackbar('$errorMessage (Kode: ${response.statusCode})');
+    }
+  } catch (e) {
+    debugPrint('Error updating sekolah data: $e');
+    if (!mounted) return;
+    _showErrorSnackbar('Terjadi kesalahan: ${e.toString()}');
+  }
+}
+
+// Method untuk menampilkan dialog sukses yang elegan
+Future<void> _showSuccessDialog(String message) async {
+  return showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.white,
+                const Color(0xFF3B060A).withValues(alpha:0.03),
+              ],
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Ikon sukses dengan animasi
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF34A853), // Hijau sukses
+                      Color(0xFF2E8B57), // Hijau lebih gelap
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF34A853).withValues(alpha:0.3),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Pesan sukses
+              Text(
+                'Berhasil!',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: _primaryColor,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Detail pesan
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.grey[700],
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 28),
+              
+              // Tombol OK dengan gradient
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: _primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                    shadowColor: _primaryColor.withValues(alpha:0.3),
+                  ),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 8),
+              
+              // Waktu update
+              Text(
+                'Diperbarui: ${DateFormat('HH:mm:ss').format(DateTime.now())}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                ),
+              ),
+            ],
+          ),
         ),
       );
-    }
-  }
+    },
+  );
+}
 
+// Method untuk menampilkan snackbar error yang konsisten
+void _showErrorSnackbar(String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.error_outline_rounded,
+              color: Colors.red[700],
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: Colors.red[700],
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      margin: const EdgeInsets.all(16),
+      duration: const Duration(seconds: 4),
+      action: SnackBarAction(
+        label: 'Tutup',
+        textColor: Colors.white,
+        onPressed: () {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        },
+      ),
+    ),
+  );
+}
   Future<void> _refreshSilently() async {
     try {
       final data = await _service.fetchDashboardData(forceRefresh: true);
@@ -411,13 +609,13 @@ class _AdminDashboardState extends State<AdminDashboard>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha:0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
           border: Border.all(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha:0.1),
             width: 1,
           ),
         ),
@@ -464,13 +662,13 @@ class _AdminDashboardState extends State<AdminDashboard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha:0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha:0.1),
           width: 1,
         ),
       ),
@@ -664,13 +862,13 @@ class _AdminDashboardState extends State<AdminDashboard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha:0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha:0.1),
           width: 1,
         ),
       ),
@@ -1277,13 +1475,13 @@ class _AdminDashboardState extends State<AdminDashboard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha:0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha:0.1),
           width: 1,
         ),
       ),
@@ -1454,13 +1652,13 @@ class _AdminDashboardState extends State<AdminDashboard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha:0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha:0.1),
           width: 1,
         ),
       ),
@@ -1656,13 +1854,13 @@ class _AdminDashboardState extends State<AdminDashboard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha:0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -1881,7 +2079,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha:0.1),
           width: 1,
         ),
       ),

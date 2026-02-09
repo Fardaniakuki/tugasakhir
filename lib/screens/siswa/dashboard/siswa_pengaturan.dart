@@ -449,10 +449,10 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 4),
+              border: Border.all(color: Colors.white.withValues(alpha:0.3), width: 4),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha:0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -488,7 +488,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha:0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -509,7 +509,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                   'NISN: $_nisnSiswa',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha:0.8),
                   ),
                 ),
               ],
@@ -545,7 +545,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha:0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -634,7 +634,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

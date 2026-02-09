@@ -1,84 +1,86 @@
-// lib/services/api_service.dart
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
+// api_service.dart - PERBAIKAN
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // Base URL dari environment
-  static String get baseUrl {
-    final url = dotenv.get('API_BASE_URL', fallback: 'https://api.gedanggoreng.com');
-    return url.endsWith('/api') ? url : '$url/api';
+  static const String baseUrl = 'https://api.gedanggoreng.com/api';
+  
+  // Helper untuk mendapatkan token
+  static Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('access_token');
   }
-
-  // GET request tanpa auth (untuk data sekolah yang public)
-  static Future<http.Response> get(String endpoint) async {
-    try {
-      debugPrint('API GET: $baseUrl$endpoint');
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      );
-
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
-      
-      return response;
-    } catch (e) {
-      debugPrint('Error in GET request: $e');
-      rethrow;
+  
+  // Helper untuk membuat headers dengan token
+  static Future<Map<String, String>> _getHeaders({
+    Map<String, String>? additionalHeaders,
+  }) async {
+    final token = await _getToken();
+    final headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...?additionalHeaders,
+    };
+    
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
     }
+    
+    return headers;
   }
-
-  // PUT request tanpa auth
-  static Future<http.Response> put(String endpoint, Map<String, dynamic> data) async {
-    try {
-      debugPrint('API PUT: $baseUrl$endpoint');
-      debugPrint('Data: $data');
-      
-      final response = await http.put(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: jsonEncode(data),
-      );
-
-      debugPrint('Response status: ${response.statusCode}');
-      debugPrint('Response body: ${response.body}');
-      
-      return response;
-    } catch (e) {
-      debugPrint('Error in PUT request: $e');
-      rethrow;
-    }
+  
+  // PUT method yang sudah include token
+  static Future<http.Response> put(
+    String endpoint,
+    Map<String, dynamic> data, {
+    Map<String, String>? headers,
+  }) async {
+    final url = Uri.parse('$baseUrl$endpoint');
+    final finalHeaders = await _getHeaders(additionalHeaders: headers);
+    
+    return await http.put(
+      url,
+      headers: finalHeaders,
+      body: jsonEncode(data),
+    );
   }
-
-  // GET request dengan auth token (jika diperlukan)
-  static Future<http.Response> getWithAuth(String endpoint, String token) async {
-    try {
-      debugPrint('API GET with Auth: $baseUrl$endpoint');
-      
-      final response = await http.get(
-        Uri.parse('$baseUrl$endpoint'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      debugPrint('Response status: ${response.statusCode}');
-      
-      return response;
-    } catch (e) {
-      debugPrint('Error in GET with Auth request: $e');
-      rethrow;
-    }
+  
+  // GET method (juga perlu diperbaiki)
+  static Future<http.Response> get(
+    String endpoint, {
+    Map<String, String>? headers,
+  }) async {
+    final url = Uri.parse('$baseUrl$endpoint');
+    final finalHeaders = await _getHeaders(additionalHeaders: headers);
+    
+    return await http.get(url, headers: finalHeaders);
+  }
+  
+  // POST method
+  static Future<http.Response> post(
+    String endpoint,
+    Map<String, dynamic> data, {
+    Map<String, String>? headers,
+  }) async {
+    final url = Uri.parse('$baseUrl$endpoint');
+    final finalHeaders = await _getHeaders(additionalHeaders: headers);
+    
+    return await http.post(
+      url,
+      headers: finalHeaders,
+      body: jsonEncode(data),
+    );
+  }
+  
+  // DELETE method
+  static Future<http.Response> delete(
+    String endpoint, {
+    Map<String, String>? headers,
+  }) async {
+    final url = Uri.parse('$baseUrl$endpoint');
+    final finalHeaders = await _getHeaders(additionalHeaders: headers);
+    
+    return await http.delete(url, headers: finalHeaders);
   }
 }

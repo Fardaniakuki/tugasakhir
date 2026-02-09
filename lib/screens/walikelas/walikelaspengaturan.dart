@@ -7,7 +7,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../login/login_screen.dart';
 
 class WaliKelasProfilePage extends StatefulWidget {
-  const WaliKelasProfilePage({super.key, required String namaWaliKelas, required String kelasWali});
+  const WaliKelasProfilePage(
+      {super.key, required String namaWaliKelas, required String kelasWali});
 
   @override
   State<WaliKelasProfilePage> createState() => _WaliKelasProfilePageState();
@@ -29,16 +30,16 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
     'kelas_wali': '-',
     'jurusan': '-',
   };
-  
+
   bool _isLoading = true;
   bool _isEditing = false;
-  
+
   // Controller untuk form edit
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _kodeGuruController = TextEditingController();
   final TextEditingController _nipController = TextEditingController();
   final TextEditingController _telpController = TextEditingController();
-  
+
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
@@ -50,67 +51,34 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
   Future<void> _loadGuruData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
+
       print('📥 Loading guru data for Wali Kelas...');
-      
+
       // Debug: print semua keys untuk melihat data apa yang tersimpan
       final allKeys = prefs.getKeys();
       print('🔑 SEMUA DATA DI SHAREDPREFERENCES:');
       for (final key in allKeys) {
         print('   $key: ${prefs.get(key)}');
       }
-      
-      // Ambil data dari berbagai kemungkinan key
-      final String? userName = prefs.getString('user_name');
-      final String? kodeGuru = prefs.getString('kode_guru');
-      final String? userNip = prefs.getString('user_nip');
-      final String? userPhone = prefs.getString('user_phone');
-      final String? guruNama = prefs.getString('guru_nama');
-      final String? guruKode = prefs.getString('guru_kode_guru');
-      final String? guruNip = prefs.getString('guru_nip');
-      final String? guruTelp = prefs.getString('guru_no_telp');
-      final int? guruId = prefs.getInt('guru_id');
-      
-      // Prioritaskan data dari guru_* keys (lebih lengkap)
-      final String nama = userName ?? guruNama ?? 'WALI KELAS';
-      final String kode = kodeGuru ?? guruKode ?? '-';
-      final String nip = userNip ?? guruNip ?? '-';
-      final String telp = userPhone ?? guruTelp ?? '-';
-      
-      // Set controller untuk form edit
-      _namaController.text = nama;
-      _kodeGuruController.text = kode;
-      _nipController.text = nip;
-      _telpController.text = telp;
-      
-      // Ambil data kelas wali
-      final kelasWali = await _fetchKelasWali(guruId);
-      
-      setState(() {
-        _guruData = {
-          'nama': nama.toUpperCase(),
-          'kode_guru': kode,
-          'nip': nip,
-          'no_telp': telp,
-          'kelas_wali': kelasWali['nama_kelas'] ?? '-',
-          'jurusan': kelasWali['jurusan'] ?? '-',
-          'guru_id': guruId ?? 0,
-        };
-        _isLoading = false;
-      });
-      
-      print('\n✅ DATA GURU YANG DIPAKAI:');
-      print('   Nama: ${_guruData['nama']}');
-      print('   Kode: ${_guruData['kode_guru']}');
-      print('   NIP: ${_guruData['nip']}');
-      print('   Telp: ${_guruData['no_telp']}');
-      print('   Kelas Wali: ${_guruData['kelas_wali']}');
-      print('   Jurusan: ${_guruData['jurusan']}');
-      print('   Guru ID: ${_guruData['guru_id']}');
-      
+
+      // Ambil ID dari SharedPreferences - ini adalah "id" dari response API
+      final int? guruId =
+          prefs.getInt('user_id'); // user_id di SharedPreferences = id di API
+      print('🔍 ID guru dari SharedPreferences (user_id): $guruId');
+
+      if (guruId == null || guruId == 0) {
+        print('❌ ID guru tidak ditemukan atau 0');
+        // Fallback ke data dari SharedPreferences
+        _loadGuruFromSharedPrefs(prefs);
+        return;
+      }
+
+      // Ambil data guru dari API menggunakan id
+      await _loadGuruFromAPI(guruId, prefs);
     } catch (e) {
       print('❌ Error loading guru data: $e');
-      
+      print('Stack trace: $e');
+
       setState(() {
         _guruData = {
           'nama': 'WALI KELAS',
@@ -119,16 +87,207 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
           'no_telp': '-',
           'kelas_wali': '-',
           'jurusan': '-',
-          'guru_id': 0,
+          'id': 0,
         };
         _isLoading = false;
       });
     }
   }
 
-  // Fungsi untuk mengambil data kelas yang menjadi wali kelas
+// Fungsi untuk mengambil data guru dari API
+  Future<void> _loadGuruFromAPI(int guruId, SharedPreferences prefs) async {
+    try {
+      await dotenv.load(fileName: '.env');
+      final token = prefs.getString('access_token');
+
+      if (token == null) {
+        print('❌ Token tidak ditemukan');
+        _loadGuruFromSharedPrefs(prefs);
+        return;
+      }
+
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+
+      print('🔄 Fetching data guru dari API...');
+      print('   URL: $baseUrl/api/guru/$guruId');
+      print('   Menggunakan ID: $guruId');
+
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/guru/$guruId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      print('📊 Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('📋 Response body: $data');
+
+        if (data['success'] == true && data['data'] != null) {
+          final guruData = data['data'] as Map<String, dynamic>;
+          print('✅ Data guru berhasil diambil dari API');
+
+          // Debug: print semua data yang diterima
+          print('📋 DETAIL DATA GURU DARI API:');
+          print('   id: ${guruData['id']}');
+          print('   user_id: ${guruData['user_id']}');
+          print('   kode_guru: ${guruData['kode_guru']}');
+          print('   nip: ${guruData['nip']}');
+          print('   nama: ${guruData['nama']}');
+          print('   no_telp: ${guruData['no_telp']}');
+          print('   is_wali_kelas: ${guruData['is_wali_kelas']}');
+          print('   is_koordinator: ${guruData['is_koordinator']}');
+          print('   is_pembimbing: ${guruData['is_pembimbing']}');
+          print('   is_kaprog: ${guruData['is_kaprog']}');
+
+          // Ambil data kelas wali
+          final kelasWali = await _fetchKelasWali(guruId);
+
+          setState(() {
+            _guruData = {
+              'nama':
+                  (guruData['nama'] ?? 'WALI KELAS').toString().toUpperCase(),
+              'kode_guru': guruData['kode_guru']?.toString() ?? '-',
+              'nip': guruData['nip']?.toString() ?? '-',
+              'no_telp': guruData['no_telp']?.toString() ?? '-',
+              'kelas_wali': kelasWali['nama_kelas'] ?? '-',
+              'jurusan': kelasWali['jurusan'] ?? '-',
+              'id': guruData['id'], // ID dari API (39)
+              'user_id': guruData['user_id'], // user_id dari API (69)
+              'is_wali_kelas': guruData['is_wali_kelas'] ?? false,
+              'is_koordinator': guruData['is_koordinator'] ?? false,
+              'is_pembimbing': guruData['is_pembimbing'] ?? false,
+              'is_kaprog': guruData['is_kaprog'] ?? false,
+            };
+            _isLoading = false;
+          });
+
+          // Set controller untuk form edit
+          _namaController.text = guruData['nama']?.toString() ?? '';
+          _kodeGuruController.text = guruData['kode_guru']?.toString() ?? '';
+          _nipController.text = guruData['nip']?.toString() ?? '';
+          _telpController.text = guruData['no_telp']?.toString() ?? '';
+
+          // Simpan ke SharedPreferences untuk cache
+          await _saveGuruToSharedPrefs(prefs, guruData, guruId);
+
+          print('\n✅ DATA GURU YANG DIPAKAI:');
+          print('   Nama: ${_guruData['nama']}');
+          print('   Kode: ${_guruData['kode_guru']}');
+          print('   NIP: ${_guruData['nip']}');
+          print('   Telp: ${_guruData['no_telp']}');
+          print('   Kelas Wali: ${_guruData['kelas_wali']}');
+          print('   Jurusan: ${_guruData['jurusan']}');
+          print('   ID: ${_guruData['id']}');
+          print('   User ID: ${_guruData['user_id']}');
+          print('   Is Wali Kelas: ${_guruData['is_wali_kelas']}');
+        } else {
+          print('❌ Response tidak valid atau success = false');
+          _loadGuruFromSharedPrefs(prefs);
+        }
+      } else {
+        print('❌ HTTP Error: ${response.statusCode}');
+        print('   Response body: ${response.body}');
+        _loadGuruFromSharedPrefs(prefs);
+      }
+    } catch (e) {
+      print('❌ Error fetching guru from API: $e');
+      print('Stack trace: $e');
+      _loadGuruFromSharedPrefs(prefs);
+    }
+  }
+
+// Fungsi untuk mengambil data dari SharedPreferences (fallback)
+  void _loadGuruFromSharedPrefs(SharedPreferences prefs) {
+    print('🔄 Menggunakan data dari SharedPreferences sebagai fallback');
+
+    // Ambil data dari berbagai kemungkinan key
+    final String? userName = prefs.getString('user_name');
+    final String? kodeGuru = prefs.getString('kode_guru');
+    final String? userNip = prefs.getString('user_nip');
+    final String? userPhone = prefs.getString('user_phone');
+
+    final String nama = userName ?? 'WALI KELAS';
+    final String kode = kodeGuru ?? '-';
+    final String nip = userNip ?? '-';
+    final String telp = userPhone ?? '-';
+    final int? id = prefs.getInt('user_id');
+
+    // Set controller untuk form edit
+    _namaController.text = nama;
+    _kodeGuruController.text = kode;
+    _nipController.text = nip;
+    _telpController.text = telp;
+
+    setState(() {
+      _guruData = {
+        'nama': nama.toUpperCase(),
+        'kode_guru': kode,
+        'nip': nip,
+        'no_telp': telp,
+        'kelas_wali': '-', // Akan diupdate nanti
+        'jurusan': '-', // Akan diupdate nanti
+        'id': id ?? 0,
+      };
+      _isLoading = false;
+    });
+  }
+
+// Fungsi untuk menyimpan data guru ke SharedPreferences
+  Future<void> _saveGuruToSharedPrefs(SharedPreferences prefs,
+      Map<String, dynamic> guruData, int guruId) async {
+    try {
+      // Simpan data utama
+      await prefs.setString('user_name', guruData['nama']?.toString() ?? '');
+      await prefs.setString(
+          'kode_guru', guruData['kode_guru']?.toString() ?? '');
+      await prefs.setString('user_nip', guruData['nip']?.toString() ?? '');
+      await prefs.setString(
+          'user_phone', guruData['no_telp']?.toString() ?? '');
+
+      // Simpan ID - simpan sebagai user_id (untuk kompatibilitas dengan login)
+      await prefs.setInt('user_id', guruId); // id dari API
+
+      // Simpan juga sebagai id jika ada
+      if (guruData['id'] != null) {
+        await prefs.setInt('guru_id', guruData['id']!);
+      }
+
+      // Simpan user_id dari API jika ada
+      if (guruData['user_id'] != null) {
+        await prefs.setInt('api_user_id', guruData['user_id']!);
+      }
+
+      // Simpan status roles
+      if (guruData['is_wali_kelas'] != null) {
+        await prefs.setBool('is_wali_kelas', guruData['is_wali_kelas']!);
+      }
+      if (guruData['is_koordinator'] != null) {
+        await prefs.setBool('is_koordinator', guruData['is_koordinator']!);
+      }
+      if (guruData['is_pembimbing'] != null) {
+        await prefs.setBool('is_pembimbing', guruData['is_pembimbing']!);
+      }
+      if (guruData['is_kaprog'] != null) {
+        await prefs.setBool('is_kaprog', guruData['is_kaprog']!);
+      }
+
+      print('💾 Data guru disimpan ke SharedPreferences');
+      print('   user_id (untuk API calls): $guruId');
+      print('   id dari API: ${guruData['id']}');
+      print('   user_id dari API: ${guruData['user_id']}');
+    } catch (e) {
+      print('❌ Error saving guru to SharedPreferences: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> _fetchKelasWali(int? guruId) async {
     if (guruId == null || guruId == 0) {
+      print('⚠️ Guru ID tidak valid untuk mencari kelas wali');
       return {'nama_kelas': '-', 'jurusan': '-'};
     }
 
@@ -136,14 +295,17 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
       await dotenv.load(fileName: '.env');
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
+
       if (token == null) {
+        print('❌ Token tidak ditemukan untuk fetch kelas wali');
         return {'nama_kelas': '-', 'jurusan': '-'};
       }
 
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+
       // Ambil semua kelas
+      print('🔄 Fetching data kelas dari API untuk mencari wali kelas...');
       final response = await http.get(
         Uri.parse('$baseUrl/api/kelas?limit=100'),
         headers: {
@@ -152,37 +314,66 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
         },
       );
 
+      print('📊 Response status: ${response.statusCode}');
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
-        if (data['success'] == true && data['data'] != null && data['data'] is Map) {
+
+        if (data['success'] == true &&
+            data['data'] != null &&
+            data['data'] is Map) {
           final kelasData = data['data'] as Map<String, dynamic>;
           final List<dynamic> kelasList = kelasData['data'] ?? [];
-          
+
+          print('   Total kelas: ${kelasList.length}');
+          print('   Mencari kelas dengan wali_kelas_guru_id: $guruId');
+
           // Cari kelas yang memiliki wali_kelas_guru_id sesuai dengan guruId
-          final kelasWali = kelasList.firstWhere(
-            (kelas) => kelas['wali_kelas_guru_id'] == guruId,
-            orElse: () => null,
-          );
-          
-          if (kelasWali != null) {
-            final String namaKelas = kelasWali['nama'] ?? '-';
-            final int? jurusanId = kelasWali['jurusan_id'];
-            String jurusan = '-';
-            
-            // Ambil nama jurusan jika ada
-            if (jurusanId != null) {
-              jurusan = await _fetchJurusanName(jurusanId, token);
+          for (final kelas in kelasList) {
+            final int? waliId = kelas['wali_kelas_guru_id'] != null
+                ? int.tryParse(kelas['wali_kelas_guru_id'].toString())
+                : null;
+
+            if (waliId == guruId) {
+              print('   ✅ Kelas ditemukan: ${kelas['nama']}');
+
+              final String namaKelas = kelas['nama'] ?? '-';
+              final int? jurusanId = kelas['jurusan_id'];
+              String jurusan = '-';
+
+              // Ambil nama jurusan jika ada
+              if (jurusanId != null) {
+                print('   🔍 Mengambil nama jurusan ID: $jurusanId');
+                jurusan = await _fetchJurusanName(jurusanId, token);
+              }
+
+              return {
+                'nama_kelas': namaKelas,
+                'jurusan': jurusan,
+              };
             }
-            
-            return {
-              'nama_kelas': namaKelas,
-              'jurusan': jurusan,
-            };
           }
+
+          print('   ❌ Tidak ada kelas dengan wali_kelas_guru_id: $guruId');
+
+          // Debug: Print beberapa kelas untuk pemeriksaan
+          print('   📋 Beberapa data kelas:');
+          for (int i = 0;
+              i < (kelasList.length > 5 ? 5 : kelasList.length);
+              i++) {
+            final kelas = kelasList[i];
+            final int? waliId = kelas['wali_kelas_guru_id'] != null
+                ? int.tryParse(kelas['wali_kelas_guru_id'].toString())
+                : null;
+            print('      [${i + 1}] ${kelas['nama']} - Wali ID: $waliId');
+          }
+        } else {
+          print('   ❌ Response tidak valid atau success = false');
         }
+      } else {
+        print('   ❌ HTTP Error: ${response.statusCode}');
       }
-      
+
       return {'nama_kelas': '-', 'jurusan': '-'};
     } catch (e) {
       print('❌ Error fetching kelas wali: $e');
@@ -194,8 +385,9 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
   Future<String> _fetchJurusanName(int jurusanId, String token) async {
     try {
       await dotenv.load(fileName: '.env');
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+
       final response = await http.get(
         Uri.parse('$baseUrl/api/jurusan/$jurusanId'),
         headers: {
@@ -214,122 +406,173 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
     } catch (e) {
       print('❌ Error fetching jurusan: $e');
     }
-    
+
     return '-';
   }
-Future<void> _updateGuruData() async {
-  if (!_formKey.currentState!.validate()) {
-    return;
-  }
 
-  try {
-    await dotenv.load(fileName: '.env');
-    
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-
-    print('🔍 DEBUG UPDATE GURU DATA:');
-    print('   Token exists: ${token != null}');
-
-    if (token == null) {
-      _showErrorDialog('Token tidak ditemukan');
+  Future<void> _updateGuruData() async {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Tampilkan loading
-    if (context.mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(
-            color: _primaryColor,
+    try {
+      await dotenv.load(fileName: '.env');
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      print('🔍 DEBUG UPDATE GURU DATA:');
+      print('   Token exists: ${token != null}');
+      print('   Data yang akan dikirim:');
+      print('     Nama: ${_namaController.text.trim()}');
+      print('     Kode: ${_kodeGuruController.text.trim()}');
+      print('     NIP: ${_nipController.text.trim()}');
+      print('     Telp: ${_telpController.text.trim()}');
+
+      if (token == null) {
+        _showErrorDialog('Token tidak ditemukan');
+        return;
+      }
+
+      // Tampilkan loading
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(
+              color: _primaryColor,
+            ),
           ),
-        ),
+        );
+      }
+
+      // Data yang akan dikirim sesuai dengan dokumentasi API
+      final Map<String, dynamic> requestData = {
+        'kode_guru': _kodeGuruController.text.trim(),
+        'nama': _namaController.text.trim(),
+        'nip': _nipController.text.trim().isNotEmpty
+            ? _nipController.text.trim()
+            : null,
+        'no_telp': _telpController.text.trim(),
+      };
+
+      // Hapus field yang null
+      requestData.removeWhere((key, value) => value == null);
+
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final url = Uri.parse('$baseUrl/api/guru/me');
+
+      print('🔄 Updating guru data...');
+      print('   URL: $url');
+      print('   Request data: $requestData');
+      print('   Headers: Authorization: Bearer ${token.substring(0, 20)}...');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(requestData),
       );
-    }
 
-    // Data yang akan dikirim sesuai dengan dokumentasi API
-    final Map<String, dynamic> requestData = {
-      'kode_guru': _kodeGuruController.text.trim(),
-      'nama': _namaController.text.trim(),
-      'nip': _nipController.text.trim(),
-      'no_telp': _telpController.text.trim(),
-    };
+      // Tutup loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
 
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-    final url = Uri.parse('$baseUrl/api/guru/me');
+      print('📤 Response status: ${response.statusCode}');
+      print('📤 Response body: ${response.body}');
 
-    print('🔄 Updating guru data...');
-    print('   URL: $url');
-    print('   Request data: $requestData');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
-    final response = await http.put(
-      url,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode(requestData),
-    );
+        if (data['success'] == true) {
+          print('✅ Update berhasil!');
 
-    // Tutup loading dialog
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
+          // Update data lokal
+          final updatedData = data['data'] as Map<String, dynamic>;
 
-    print('📤 Response status: ${response.statusCode}');
-    print('📤 Response body: ${response.body}');
+          print('📋 Data yang diupdate dari API:');
+          print('   Nama: ${updatedData['nama']}');
+          print('   Kode: ${updatedData['kode_guru']}');
+          print('   NIP: ${updatedData['nip']}');
+          print('   Telp: ${updatedData['no_telp']}');
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      
-      if (data['success'] == true) {
-        // Update data lokal
-        final updatedData = data['data'] as Map<String, dynamic>;
-        
-        setState(() {
-          _guruData['nama'] = (updatedData['nama'] ?? _namaController.text.trim()).toString().toUpperCase();
-          _guruData['kode_guru'] = updatedData['kode_guru'] ?? _kodeGuruController.text.trim();
-          _guruData['nip'] = updatedData['nip'] ?? _nipController.text.trim();
-          _guruData['no_telp'] = updatedData['no_telp'] ?? _telpController.text.trim();
-          _isEditing = false;
-        });
+          setState(() {
+            _guruData['nama'] =
+                (updatedData['nama'] ?? _namaController.text.trim())
+                    .toString()
+                    .toUpperCase();
+            _guruData['kode_guru'] =
+                updatedData['kode_guru'] ?? _kodeGuruController.text.trim();
+            _guruData['nip'] = updatedData['nip'] ?? _nipController.text.trim();
+            _guruData['no_telp'] =
+                updatedData['no_telp'] ?? _telpController.text.trim();
+            _isEditing = false;
+          });
 
-        // Update SharedPreferences
-        await prefs.setString('user_name', _guruData['nama']);
-        await prefs.setString('kode_guru', _guruData['kode_guru']);
-        await prefs.setString('user_nip', _guruData['nip']);
-        await prefs.setString('user_phone', _guruData['no_telp']);
-        await prefs.setString('guru_nama', _guruData['nama']);
-        await prefs.setString('guru_kode_guru', _guruData['kode_guru']);
-        await prefs.setString('guru_nip', _guruData['nip']);
-        await prefs.setString('guru_no_telp', _guruData['no_telp']);
+          // Update SharedPreferences
+          await prefs.setString('user_name', _guruData['nama']);
+          await prefs.setString('kode_guru', _guruData['kode_guru']);
+          await prefs.setString('user_nip', _guruData['nip']);
+          await prefs.setString('user_phone', _guruData['no_telp']);
+          await prefs.setString('guru_nama', _guruData['nama']);
+          await prefs.setString('guru_kode_guru', _guruData['kode_guru']);
+          await prefs.setString('guru_nip', _guruData['nip']);
+          await prefs.setString('guru_no_telp', _guruData['no_telp']);
 
-        _showSuccessDialog('Data berhasil diperbarui');
+          _showSuccessDialog('Data berhasil diperbarui');
+        } else {
+          final errorMsg =
+              data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
+          print('❌ Update gagal: $errorMsg');
+          _showErrorDialog(errorMsg.toString());
+        }
+      } else if (response.statusCode == 422) {
+        // Validation error
+        try {
+          final errorData = jsonDecode(response.body);
+          final errors = errorData['errors'] ?? {};
+          String errorMessage = 'Validasi gagal:\n';
+
+          errors.forEach((key, value) {
+            if (value is List) {
+              errorMessage += '• $key: ${value.join(', ')}\n';
+            }
+          });
+
+          print('❌ Validation error: $errorMessage');
+          _showErrorDialog(errorMessage);
+        } catch (e) {
+          _showErrorDialog(
+              'Terjadi kesalahan validasi: ${response.statusCode}');
+        }
       } else {
-        final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
-        _showErrorDialog(errorMsg.toString());
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMsg = errorData['message'] ??
+              errorData['error'] ??
+              'Terjadi kesalahan: ${response.statusCode}';
+          print('❌ HTTP Error: $errorMsg');
+          _showErrorDialog(errorMsg.toString());
+        } catch (e) {
+          _showErrorDialog(
+              'Terjadi kesalahan: ${response.statusCode}\n${response.body}');
+        }
       }
-    } else {
-      try {
-        final errorData = jsonDecode(response.body);
-        final errorMsg = errorData['message'] ?? 
-                        errorData['error'] ?? 
-                        'Terjadi kesalahan: ${response.statusCode}';
-        _showErrorDialog(errorMsg.toString());
-      } catch (e) {
-        _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
       }
+      print('❌ Exception during update: $e');
+      _showErrorDialog('Terjadi kesalahan: $e');
     }
-  } catch (e) {
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
-    _showErrorDialog('Terjadi kesalahan: $e');
   }
-}
+
   void _showSuccessDialog(String message) {
     showDialog(
       context: context,
@@ -436,7 +679,7 @@ Future<void> _updateGuruData() async {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Nama
           TextFormField(
             controller: _namaController,
@@ -459,7 +702,7 @@ Future<void> _updateGuruData() async {
             },
           ),
           const SizedBox(height: 12),
-          
+
           // Kode Guru
           TextFormField(
             controller: _kodeGuruController,
@@ -482,24 +725,38 @@ Future<void> _updateGuruData() async {
             },
           ),
           const SizedBox(height: 12),
-          
-          // NIP
+
+          // NIP - NON EDITABLE (READ ONLY)
           TextFormField(
             controller: _nipController,
+            enabled: false, // Ini yang membuatnya non-editable
             decoration: InputDecoration(
               labelText: 'NIP',
+              labelStyle: const TextStyle(color: Colors.grey),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _borderColor),
+                borderSide: const BorderSide(color: Colors.grey),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _primaryColor, width: 2),
+                borderSide: const BorderSide(color: Colors.grey, width: 1),
               ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.grey),
+              ),
+              filled: true,
+              fillColor: Colors.grey[100],
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+            ),
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 14,
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // No Telepon
           TextFormField(
             controller: _telpController,
@@ -515,9 +772,15 @@ Future<void> _updateGuruData() async {
               ),
             ),
             keyboardType: TextInputType.phone,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'No. Telepon tidak boleh kosong';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 20),
-          
+
           // Tombol Simpan & Batal
           Row(
             children: [
@@ -583,7 +846,7 @@ Future<void> _updateGuruData() async {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withValues(alpha:0.1),
+                    color: Colors.grey.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),
@@ -609,7 +872,7 @@ Future<void> _updateGuruData() async {
                     ),
                   ),
                   const Spacer(),
-                  if (!_isLoading && _guruData['guru_id'] != 0 && !_isEditing)
+                  if (!_isLoading && _guruData['id'] != 0 && !_isEditing)
                     IconButton(
                       onPressed: () {
                         setState(() {
@@ -627,7 +890,8 @@ Future<void> _updateGuruData() async {
 
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
                   children: [
                     // Profile Section
@@ -653,7 +917,6 @@ Future<void> _updateGuruData() async {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          
                           _isLoading
                               ? _buildProfileSkeleton()
                               : Column(
@@ -673,10 +936,12 @@ Future<void> _updateGuruData() async {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 16, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: _primaryColor.withValues(alpha:0.1),
+                                        color: _primaryColor.withValues(
+                                            alpha: 0.1),
                                         borderRadius: BorderRadius.circular(20),
                                         border: Border.all(
-                                          color: _primaryColor.withValues(alpha:0.3),
+                                          color: _primaryColor.withValues(
+                                              alpha: 0.3),
                                         ),
                                       ),
                                       child: const Text(
@@ -708,7 +973,7 @@ Future<void> _updateGuruData() async {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha:0.05),
+                            color: Colors.grey.withValues(alpha: 0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -733,15 +998,19 @@ Future<void> _updateGuruData() async {
                             const SizedBox(height: 16),
 
                             // Kelas Wali
-                            _buildDetailItem('Kelas Wali', _guruData['kelas_wali']!),
+                            _buildDetailItem(
+                                'Kelas Wali', _guruData['kelas_wali']!),
                             const SizedBox(height: 12),
-                            _buildDetailItem('Konsetrasi Keahlian', _guruData['jurusan']!),
+                            _buildDetailItem(
+                                'Konsetrasi Keahlian', _guruData['jurusan']!),
                             const SizedBox(height: 12),
-                            _buildDetailItem('Kode Guru', _guruData['kode_guru']!),
+                            _buildDetailItem(
+                                'Kode Guru', _guruData['kode_guru']!),
                             const SizedBox(height: 12),
                             _buildDetailItem('NIP', _guruData['nip']!),
                             const SizedBox(height: 12),
-                            _buildDetailItem('No. Telepon', _guruData['no_telp']!),
+                            _buildDetailItem(
+                                'No. Telepon', _guruData['no_telp']!),
                           ],
                         ],
                       ),
@@ -761,7 +1030,7 @@ Future<void> _updateGuruData() async {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.grey.withValues(alpha:0.05),
+                            color: Colors.grey.withValues(alpha: 0.05),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -781,16 +1050,14 @@ Future<void> _updateGuruData() async {
                           const SizedBox(height: 16),
                           const Divider(color: _borderColor),
                           const SizedBox(height: 16),
-
                           _buildMenuTile(
                             icon: Icons.help_outline,
                             title: 'Bantuan & Panduan',
                             subtitle: 'Cara menggunakan aplikasi',
-                            onTap: () => _showUnderDevelopment('Bantuan & Panduan', context),
+                            onTap: () => _showUnderDevelopment(
+                                'Bantuan & Panduan', context),
                           ),
-
                           const SizedBox(height: 12),
-
                           _buildMenuTile(
                             icon: Icons.info_outline,
                             title: 'Tentang Aplikasi',
@@ -812,7 +1079,8 @@ Future<void> _updateGuruData() async {
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
-                            side: const BorderSide(color: _accentColor, width: 1.5),
+                            side: const BorderSide(
+                                color: _accentColor, width: 1.5),
                           ),
                           elevation: 0,
                           shadowColor: Colors.transparent,
@@ -897,7 +1165,7 @@ Future<void> _updateGuruData() async {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha:0.1),
+                  color: _primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(

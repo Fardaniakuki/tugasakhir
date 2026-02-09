@@ -22,14 +22,21 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   bool _isLoading = true;
   bool _isCheckingToken = true;
 
+  // Data perizinan dari database
+  List<dynamic> _perizinanData = [];
+  final Map<int, String> _kelasCache = {};
+  
   // Data statistik SIA (Sakit/Izin/Alpha) - DIHITUNG OTOMATIS
-  int get _totalSIA => _siaList.length;
-  int get _siaMenunggu =>
-      _siaList.where((sia) => sia['status'] == 'Menunggu').length;
-  int get _siaDisetujui =>
-      _siaList.where((sia) => sia['status'] == 'Disetujui').length;
-  int get _siaDitolak =>
-      _siaList.where((sia) => sia['status'] == 'Ditolak').length;
+  int get _totalSIA => _perizinanData.length;
+  int get _siaMenunggu => _perizinanData
+      .where((item) => item['status']?.toString().toLowerCase() == 'pending')
+      .length;
+  int get _siaDisetujui => _perizinanData
+      .where((item) => item['status']?.toString().toLowerCase() == 'approved')
+      .length;
+  int get _siaDitolak => _perizinanData
+      .where((item) => item['status']?.toString().toLowerCase() == 'rejected')
+      .length;
 
   // Data laporan dan progres - DUMMY DATA
   final int _laporanSelesai = 12;
@@ -38,68 +45,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   final int _progresKurang = 7;
 
   // Data permasalahan - DUMMY DATA
-  final int _permasalahanTotal = 6;
-
-  // Data SIA - DUMMY DATA
-  final List<Map<String, dynamic>> _siaList = [
-    {
-      'id': 'S001',
-      'nama': 'Ahmad Rizki',
-      'kelas': 'XII TKJ 1',
-      'industri': 'PT. Teknologi Indonesia',
-      'jenis': 'Izin',
-      'tanggal': '15-20 Jan 2024',
-      'alasan': 'Keperluan keluarga penting',
-      'status': 'Disetujui',
-      'catatan': 'Izin disetujui',
-      'statusColor': const Color(0xFF4CAF50),
-      'dokumen': null,
-      'tanggal_diajukan': '14 Jan 2024',
-    },
-    {
-      'id': 'S002',
-      'nama': 'Siti Nurhaliza',
-      'kelas': 'XII RPL 2',
-      'industri': 'CV. Digital Solusi',
-      'jenis': 'Izin',
-      'tanggal': '18-19 Jan 2024',
-      'alasan': 'Mengikuti seminar teknologi',
-      'status': 'Menunggu',
-      'catatan': 'Menunggu persetujuan',
-      'statusColor': const Color(0xFFFF9800),
-      'dokumen': 'surat_seminar.pdf',
-      'tanggal_diajukan': '17 Jan 2024',
-    },
-    {
-      'id': 'S003',
-      'nama': 'Budi Santoso',
-      'kelas': 'XII MM 1',
-      'industri': 'PT. Media Kreatif',
-      'jenis': 'Sakit',
-      'tanggal': '22-24 Jan 2024',
-      'alasan': 'Demam dan flu',
-      'status': 'Disetujui',
-      'catatan': 'Perlu istirahat',
-      'statusColor': const Color(0xFF4CAF50),
-      'dokumen': 'surat_dokter.pdf',
-      'tanggal_diajukan': '21 Jan 2024',
-    },
-    {
-      'id': 'S004',
-      'nama': 'Dewi Lestari',
-      'kelas': 'XII TKJ 2',
-      'industri': 'PT. Network Indonesia',
-      'jenis': 'Alpha',
-      'tanggal': '17 Jan 2024',
-      'alasan': 'Tidak ada keterangan',
-      'status': 'Ditolak',
-      'catatan': 'Harap konfirmasi',
-      'statusColor': const Color(0xFFF44336),
-      'dokumen': null,
-      'tanggal_diajukan': '16 Jan 2024',
-    },
-  ];
-// Data permasalahan - DUMMY DATA DIUPDATE
   final List<Map<String, dynamic>> _permasalahanList = [
     {
       'id': 'M001',
@@ -151,9 +96,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     },
   ];
 
+  int get _permasalahanTotal => _permasalahanList.length;
+
   // Warna tema
   static const Color _primaryRed = Color(0xFF6B1B1B);
-  static const Color _bgSoft = const Color(0xFF6B1B1B);
+  static const Color _bgSoft = Color(0xFF6B1B1B);
   static const Color _secondaryColor = Colors.white;
   static const Color _borderOrange = Color(0xFFFFB74D);
   static const Color _orange = Color(0xFFFF9800);
@@ -229,10 +176,221 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     } catch (e) {
       print('Error loading profile: $e');
     } finally {
+      // Setelah load profile, fetch data perizinan
+      await _fetchPerizinanData();
       setState(() {
         _isCheckingToken = false;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('access_token');
+  }
+
+  Future<String?> _fetchKelas(int kelasId) async {
+    try {
+      if (_kelasCache.containsKey(kelasId)) return _kelasCache[kelasId];
+      
+      final token = await _getToken();
+      if (token == null) return null;
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/kelas/$kelasId'),
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final kelasNama = data['data']['nama'] ?? 'Tidak Diketahui';
+          _kelasCache[kelasId] = kelasNama;
+          return kelasNama;
+        }
+      }
+    } catch (e) {
+      print('Error fetching kelas: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _fetchSiswaDetail(int siswaId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return null;
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/siswa/$siswaId'),
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          final siswaData = data['data'] as Map<String, dynamic>;
+          final kelasId = siswaData['kelas_id'];
+          if (kelasId != null) {
+            final kelasNama = await _fetchKelas(kelasId);
+            siswaData['kelas'] = kelasNama ?? 'Tidak Diketahui';
+          }
+          siswaData['nama_lengkap'] = siswaData['nama_lengkap'] ?? 
+                                     siswaData['username'] ?? 
+                                     'Siswa $siswaId';
+          return siswaData;
+        }
+      }
+    } catch (e) {
+      print('Error fetching siswa detail: $e');
+    }
+    return null;
+  }
+
+  Future<void> _fetchPerizinanData() async {
+    try {
+      final token = await _getToken();
+      if (token == null) return;
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/izin/wali-kelas'),
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token'
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final List<dynamic> processedData = [];
+        
+        if (data is List && data.isNotEmpty) {
+          for (var izin in data) {
+            if (izin['siswa_id'] != null) {
+              final siswaDetail = await _fetchSiswaDetail(izin['siswa_id']);
+              if (siswaDetail != null) {
+                izin['siswa_data'] = siswaDetail;
+                izin['siswa_nama'] = siswaDetail['nama_lengkap'];
+                izin['kelas'] = siswaDetail['kelas'] ?? '-';
+              }
+            }
+            // Ambil 4 data terbaru untuk dashboard
+            processedData.add(izin);
+            if (processedData.length >= 4) break; // Batasi 4 item untuk dashboard
+          }
+        }
+        
+        setState(() {
+          _perizinanData = processedData;
+        });
+      }
+    } catch (e) {
+      print('Error fetching perizinan data: $e');
+      // Fallback ke dummy data jika API error
+      _setDummyData();
+    }
+  }
+
+  void _setDummyData() {
+    setState(() {
+      _perizinanData = [
+        {
+          'id': 1,
+          'siswa_id': 78,
+          'siswa_nama': 'Ahmad Rizki',
+          'kelas': 'XII TKJ 1',
+          'industri': 'PT. Teknologi Indonesia',
+          'jenis': 'Sakit',
+          'tanggal': '15-20 Jan 2024',
+          'keterangan': 'Demam tinggi, ada surat dokter',
+          'status': 'approved',
+          'bukti_foto_urls': [],
+        },
+        {
+          'id': 2,
+          'siswa_id': 190,
+          'siswa_nama': 'Siti Nurhaliza',
+          'kelas': 'XII RPL 2',
+          'industri': 'CV. Digital Solusi',
+          'jenis': 'Izin',
+          'tanggal': '18-19 Jan 2024',
+          'keterangan': 'Mengikuti seminar teknologi',
+          'status': 'pending',
+          'bukti_foto_urls': [],
+        },
+        {
+          'id': 3,
+          'siswa_id': 166,
+          'siswa_nama': 'Budi Santoso',
+          'kelas': 'XII MM 1',
+          'industri': 'PT. Media Kreatif',
+          'jenis': 'Sakit',
+          'tanggal': '22-24 Jan 2024',
+          'keterangan': 'Pusing dan mual',
+          'status': 'approved',
+          'bukti_foto_urls': [],
+        },
+        {
+          'id': 4,
+          'siswa_id': 200,
+          'siswa_nama': 'Dewi Lestari',
+          'kelas': 'XII TKJ 2',
+          'industri': 'PT. Network Indonesia',
+          'jenis': 'Izin',
+          'tanggal': '17 Jan 2024',
+          'keterangan': 'Keperluan keluarga',
+          'status': 'rejected',
+          'rejection_reason': 'Bukti tidak jelas',
+          'bukti_foto_urls': [],
+        },
+      ];
+    });
+  }
+
+  String _translateStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending': return 'Menunggu';
+      case 'approved': return 'Disetujui';
+      case 'rejected': return 'Ditolak';
+      default: return status;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved': return _green;
+      case 'rejected': return _red;
+      case 'pending': return _orange;
+      default: return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved': return Icons.check_circle;
+      case 'rejected': return Icons.cancel;
+      case 'pending': return Icons.access_time;
+      default: return Icons.help_outline;
+    }
+  }
+
+  IconData _getSIAIcon(String jenis) {
+    switch (jenis.toLowerCase()) {
+      case 'sakit':
+        return Icons.healing;
+      case 'izin':
+        return Icons.person_pin_circle;
+      default:
+        return Icons.description;
     }
   }
 
@@ -274,8 +432,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   Widget _content() {
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.delayed(const Duration(seconds: 1));
-        setState(() {});
+        await _fetchPerizinanData();
       },
       backgroundColor: Colors.white,
       color: _primaryRed,
@@ -303,7 +460,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha:0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -340,11 +497,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B1B1B).withValues(alpha: 0.1),
+                        color: const Color(0xFF6B1B1B).withValues(alpha:0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color:
-                                const Color(0xFF6B1B1B).withValues(alpha: 0.3),
+                            color: const Color(0xFF6B1B1B).withValues(alpha:0.3),
                             width: 1.5),
                       ),
                       child: const Icon(
@@ -383,7 +539,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withValues(alpha:0.08),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -424,7 +580,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const KelolaPerizinanTabScreen(),
+            builder: (context) =>
+                KelolaPerizinanTabScreen(scrollController: ScrollController()),
           ),
         );
       },
@@ -434,10 +591,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           color: _primaryRed,
           borderRadius: BorderRadius.circular(18),
           border:
-              Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
+              Border.all(color: _primaryRed.withValues(alpha:0.8), width: 1),
           boxShadow: [
             BoxShadow(
-              color: _primaryRed.withValues(alpha: 0.3),
+              color: _primaryRed.withValues(alpha:0.3),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -448,7 +605,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withValues(alpha:0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.healing, color: Colors.white, size: 28),
@@ -464,7 +621,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withValues(alpha:0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -521,17 +678,17 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-              color: _borderOrange.withValues(alpha: 0.5), width: 1.5),
+              color: _borderOrange.withValues(alpha:0.5), width: 1.5),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(8),
                 border:
-                    Border.all(color: color.withValues(alpha: 0.2), width: 1),
+                    Border.all(color: color.withValues(alpha:0.2), width: 1),
               ),
               child: Icon(icon, color: color, size: 20),
             ),
@@ -563,7 +720,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withValues(alpha:0.1),
             blurRadius: 20,
             offset: const Offset(0, -10),
           ),
@@ -574,7 +731,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionTitleWithSeeAll('Perizinan Terkini', _siaList.length),
+            _sectionTitleWithSeeAll('Perizinan Terkini', _perizinanData.length),
             const SizedBox(height: 16),
             _siaListHorizontal(),
             const SizedBox(height: 40),
@@ -604,10 +761,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: _primaryRed.withValues(alpha: 0.1),
+              color: _primaryRed.withValues(alpha:0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                  color: _primaryRed.withValues(alpha: 0.2), width: 1),
+                  color: _primaryRed.withValues(alpha:0.2), width: 1),
             ),
             child: Text(
               '$count total',
@@ -624,37 +781,71 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   }
 
   Widget _siaListHorizontal() {
+    if (_perizinanData.isEmpty) {
+      return Container(
+        height: 180,
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.healing,
+                size: 48,
+                color: Colors.grey[300],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Tidak ada data perizinan',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
-      height: 240, // DIPERKECIL dari 280
+      height: 240,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: _siaList.length,
+        itemCount: _perizinanData.length,
         itemBuilder: (context, index) {
-          final siaData = _siaList[index];
+          final perizinan = _perizinanData[index];
           return Container(
-            width: 300, // Lebar tetap
+            width: 300,
             margin: EdgeInsets.only(
-              right: index < _siaList.length - 1 ? 16 : 0,
+              right: index < _perizinanData.length - 1 ? 16 : 0,
             ),
-            child: _siaCardHorizontal(siaData),
+            child: _siaCardHorizontal(perizinan),
           );
         },
       ),
     );
   }
 
-  Widget _siaCardHorizontal(Map<String, dynamic> siaData) {
-    final siswaName = siaData['nama'];
-    final jenis = siaData['jenis'];
-    final tanggal = siaData['tanggal'];
-    final status = siaData['status'];
-    final statusColor = siaData['statusColor'] as Color;
-    final kelas = siaData['kelas'];
-    final industri = siaData['industri'];
+  Widget _siaCardHorizontal(dynamic perizinanData) {
+    final siswaName = perizinanData['siswa_nama'] ?? 
+                     perizinanData['siswa_data']?['nama_lengkap'] ?? 
+                     'Siswa ${perizinanData['siswa_id']}';
+    final jenis = perizinanData['jenis']?.toString() ?? '';
+    final tanggal = perizinanData['tanggal']?.toString().split(' ')[0] ?? '';
+    final status = _translateStatus(perizinanData['status']?.toString() ?? '');
+    final statusColor = _getStatusColor(perizinanData['status']?.toString() ?? '');
+    final kelas = perizinanData['kelas'] ?? 
+                 perizinanData['siswa_data']?['kelas'] ?? '-';
+    final keterangan = perizinanData['keterangan']?.toString() ?? '';
 
     return GestureDetector(
       onTap: () {
-        _showSIADetail(siaData);
+        _showSIADetail(perizinanData);
       },
       child: Container(
         decoration: BoxDecoration(
@@ -663,7 +854,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           border: Border.all(color: Colors.grey[200]!, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withValues(alpha:0.08),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -681,10 +872,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: _primaryRed.withValues(alpha: 0.1),
+                      color: _primaryRed.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: _primaryRed.withValues(alpha: 0.3),
+                          color: _primaryRed.withValues(alpha:0.3),
                           width: 1.5),
                     ),
                     child: Icon(
@@ -709,7 +900,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        if (kelas.isNotEmpty)
+                        if (kelas.isNotEmpty && kelas != '-')
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 3),
@@ -733,24 +924,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.apartment, size: 14, color: Colors.grey[600]),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      industri,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
                   Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
                   const SizedBox(width: 6),
                   Text(
@@ -762,21 +935,34 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              if (keterangan.isNotEmpty)
+                Text(
+                  keterangan.length > 50 
+                    ? '${keterangan.substring(0, 50)}...' 
+                    : keterangan,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               const SizedBox(height: 12),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
+                  color: statusColor.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: statusColor.withValues(alpha: 0.3), width: 1),
+                      color: statusColor.withValues(alpha:0.3), width: 1),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      _getStatusIcon(status),
+                      _getStatusIcon(perizinanData['status']?.toString() ?? ''),
                       color: statusColor,
                       size: 16,
                     ),
@@ -796,7 +982,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _showSIADetail(siaData),
+                  onPressed: () => _showSIADetail(perizinanData),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _primaryRed,
                     side: const BorderSide(color: _primaryRed),
@@ -823,40 +1009,16 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
-  IconData _getSIAIcon(String jenis) {
-    switch (jenis.toLowerCase()) {
-      case 'sakit':
-        return Icons.healing;
-      case 'izin':
-        return Icons.person_pin_circle;
-      case 'alpha':
-        return Icons.warning;
-      default:
-        return Icons.description;
-    }
-  }
-
-  IconData _getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case 'disetujui':
-        return Icons.check_circle;
-      case 'ditolak':
-        return Icons.cancel;
-      default:
-        return Icons.access_time;
-    }
-  }
-
   Widget _permasalahanListHorizontal() {
     return SizedBox(
-      height: 255, // DIPERKECIL dari 240 (FIX OVERFLOW)
+      height: 255,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: _permasalahanList.length,
         itemBuilder: (context, index) {
           final masalahData = _permasalahanList[index];
           return Container(
-            width: 280, // Lebar tetap
+            width: 280,
             margin: EdgeInsets.only(
               right: index < _permasalahanList.length - 1 ? 16 : 0,
             ),
@@ -874,7 +1036,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     final statusColor = masalahData['statusColor'] as Color;
     final kelas = masalahData['kelas'];
     final industri = masalahData['industri'];
-    // HAPUS: final tingkat = masalahData['tingkat'];
 
     return GestureDetector(
       onTap: () {
@@ -887,7 +1048,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           border: Border.all(color: Colors.grey[200]!, width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withValues(alpha:0.08),
               blurRadius: 12,
               offset: const Offset(0, 6),
             ),
@@ -905,10 +1066,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: _darkRed.withValues(alpha: 0.1),
+                      color: _darkRed.withValues(alpha:0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: _darkRed.withValues(alpha: 0.3), width: 1.5),
+                          color: _darkRed.withValues(alpha:0.3), width: 1.5),
                     ),
                     child: const Icon(
                       Icons.warning,
@@ -972,36 +1133,14 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 ],
               ),
               const SizedBox(height: 8),
-              // HAPUS bagian yang menampilkan tingkat
-              // Container(
-              //   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              //   decoration: BoxDecoration(
-              //     color: _getTingkatColor(tingkat).withValues(alpha: 0.1),
-              //     borderRadius: BorderRadius.circular(8),
-              //     border: Border.all(
-              //         color: _getTingkatColor(tingkat).withValues(alpha: 0.3),
-              //         width: 1),
-              //   ),
-              //   child: Text(
-              //     '$tingkat • $jenis',
-              //     style: TextStyle(
-              //       color: _getTingkatColor(tingkat),
-              //       fontSize: 12,
-              //       fontWeight: FontWeight.w600,
-              //     ),
-              //     maxLines: 1,
-              //     overflow: TextOverflow.ellipsis,
-              //   ),
-              // ),
-              // TAMBAHKAN ini sebagai pengganti: Container untuk jenis permasalahan saja
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _darkRed.withValues(alpha: 0.1),
+                  color: _darkRed.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: _darkRed.withValues(alpha: 0.3), width: 1),
+                      color: _darkRed.withValues(alpha:0.3), width: 1),
                 ),
                 child: Text(
                   jenis,
@@ -1019,10 +1158,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
+                  color: statusColor.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                      color: statusColor.withValues(alpha: 0.3), width: 1),
+                      color: statusColor.withValues(alpha:0.3), width: 1),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1077,7 +1216,20 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
-  void _showSIADetail(Map<String, dynamic> siaData) {
+  void _showSIADetail(dynamic data) {
+    final status = _translateStatus(data['status']?.toString() ?? '');
+    final jenis = data['jenis']?.toString() ?? '';
+    final tanggal = data['tanggal']?.toString() ?? '';
+    final keterangan = data['keterangan']?.toString() ?? '';
+    final siswaNama = data['siswa_nama'] ?? 
+                     data['siswa_data']?['nama_lengkap'] ?? 
+                     'Siswa ${data['siswa_id']}';
+    final kelas = data['kelas'] ?? 
+                 data['siswa_data']?['kelas'] ?? '-';
+    final fotoUrls = (data['bukti_foto_urls'] as List<dynamic>?)?.cast<String>() ?? [];
+    final statusColor = _getStatusColor(data['status']?.toString() ?? '');
+    final rejectionReason = data['rejection_reason'];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1087,22 +1239,33 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           topRight: Radius.circular(24),
         ),
       ),
-      builder: (context) => _siaDetailBottomSheet(siaData),
+      builder: (context) => _siaDetailBottomSheet(
+        data,
+        siswaNama,
+        jenis,
+        tanggal,
+        keterangan,
+        kelas,
+        fotoUrls,
+        status,
+        statusColor,
+        rejectionReason,
+      ),
     );
   }
 
-  Widget _siaDetailBottomSheet(Map<String, dynamic> siaData) {
-    final siswaName = siaData['nama'];
-    final jenis = siaData['jenis'];
-    final tanggal = siaData['tanggal'];
-    final status = siaData['status'];
-    final kelas = siaData['kelas'] ?? '';
-    final industri = siaData['industri'] ?? '';
-    final alasan = siaData['alasan'] ?? 'Tidak ada alasan';
-    final catatan = siaData['catatan'] ?? 'Tidak ada catatan';
-    final dokumen = siaData['dokumen'];
-    final tanggalDiajukan = siaData['tanggal_diajukan'] ?? '-';
-
+  Widget _siaDetailBottomSheet(
+    dynamic data,
+    String siswaName,
+    String jenis,
+    String tanggal,
+    String keterangan,
+    String kelas,
+    List<String> fotoUrls,
+    String status,
+    Color statusColor,
+    String? rejectionReason,
+  ) {
     return Container(
       padding: const EdgeInsets.all(24),
       height: MediaQuery.of(context).size.height * 0.85,
@@ -1140,10 +1303,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: _primaryRed.withValues(alpha: 0.05),
+                      color: _primaryRed.withValues(alpha:0.05),
                       borderRadius: BorderRadius.circular(16),
                       border:
-                          Border.all(color: _primaryRed.withValues(alpha: 0.1)),
+                          Border.all(color: _primaryRed.withValues(alpha:0.1)),
                     ),
                     child: Row(
                       children: [
@@ -1151,10 +1314,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: _primaryRed.withValues(alpha: 0.1),
+                            color: _primaryRed.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: _primaryRed.withValues(alpha: 0.3)),
+                                color: _primaryRed.withValues(alpha:0.3)),
                           ),
                           child: Icon(
                             _getSIAIcon(jenis),
@@ -1176,7 +1339,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '$kelas • $industri',
+                                kelas,
                                 style: const TextStyle(
                                   fontSize: 14,
                                   color: Colors.grey,
@@ -1189,17 +1352,15 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color:
-                                siaData['statusColor'].withValues(alpha: 0.1),
+                            color: statusColor.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                                color: siaData['statusColor']
-                                    .withValues(alpha: 0.3)),
+                                color: statusColor.withValues(alpha:0.3)),
                           ),
                           child: Text(
                             status,
                             style: TextStyle(
-                              color: siaData['statusColor'],
+                              color: statusColor,
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
@@ -1232,24 +1393,24 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       children: [
                         _detailInfoRow('Jenis Perizinan', jenis),
                         const SizedBox(height: 12),
-                        _detailInfoRow('Tanggal Diajukan', tanggalDiajukan),
-                        const SizedBox(height: 12),
-                        _detailInfoRow('Periode Perizinan', tanggal),
+                        _detailInfoRow('Tanggal Pengajuan', tanggal),
                         const SizedBox(height: 12),
                         _detailInfoRow('Status', status),
                         const SizedBox(height: 12),
-                        _detailInfoRow('Alasan', alasan),
-                        const SizedBox(height: 12),
-                        _detailInfoRow('Catatan', catatan),
-                        if (dokumen != null) ...[
+                        _detailInfoRow('Alasan', keterangan),
+                        if (rejectionReason != null) ...[
                           const SizedBox(height: 12),
-                          Row(
+                          _detailInfoRow('Alasan Penolakan', rejectionReason),
+                        ],
+                        if (fotoUrls.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          const Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const SizedBox(
+                              SizedBox(
                                 width: 120,
                                 child: Text(
-                                  'Dokumen:',
+                                  'Bukti Foto:',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -1257,44 +1418,54 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () {},
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          _primaryRed.withValues(alpha: 0.05),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: _primaryRed.withValues(
-                                              alpha: 0.2)),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.attach_file,
-                                            color: _primaryRed, size: 18),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            dokumen,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: _primaryRed,
-                                            ),
+                              SizedBox(width: 8),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ...fotoUrls.map((url) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: GestureDetector(
+                              onTap: () => _showImagePreview([url]),
+                              child: Container(
+                                width: double.infinity,
+                                height: 200,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    url,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Center(
+                                        child: CircularProgressIndicator(
+                                          value: loadingProgress.expectedTotalBytes != null
+                                              ? loadingProgress.cumulativeBytesLoaded /
+                                                  loadingProgress.expectedTotalBytes!
+                                              : null,
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey[200],
+                                        child: const Center(
+                                          child: Icon(
+                                            Icons.broken_image,
+                                            color: Colors.grey,
+                                            size: 48,
                                           ),
                                         ),
-                                        const Icon(Icons.download,
-                                            color: _primaryRed, size: 18),
-                                      ],
-                                    ),
+                                      );
+                                    },
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          )),
                         ],
                       ],
                     ),
@@ -1309,7 +1480,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _rejectSIA(siaData),
+                    onPressed: () => _rejectSIA(data),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _red,
                       side: const BorderSide(color: _red),
@@ -1331,7 +1502,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _approveSIA(siaData),
+                    onPressed: () => _approveSIA(data),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _green,
                       foregroundColor: Colors.white,
@@ -1380,6 +1551,55 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
+  void _showImagePreview(List<String> imageUrls) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.black87,
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 600, maxWidth: 500),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                color: Colors.black,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Bukti Foto', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                    IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context)),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: PageView.builder(
+                  itemCount: imageUrls.length,
+                  itemBuilder: (context, index) => InteractiveViewer(
+                    panEnabled: true, minScale: 0.5, maxScale: 3.0,
+                    child: Image.network(imageUrls[index], fit: BoxFit.contain, errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey[800],
+                      child: const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(Icons.broken_image, color: Colors.grey, size: 48),
+                        SizedBox(height: 12),
+                        Text('Gagal memuat gambar', style: TextStyle(color: Colors.grey)),
+                      ])),
+                    )),
+                  ),
+                ),
+              ),
+              if (imageUrls.length > 1) Container(
+                padding: const EdgeInsets.all(12),
+                color: Colors.black,
+                child: Text('Gambar ${imageUrls.length} - Geser untuk melihat lainnya', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white60, fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _detailInfoRow(String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1409,18 +1629,35 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
-  void _approveSIA(Map<String, dynamic> data) {
-    setState(() {
-      data['status'] = 'Disetujui';
-      data['statusColor'] = _green;
-      data['catatan'] =
-          'Disetujui oleh $_namaWaliKelas pada ${DateTime.now().toLocal().toString().split(' ')[0]}';
-    });
-    _showSnackBar('Pengajuan ${data['jenis']} disetujui');
-    Navigator.pop(context);
+  void _approveSIA(dynamic data) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return;
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/izin/${data['id']}/approve'),
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          data['status'] = 'approved';
+        });
+        _showSnackBar('Pengajuan ${data['jenis']} disetujui');
+        Navigator.pop(context);
+      } else {
+        _showSnackBar('Gagal menyetujui pengajuan', isError: true);
+      }
+    } catch (e) {
+      _showSnackBar('Terjadi kesalahan', isError: true);
+    }
   }
 
-  void _rejectSIA(Map<String, dynamic> data) {
+  void _rejectSIA(dynamic data) {
     final TextEditingController alasanController = TextEditingController();
 
     showDialog(
@@ -1447,7 +1684,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: _red.withValues(alpha: 0.1),
+                          color: _red.withValues(alpha:0.1),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Icon(
@@ -1471,7 +1708,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Siswa: ${data['nama']}',
+                              'Siswa: ${data['siswa_nama']}',
                               style: const TextStyle(
                                 fontSize: 13,
                                 color: Colors.grey,
@@ -1538,23 +1775,43 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             if (alasanController.text.trim().isEmpty) {
-                              _showSnackBar('Masukkan alasan penolakan',
-                                  isError: true);
+                              _showSnackBar('Masukkan alasan penolakan', isError: true);
                               return;
                             }
 
-                            setState(() {
-                              data['status'] = 'Ditolak';
-                              data['statusColor'] = _red;
-                              data['catatan'] =
-                                  'Ditolak: ${alasanController.text.trim()}';
-                            });
+                            try {
+                              final token = await _getToken();
+                              if (token == null) return;
 
-                            _showSnackBar('Pengajuan ditolak');
-                            Navigator.pop(context);
-                            Navigator.pop(context);
+                              final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+                              final response = await http.post(
+                                Uri.parse('$baseUrl/api/izin/${data['id']}/reject'),
+                                headers: {
+                                  'accept': 'application/json',
+                                  'Authorization': 'Bearer $token',
+                                  'Content-Type': 'application/json',
+                                },
+                                body: jsonEncode({
+                                  'rejection_reason': alasanController.text.trim()
+                                }),
+                              );
+
+                              if (response.statusCode == 200) {
+                                setState(() {
+                                  data['status'] = 'rejected';
+                                  data['rejection_reason'] = alasanController.text.trim();
+                                });
+                                _showSnackBar('Pengajuan ditolak');
+                                Navigator.pop(context);
+                                Navigator.pop(context);
+                              } else {
+                                _showSnackBar('Gagal menolak pengajuan', isError: true);
+                              }
+                            } catch (e) {
+                              _showSnackBar('Terjadi kesalahan', isError: true);
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _red,
@@ -1629,7 +1886,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     final industri = masalahData['industri'] ?? '';
     final tanggal = masalahData['tanggal'] ?? '-';
     final lokasi = masalahData['lokasi'] ?? 'Tempat PKL';
-    // HAPUS: final tingkat = masalahData['tingkat'] ?? 'Sedang';
     final statusColor = masalahData['statusColor'] as Color;
 
     return Container(
@@ -1669,10 +1925,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: _darkRed.withValues(alpha: 0.05),
+                      color: _darkRed.withValues(alpha:0.05),
                       borderRadius: BorderRadius.circular(16),
                       border:
-                          Border.all(color: _darkRed.withValues(alpha: 0.1)),
+                          Border.all(color: _darkRed.withValues(alpha:0.1)),
                     ),
                     child: Row(
                       children: [
@@ -1680,10 +1936,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            color: _darkRed.withValues(alpha: 0.1),
+                            color: _darkRed.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: _darkRed.withValues(alpha: 0.3)),
+                                color: _darkRed.withValues(alpha:0.3)),
                           ),
                           child: const Icon(
                             Icons.warning,
@@ -1718,10 +1974,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
+                            color: statusColor.withValues(alpha:0.1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                                color: statusColor.withValues(alpha: 0.3)),
+                                color: statusColor.withValues(alpha:0.3)),
                           ),
                           child: Text(
                             status,
@@ -1760,7 +2016,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                         _detailInfoRow('Jenis Permasalahan', jenis),
                         const SizedBox(height: 12),
                         _detailInfoRow('Tanggal Laporan', tanggal),
-                        // HAPUS baris ini: _detailInfoRow('Tingkat', tingkat),
                         const SizedBox(height: 12),
                         _detailInfoRow('Lokasi', lokasi),
                         const SizedBox(height: 12),
@@ -1829,59 +2084,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               ),
             ),
           ),
-          const SizedBox(height: 30),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    _updatePermasalahanStatus(masalahData, 'Ditindaklanjuti');
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _darkRed,
-                    side: const BorderSide(color: Color(0xFFB71C1C)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  icon: const Icon(Icons.update, size: 20),
-                  label: const Text(
-                    'TINDAK LANJUT',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    _markPermasalahanSolved(masalahData);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _green,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  icon: const Icon(Icons.check, size: 20),
-                  label: const Text(
-                    'SELESAI',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
         ],
       ),
     );
@@ -1914,7 +2116,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: _orange.withValues(alpha: 0.1),
+                          color: _orange.withValues(alpha:0.1),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Icon(
@@ -2082,7 +2284,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   border: Border.all(color: Colors.grey[200]!),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
+                      color: Colors.black.withValues(alpha:0.08),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -2149,7 +2351,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   border: Border.all(color: Colors.grey[200]!),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
+                      color: Colors.black.withValues(alpha:0.08),
                       blurRadius: 18,
                       offset: const Offset(0, 8),
                     ),
@@ -2244,7 +2446,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withValues(alpha:0.1),
                       blurRadius: 20,
                       offset: const Offset(0, -10),
                     ),

@@ -68,7 +68,7 @@ class AdminSetting extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Konfirmasi Logout',
+                            'Konfirmasi Keluar',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 20,

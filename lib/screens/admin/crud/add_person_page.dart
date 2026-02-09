@@ -1677,6 +1677,7 @@ class _SuccessPopupState extends State<SuccessPopup>
 
   @override
   Widget build(BuildContext context) {
+    // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: () async {
         _closePopup();
@@ -1847,6 +1848,7 @@ class _ErrorPopupState extends State<ErrorPopup>
 
   @override
   Widget build(BuildContext context) {
+    // ignore: deprecated_member_use
     return WillPopScope(
       onWillPop: () async {
         _closePopup();

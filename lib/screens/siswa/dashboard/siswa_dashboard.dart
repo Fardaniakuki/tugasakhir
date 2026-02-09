@@ -394,7 +394,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha:0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -595,7 +595,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha:0.05),
               blurRadius: 5,
               offset: const Offset(0, 2),
             ),
@@ -1405,7 +1405,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                             width: 120,
                             height: 24,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha:0.8),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -1414,7 +1414,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                             width: 180,
                             height: 14,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.6),
+                              color: Colors.white.withValues(alpha:0.6),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -1425,11 +1425,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha:0.8),
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha:0.1),
                             blurRadius: 6,
                             offset: const Offset(0, 3),
                           ),
@@ -1450,7 +1450,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha:0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1534,7 +1534,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                   width: 120,
                                   height: 24,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha:0.8),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                 ),
@@ -1543,7 +1543,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                   width: 180,
                                   height: 14,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.6),
+                                    color: Colors.white.withValues(alpha:0.6),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                 ),
@@ -1562,7 +1562,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                   'Selamat datang di dashboard PKL',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha:0.8),
                                   ),
                                 ),
                               ],
@@ -1573,11 +1573,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha:0.8),
                               borderRadius: BorderRadius.circular(22),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: Colors.black.withValues(alpha:0.1),
                                   blurRadius: 6,
                                   offset: const Offset(0, 3),
                                 ),
@@ -1594,7 +1594,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                                   borderRadius: BorderRadius.circular(22),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
+                                      color: Colors.black.withValues(alpha:0.1),
                                       blurRadius: 6,
                                       offset: const Offset(0, 3),
                                     ),
@@ -1652,7 +1652,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha:0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -2047,7 +2047,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2144,7 +2144,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         borderRadius: BorderRadius.circular(19),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha:0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -2238,7 +2238,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha:0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2254,7 +2254,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: _statusColor(status).withOpacity(0.1),
+              color: _statusColor(status).withValues(alpha:0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: _statusColor(status),
@@ -2407,7 +2407,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _statusColor(status).withOpacity(0.05),
+              color: _statusColor(status).withValues(alpha:0.05),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Column(
@@ -2483,7 +2483,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha:0.1),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
                 ),
@@ -2524,7 +2524,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha:0.1),
                   blurRadius: 6,
                   offset: const Offset(0, 3),
                 ),

@@ -20,7 +20,6 @@ class _PengaturanPageState extends State<PengaturanPage> {
   static const Color _textColor = Color(0xFF333333);
   static const Color _borderColor = Color(0xFFE0E0E0);
 
-  // Data guru yang sedang login
   Map<String, dynamic> _guruData = {
     'nama': 'PEMBIMBING',
     'kode_guru': '-',
@@ -31,7 +30,6 @@ class _PengaturanPageState extends State<PengaturanPage> {
   bool _isLoading = true;
   bool _isEditing = false;
   
-  // Controller untuk form edit
   final TextEditingController _namaController = TextEditingController();
   final TextEditingController _kodeGuruController = TextEditingController();
   final TextEditingController _nipController = TextEditingController();
@@ -48,17 +46,9 @@ class _PengaturanPageState extends State<PengaturanPage> {
   Future<void> _loadGuruData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      
       print('📥 Loading guru data for Pembimbing...');
       
-      // Debug: print semua keys untuk melihat data apa yang tersimpan
-      final allKeys = prefs.getKeys();
-      print('🔑 SEMUA DATA DI SHAREDPREFERENCES:');
-      for (final key in allKeys) {
-        print('   $key: ${prefs.get(key)}');
-      }
-      
-      // Ambil data dari berbagai kemungkinan key
+      // Ambil data dari SharedPreferences
       final String? userName = prefs.getString('user_name');
       final String? kodeGuru = prefs.getString('kode_guru');
       final String? userNip = prefs.getString('user_nip');
@@ -68,13 +58,11 @@ class _PengaturanPageState extends State<PengaturanPage> {
       final String? guruNip = prefs.getString('guru_nip');
       final String? guruTelp = prefs.getString('guru_no_telp');
       
-      // Prioritaskan data dari guru_* keys (lebih lengkap)
       final String nama = userName ?? guruNama ?? 'PEMBIMBING';
       final String kode = kodeGuru ?? guruKode ?? '-';
       final String nip = userNip ?? guruNip ?? '-';
       final String telp = userPhone ?? guruTelp ?? '-';
       
-      // Set controller untuk form edit
       _namaController.text = nama;
       _kodeGuruController.text = kode;
       _nipController.text = nip;
@@ -90,15 +78,8 @@ class _PengaturanPageState extends State<PengaturanPage> {
         _isLoading = false;
       });
       
-      print('\n✅ DATA GURU YANG DIPAKAI:');
-      print('   Nama: ${_guruData['nama']}');
-      print('   Kode: ${_guruData['kode_guru']}');
-      print('   NIP: ${_guruData['nip']}');
-      print('   Telp: ${_guruData['no_telp']}');
-      
     } catch (e) {
       print('❌ Error loading guru data: $e');
-      
       setState(() {
         _guruData = {
           'nama': 'PEMBIMBING',
@@ -110,158 +91,116 @@ class _PengaturanPageState extends State<PengaturanPage> {
       });
     }
   }
-Future<void> _updateGuruData() async {
-  if (!_formKey.currentState!.validate()) {
-    return;
-  }
 
-  try {
-    await dotenv.load(fileName: '.env');
-    
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
+  Future<void> _updateGuruData() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    print('🔍 DEBUG UPDATE GURU DATA:');
-    print('   Token exists: ${token != null}');
+    try {
+      await dotenv.load(fileName: '.env');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
 
-    if (token == null) {
-      _showErrorDialog('Token tidak ditemukan');
-      return;
-    }
+      if (token == null) {
+        _showErrorDialog('Token tidak ditemukan');
+        return;
+      }
 
-    // Tampilkan loading
-    if (context.mounted) {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(
-            color: _primaryColor,
+      // Tampilkan loading
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(color: _primaryColor),
           ),
-        ),
+        );
+      }
+
+      // Data yang akan dikirim - TANPA NIP
+      final Map<String, dynamic> requestData = {
+        'kode_guru': _kodeGuruController.text.trim(),
+        'nama': _namaController.text.trim(),
+        'no_telp': _telpController.text.trim(),
+      };
+
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final url = Uri.parse('$baseUrl/api/guru/me');
+
+      final response = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(requestData),
       );
-    }
 
-    // Data yang akan dikirim sesuai dengan dokumentasi API
-    final Map<String, dynamic> requestData = {
-      'kode_guru': _kodeGuruController.text.trim(),
-      'nama': _namaController.text.trim(),
-      'nip': _nipController.text.trim(),
-      'no_telp': _telpController.text.trim(),
-    };
+      // Tutup loading dialog
+      if (context.mounted) Navigator.pop(context);
 
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-    final url = Uri.parse('$baseUrl/api/guru/me');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final updatedData = data['data'] as Map<String, dynamic>;
+          
+          setState(() {
+            _guruData['nama'] = (updatedData['nama'] ?? _namaController.text.trim()).toString().toUpperCase();
+            _guruData['kode_guru'] = updatedData['kode_guru'] ?? _kodeGuruController.text.trim();
+            _guruData['nip'] = updatedData['nip'] ?? _nipController.text.trim(); // NIP tetap dari server
+            _guruData['no_telp'] = updatedData['no_telp'] ?? _telpController.text.trim();
+            _isEditing = false;
+          });
 
-    print('🔄 Updating guru data...');
-    print('   URL: $url');
-    print('   Request data: $requestData');
+          // Update SharedPreferences
+          await prefs.setString('user_name', _guruData['nama']);
+          await prefs.setString('kode_guru', _guruData['kode_guru']);
+          await prefs.setString('user_nip', _guruData['nip']);
+          await prefs.setString('user_phone', _guruData['no_telp']);
+          await prefs.setString('guru_nama', _guruData['nama']);
+          await prefs.setString('guru_kode_guru', _guruData['kode_guru']);
+          await prefs.setString('guru_nip', _guruData['nip']);
+          await prefs.setString('guru_no_telp', _guruData['no_telp']);
 
-    final response = await http.put(
-      url,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: jsonEncode(requestData),
-    );
-
-    // Tutup loading dialog
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
-
-    print('📤 Response status: ${response.statusCode}');
-    print('📤 Response body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      
-      if (data['success'] == true) {
-        // Update data lokal
-        final updatedData = data['data'] as Map<String, dynamic>;
-        
-        setState(() {
-          _guruData['nama'] = (updatedData['nama'] ?? _namaController.text.trim()).toString().toUpperCase();
-          _guruData['kode_guru'] = updatedData['kode_guru'] ?? _kodeGuruController.text.trim();
-          _guruData['nip'] = updatedData['nip'] ?? _nipController.text.trim();
-          _guruData['no_telp'] = updatedData['no_telp'] ?? _telpController.text.trim();
-          _isEditing = false;
-        });
-
-        // Update SharedPreferences
-        await prefs.setString('user_name', _guruData['nama']);
-        await prefs.setString('kode_guru', _guruData['kode_guru']);
-        await prefs.setString('user_nip', _guruData['nip']);
-        await prefs.setString('user_phone', _guruData['no_telp']);
-        await prefs.setString('guru_nama', _guruData['nama']);
-        await prefs.setString('guru_kode_guru', _guruData['kode_guru']);
-        await prefs.setString('guru_nip', _guruData['nip']);
-        await prefs.setString('guru_no_telp', _guruData['no_telp']);
-
-        _showSuccessDialog('Data berhasil diperbarui');
+          _showSuccessDialog('Data berhasil diperbarui');
+        } else {
+          final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
+          _showErrorDialog(errorMsg.toString());
+        }
       } else {
-        final errorMsg = data['message'] ?? data['error'] ?? 'Gagal memperbarui data';
-        _showErrorDialog(errorMsg.toString());
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMsg = errorData['message'] ?? errorData['error'] ?? 'Terjadi kesalahan: ${response.statusCode}';
+          _showErrorDialog(errorMsg.toString());
+        } catch (e) {
+          _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
+        }
       }
-    } else {
-      try {
-        final errorData = jsonDecode(response.body);
-        final errorMsg = errorData['message'] ?? 
-                        errorData['error'] ?? 
-                        'Terjadi kesalahan: ${response.statusCode}';
-        _showErrorDialog(errorMsg.toString());
-      } catch (e) {
-        _showErrorDialog('Terjadi kesalahan: ${response.statusCode}');
-      }
+    } catch (e) {
+      if (context.mounted) Navigator.pop(context);
+      _showErrorDialog('Terjadi kesalahan: $e');
     }
-  } catch (e) {
-    if (context.mounted) {
-      Navigator.pop(context);
-    }
-    _showErrorDialog('Terjadi kesalahan: $e');
   }
-}
+
   void _showSuccessDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Row(
           children: [
             Icon(Icons.check_circle, color: Colors.green),
             SizedBox(width: 8),
-            Text(
-              'Sukses',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: _textColor,
-              ),
-            ),
+            Text('Sukses', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _textColor)),
           ],
         ),
-        content: Text(
-          message,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
-        ),
+        content: Text(message, style: const TextStyle(fontSize: 14, color: Colors.grey)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: _primaryColor,
-            ),
-            child: const Text(
-              'OK',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+            style: TextButton.styleFrom(foregroundColor: _primaryColor),
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -273,40 +212,20 @@ Future<void> _updateGuruData() async {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Row(
           children: [
             Icon(Icons.error, color: Colors.red),
             SizedBox(width: 8),
-            Text(
-              'Error',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: _textColor,
-              ),
-            ),
+            Text('Error', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _textColor)),
           ],
         ),
-        content: Text(
-          message,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
-        ),
+        content: Text(message, style: const TextStyle(fontSize: 14, color: Colors.grey)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: _primaryColor,
-            ),
-            child: const Text(
-              'OK',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+            style: TextButton.styleFrom(foregroundColor: _primaryColor),
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -319,93 +238,55 @@ Future<void> _updateGuruData() async {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Edit Data Profil',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: _textColor,
-              decoration: TextDecoration.underline,
-            ),
-          ),
+          const Text('Edit Data Profil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _textColor, decoration: TextDecoration.underline)),
           const SizedBox(height: 16),
           
-          // Nama
+          // Nama (bisa diedit)
           TextFormField(
             controller: _namaController,
             decoration: InputDecoration(
               labelText: 'Nama',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _primaryColor, width: 2),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _borderColor)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _primaryColor, width: 2)),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Nama tidak boleh kosong';
-              }
-              return null;
-            },
+            validator: (value) => value == null || value.isEmpty ? 'Nama tidak boleh kosong' : null,
           ),
           const SizedBox(height: 12),
           
-          // Kode Guru
+          // Kode Guru (bisa diedit)
           TextFormField(
             controller: _kodeGuruController,
             decoration: InputDecoration(
               labelText: 'Kode Guru',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _primaryColor, width: 2),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _borderColor)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _primaryColor, width: 2)),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Kode guru tidak boleh kosong';
-              }
-              return null;
-            },
+            validator: (value) => value == null || value.isEmpty ? 'Kode guru tidak boleh kosong' : null,
           ),
           const SizedBox(height: 12),
           
-          // NIP
+          // NIP (TIDAK bisa diedit)
           TextFormField(
             controller: _nipController,
             decoration: InputDecoration(
               labelText: 'NIP',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _primaryColor, width: 2),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _borderColor)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.grey, width: 2)),
+              filled: true,
+              fillColor: Colors.grey[100],
             ),
+            enabled: false, // Nonaktifkan field NIP
+            readOnly: true, // Hanya baca saja
           ),
           const SizedBox(height: 12),
           
-          // No Telepon
+          // No Telepon (bisa diedit)
           TextFormField(
             controller: _telpController,
             decoration: InputDecoration(
               labelText: 'No. Telepon',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _borderColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: _primaryColor, width: 2),
-              ),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _borderColor)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _primaryColor, width: 2)),
             ),
             keyboardType: TextInputType.phone,
           ),
@@ -419,20 +300,16 @@ Future<void> _updateGuruData() async {
                   onPressed: () {
                     setState(() {
                       _isEditing = false;
+                      _namaController.text = _guruData['nama'];
+                      _kodeGuruController.text = _guruData['kode_guru'];
+                      _telpController.text = _guruData['no_telp'];
                     });
-                    // Reset ke data awal
-                    _namaController.text = _guruData['nama'];
-                    _kodeGuruController.text = _guruData['kode_guru'];
-                    _nipController.text = _guruData['nip'];
-                    _telpController.text = _guruData['no_telp'];
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.grey[200],
                     foregroundColor: _textColor,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text('Batal'),
                 ),
@@ -445,9 +322,7 @@ Future<void> _updateGuruData() async {
                     backgroundColor: _primaryColor,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   child: const Text('Simpan'),
                 ),
@@ -474,37 +349,17 @@ Future<void> _updateGuruData() async {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha:0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha:0.1), blurRadius: 4, offset: const Offset(0, 2))],
               ),
               child: Row(
                 children: [
                   const SizedBox(width: 8),
-                  const Text(
-                    'Profil Pembimbing',
-                    style: TextStyle(
-                      color: _primaryColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                  const Text('Profil Pembimbing', style: TextStyle(color: _primaryColor, fontSize: 20, fontWeight: FontWeight.w700)),
                   const Spacer(),
                   if (!_isLoading && !_isEditing)
                     IconButton(
-                      onPressed: () {
-                        setState(() {
-                          _isEditing = true;
-                        });
-                      },
-                      icon: const Icon(
-                        Icons.edit,
-                        color: _primaryColor,
-                      ),
+                      onPressed: () => setState(() => _isEditing = true),
+                      icon: const Icon(Icons.edit, color: _primaryColor),
                     ),
                 ],
               ),
@@ -521,60 +376,30 @@ Future<void> _updateGuruData() async {
                       child: Column(
                         children: [
                           Container(
-                            width: 100,
-                            height: 100,
+                            width: 100, height: 100,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: _primaryColor,
-                              border: Border.all(
-                                color: _borderColor,
-                                width: 1,
-                              ),
+                              border: Border.all(color: _borderColor, width: 1),
                             ),
-                            child: const Icon(
-                              Icons.work_rounded,
-                              size: 50,
-                              color: Colors.white,
-                            ),
+                            child: const Icon(Icons.work_rounded, size: 50, color: Colors.white),
                           ),
                           const SizedBox(height: 16),
-                          
-                          _isLoading
-                              ? _buildProfileSkeleton()
-                              : Column(
-                                  children: [
-                                    Text(
-                                      _guruData['nama']!,
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        color: _textColor,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    // Role badge
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: _primaryColor.withValues(alpha:0.1),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: _primaryColor.withValues(alpha:0.3),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'PEMBIMBING INDUSTRI',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: _primaryColor,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                          _isLoading ? _buildProfileSkeleton() : Column(
+                            children: [
+                              Text(_guruData['nama']!, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _textColor), textAlign: TextAlign.center),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: _primaryColor.withValues(alpha:0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: _primaryColor.withValues(alpha:0.3)),
                                 ),
+                                child: const Text('PEMBIMBING INDUSTRI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primaryColor)),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -587,17 +412,8 @@ Future<void> _updateGuruData() async {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _borderColor,
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withValues(alpha:0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        border: Border.all(color: _borderColor, width: 1),
+                        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 2))],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,18 +421,10 @@ Future<void> _updateGuruData() async {
                           if (_isEditing)
                             _buildEditForm()
                           else ...[
-                            const Text(
-                              'Data Profil',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: _textColor,
-                              ),
-                            ),
+                            const Text('Data Profil', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _textColor)),
                             const SizedBox(height: 16),
                             const Divider(color: _borderColor),
                             const SizedBox(height: 16),
-
                             _buildDetailItem('Kode Guru', _guruData['kode_guru']!),
                             const SizedBox(height: 12),
                             _buildDetailItem('NIP', _guruData['nip']!),
@@ -635,42 +443,23 @@ Future<void> _updateGuruData() async {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _borderColor,
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withValues(alpha:0.05),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        border: Border.all(color: _borderColor, width: 1),
+                        boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 2))],
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Menu',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: _textColor,
-                            ),
-                          ),
+                          const Text('Menu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _textColor)),
                           const SizedBox(height: 16),
                           const Divider(color: _borderColor),
                           const SizedBox(height: 16),
-
                           _buildMenuTile(
                             icon: Icons.help_outline,
                             title: 'Bantuan & Panduan',
                             subtitle: 'Cara menggunakan aplikasi',
                             onTap: () => _showUnderDevelopment('Bantuan & Panduan', context),
                           ),
-
                           const SizedBox(height: 12),
-
                           _buildMenuTile(
                             icon: Icons.info_outline,
                             title: 'Tentang Aplikasi',
@@ -681,7 +470,7 @@ Future<void> _updateGuruData() async {
                       ),
                     ),
 
-                    // Logout Button dengan jarak
+                    // Logout Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -702,19 +491,11 @@ Future<void> _updateGuruData() async {
                           children: [
                             Icon(Icons.logout, size: 20),
                             SizedBox(width: 8),
-                            Text(
-                              'Keluar dari Aplikasi',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                            Text('Keluar dari Aplikasi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
                     ),
-
-                    // TAMBAH JARAK KE BAWAH
                     const SizedBox(height: 80),
                   ],
                 ),
@@ -732,38 +513,14 @@ Future<void> _updateGuruData() async {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _textColor,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-          ),
+          Expanded(flex: 2, child: Text('$label:', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textColor))),
+          Expanded(flex: 3, child: Text(value, style: const TextStyle(fontSize: 14, color: Colors.grey))),
         ],
       ),
     );
   }
 
-  Widget _buildMenuTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildMenuTile({required IconData icon, required String title, required String subtitle, required VoidCallback onTap}) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -774,47 +531,22 @@ Future<void> _updateGuruData() async {
           child: Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha:0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  icon,
-                  color: _primaryColor,
-                  size: 20,
-                ),
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: _primaryColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: _primaryColor, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: _textColor,
-                      ),
-                    ),
+                    Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _textColor)),
                     const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
-                      ),
-                    ),
+                    Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.grey)),
                   ],
                 ),
               ),
-              const Icon(
-                Icons.chevron_right,
-                color: Colors.grey,
-                size: 20,
-              ),
+              const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
             ],
           ),
         ),
@@ -825,23 +557,9 @@ Future<void> _updateGuruData() async {
   Widget _buildProfileSkeleton() {
     return Column(
       children: [
-        Container(
-          width: 120,
-          height: 24,
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
+        Container(width: 120, height: 24, decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4))),
         const SizedBox(height: 8),
-        Container(
-          width: 80,
-          height: 18,
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ),
+        Container(width: 80, height: 18, decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4))),
       ],
     );
   }
@@ -851,40 +569,20 @@ Future<void> _updateGuruData() async {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Row(
           children: [
             Icon(Icons.construction, color: _primaryColor),
             SizedBox(width: 8),
-            Text(
-              'Fitur dalam Pengembangan',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: _textColor,
-              ),
-            ),
+            Text('Fitur dalam Pengembangan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _textColor)),
           ],
         ),
-        content: Text(
-          '$featureName sedang dalam tahap pengembangan dan akan segera hadir.',
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
-        ),
+        content: Text('$featureName sedang dalam tahap pengembangan dan akan segera hadir.', style: const TextStyle(fontSize: 14, color: Colors.grey)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: _primaryColor,
-            ),
-            child: const Text(
-              'Tutup',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+            style: TextButton.styleFrom(foregroundColor: _primaryColor),
+            child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -896,63 +594,30 @@ Future<void> _updateGuruData() async {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Row(
           children: [
             Icon(Icons.info, color: _primaryColor),
             SizedBox(width: 8),
-            Text(
-              'Tentang Aplikasi',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: _textColor,
-              ),
-            ),
+            Text('Tentang Aplikasi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _textColor)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'SISFO PKL - PEMBIMBING',
-              style: TextStyle(
-                fontSize: 16,
-                color: _primaryColor,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            const Text('SISFO PKL - PEMBIMBING', style: TextStyle(fontSize: 16, color: _primaryColor, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
-            const Text(
-              'Versi: 1.0.0\nBuild: 2024.01',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
+            const Text('Versi: 1.0.0\nBuild: 2024.01', style: TextStyle(fontSize: 14, color: Colors.grey)),
             const SizedBox(height: 12),
-            Text(
-              'Aplikasi untuk monitoring dan bimbingan siswa PKL bagi Pembimbing',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-              ),
-            ),
+            Text('Aplikasi untuk monitoring dan bimbingan siswa PKL bagi Pembimbing', style: TextStyle(fontSize: 14, color: Colors.grey[700])),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              foregroundColor: _primaryColor,
-            ),
-            child: const Text(
-              'Tutup',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+            style: TextButton.styleFrom(foregroundColor: _primaryColor),
+            child: const Text('Tutup', style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -965,62 +630,21 @@ Future<void> _updateGuruData() async {
       barrierColor: Colors.black54,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        title: const Text(
-          'Konfirmasi Logout',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: _textColor,
-          ),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Konfirmasi Logout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: _textColor)),
         content: const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.exit_to_app,
-              size: 48,
-              color: _accentColor,
-            ),
+            Icon(Icons.exit_to_app, size: 48, color: _accentColor),
             SizedBox(height: 16),
-            Text(
-              'Yakin ingin keluar dari aplikasi?',
-              style: TextStyle(
-                fontSize: 16,
-                color: _textColor,
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            Text('Yakin ingin keluar dari aplikasi?', style: TextStyle(fontSize: 16, color: _textColor, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
             SizedBox(height: 8),
-            Text(
-              'Anda perlu login kembali untuk masuk',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            Text('Anda perlu login kembali untuk masuk', style: TextStyle(fontSize: 14, color: Colors.grey), textAlign: TextAlign.center),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            style: TextButton.styleFrom(
-              foregroundColor: _textColor,
-            ),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _accentColor,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Keluar'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), style: TextButton.styleFrom(foregroundColor: _textColor), child: const Text('Batal')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: _accentColor, foregroundColor: Colors.white), child: const Text('Keluar')),
         ],
       ),
     );
@@ -1031,21 +655,15 @@ Future<void> _updateGuruData() async {
         barrierDismissible: false,
         builder: (context) => const Dialog(
           backgroundColor: Colors.transparent,
-          child: Center(
-            child: CircularProgressIndicator(
-              color: _primaryColor,
-            ),
-          ),
+          child: Center(child: CircularProgressIndicator(color: _primaryColor)),
         ),
       );
 
       await Future.delayed(const Duration(milliseconds: 500));
-
       await _processLogout();
 
       if (context.mounted) {
         Navigator.pop(context);
-
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -1057,27 +675,17 @@ Future<void> _updateGuruData() async {
 
   Future<void> _processLogout() async {
     print('🔄 Processing logout for Pembimbing...');
-
     final prefs = await SharedPreferences.getInstance();
     final currentUsername = prefs.getString('user_name');
-
     print('👤 Current username: $currentUsername');
 
-    // Hapus semua data login
-    print('🗑️ Removing all login data...');
+    // Hapus semua data login kecuali notifications
     final allKeys = prefs.getKeys();
     for (final key in allKeys) {
-      // Hapus semua kecuali notifications
       if (!key.startsWith('notifications_')) {
         await prefs.remove(key);
-        print('   Removed: $key');
       }
     }
-
     print('✅ Logout completed successfully');
-    print('   - User: ${currentUsername ?? 'unknown_user'}');
-    print('   - Role: Pembimbing');
-    print('   - All login data: REMOVED');
-    print('   - Notifications: PRESERVED');
   }
 }
