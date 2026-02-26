@@ -23,51 +23,35 @@ class RekapTheme {
 }
 
 class SiswaRekap extends StatefulWidget {
-  const SiswaRekap({super.key, required void Function() onQuickActionPressed, required Future<void> Function() onAjukanIjin});
+  const SiswaRekap(
+      {super.key,
+      required void Function() onQuickActionPressed,
+      required Future<void> Function() onAjukanIjin});
   @override
   State<SiswaRekap> createState() => _SiswaRekapState();
 }
 
-class _SiswaRekapState extends State<SiswaRekap> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-  late TabController _tabController;
-  @override bool get wantKeepAlive => true;
-  @override void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-  @override void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-  @override Widget build(BuildContext context) {
+class _SiswaRekapState extends State<SiswaRekap>
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
     super.build(context);
     return Scaffold(
       backgroundColor: RekapTheme.background,
       appBar: AppBar(
         backgroundColor: RekapTheme.surface,
         elevation: 0,
-        title: const Text('Perizinan', style: TextStyle(color: RekapTheme.textDark, fontWeight: FontWeight.bold, fontSize: 20)),
+        title: const Text('Perizinan',
+            style: TextStyle(
+                color: RekapTheme.textDark,
+                fontWeight: FontWeight.bold,
+                fontSize: 20)),
         centerTitle: false,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Container(
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: RekapTheme.border))),
-            child: TabBar(
-              controller: _tabController,
-              labelColor: RekapTheme.primaryRed,
-              unselectedLabelColor: RekapTheme.textGrey,
-              indicatorColor: RekapTheme.primaryRed,
-              indicatorWeight: 3,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              tabs: const [Tab(text: 'Riwayat Izin Dan Sakit'), Tab(text: 'Riwayat Pindah')],
-            ),
-          ),
-        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: const [SiswaSiaContent(), SiswaPengajuanPklContent()],
-      ),
+      body: const SiswaSiaContent(),
     );
   }
 }
@@ -82,7 +66,12 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
   List<dynamic> _siaData = [];
   bool _isLoading = true;
   String _filterStatus = 'Semua';
-  final List<String> _statusOptions = ['Semua', 'Disetujui', 'Menunggu', 'Ditolak'];
+  final List<String> _statusOptions = [
+    'Semua',
+    'Disetujui',
+    'Menunggu',
+    'Ditolak'
+  ];
 
   @override
   void initState() {
@@ -99,14 +88,22 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
     }
     try {
       await dotenv.load();
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
       String url = '$baseUrl/api/izin/me';
       if (status != null && status != 'Semua') {
-        final statusMap = {'Disetujui': 'approved', 'Menunggu': 'pending', 'Ditolak': 'rejected'};
+        final statusMap = {
+          'Disetujui': 'approved',
+          'Menunggu': 'pending',
+          'Ditolak': 'rejected'
+        };
         final apiStatus = statusMap[status];
         if (apiStatus != null) url = '$url?status=$apiStatus';
       }
-      final response = await http.get(Uri.parse(url), headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'});
+      final response = await http.get(Uri.parse(url), headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json'
+      });
       if (response.statusCode == 200) {
         final dynamic responseData = jsonDecode(response.body);
         List<dynamic> izinList = [];
@@ -129,10 +126,20 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
     }
   }
 
+  Future<void> _refreshData() async {
+    // Reset filter ke Semua saat refresh
+    setState(() {
+      _filterStatus = 'Semua';
+    });
+    await _loadIzinData();
+  }
+
   void _redirectToLogin() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder: (context) => const LoginScreen()), (Route<dynamic> route) => false);
+        Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (Route<dynamic> route) => false);
       }
     });
   }
@@ -142,7 +149,9 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(25), topRight: Radius.circular(25))),
       builder: (BuildContext context) {
         return DetailIzinScreen(izinData: izinData);
       },
@@ -156,16 +165,22 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
     if (statusLower.contains('disetujui') || statusLower.contains('approved')) {
       color = RekapTheme.green;
       statusDisplay = 'Disetujui';
-    } else if (statusLower.contains('ditolak') || statusLower.contains('rejected')) {
+    } else if (statusLower.contains('ditolak') ||
+        statusLower.contains('rejected')) {
       color = RekapTheme.red;
       statusDisplay = 'Ditolak';
-    // ignore: duplicate_ignore
-    // ignore: curly_braces_in_flow_control_structures
+      // ignore: duplicate_ignore
+      // ignore: curly_braces_in_flow_control_structures
     } else if (statusLower.contains('pending')) statusDisplay = 'Menunggu';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: color.withValues(alpha:0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha:0.2))),
-      child: Text(statusDisplay, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+      decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withValues(alpha: 0.2))),
+      child: Text(statusDisplay,
+          style: TextStyle(
+              color: color, fontSize: 11, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -173,7 +188,20 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
     if (dateString == null) return '-';
     try {
       final date = DateTime.parse(dateString);
-      final bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      final bulan = [
+        'Januari',
+        'Februari',
+        'Maret',
+        'April',
+        'Mei',
+        'Juni',
+        'Juli',
+        'Agustus',
+        'September',
+        'Oktober',
+        'November',
+        'Desember'
+      ];
       return '${date.day} ${bulan[date.month - 1]} ${date.year}';
     } catch (e) {
       return dateString;
@@ -184,7 +212,20 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
     if (dateTimeString == null) return '-';
     try {
       final dateTime = DateTime.parse(dateTimeString);
-      final bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      final bulan = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Agu',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des'
+      ];
       return '${dateTime.day} ${bulan[dateTime.month - 1]} ${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return dateTimeString;
@@ -198,44 +239,105 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
       final status = item['status']?.toString() ?? '';
       final statusLower = status.toLowerCase();
       if (_filterStatus == 'Disetujui') {
-        return statusLower.contains('disetujui') || statusLower.contains('approved');
-      } else if (_filterStatus == 'Menunggu') return statusLower.contains('menunggu') || statusLower.contains('pending');
-      else if (_filterStatus == 'Ditolak') return statusLower.contains('ditolak') || statusLower.contains('rejected');
+        return statusLower.contains('disetujui') ||
+            statusLower.contains('approved');
+      } else if (_filterStatus == 'Menunggu')
+        return statusLower.contains('menunggu') ||
+            statusLower.contains('pending');
+      else if (_filterStatus == 'Ditolak')
+        return statusLower.contains('ditolak') ||
+            statusLower.contains('rejected');
       return true;
     }).toList();
     final totalDisetujui = _siaData.where((e) {
       final status = e['status']?.toString().toLowerCase() ?? '';
       return status.contains('disetujui') || status.contains('approved');
     }).length;
-    return _isLoading ? _buildLoading() : SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(child: _buildSummaryCard('Total Izin', _siaData.length.toString(), Icons.folder_copy_outlined, RekapTheme.blue)),
-            const SizedBox(width: 12),
-            Expanded(child: _buildSummaryCard('Disetujui', totalDisetujui.toString(), Icons.check_circle_outlined, RekapTheme.green)),
-          ]),
-          const SizedBox(height: 24),
-          SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: _statusOptions.map((status) => _buildFilterChip(status)).toList())),
-          const SizedBox(height: 20),
-          if (filteredData.isEmpty) _buildEmptyState() else ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: filteredData.length,
-            separatorBuilder: (ctx, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) => _buildSiaCard(filteredData[index]),
-          ),
-          const SizedBox(height: 40),
-        ]));
+
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      color: RekapTheme.primaryRed,
+      backgroundColor: RekapTheme.surface,
+      strokeWidth: 2.5,
+      triggerMode: RefreshIndicatorTriggerMode.anywhere,
+      displacement: 40,
+      edgeOffset: 0,
+      child: _isLoading
+          ? _buildLoading()
+          : SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Expanded(
+                        child: _buildSummaryCard(
+                            'Total Izin',
+                            _siaData.length.toString(),
+                            Icons.folder_copy_outlined,
+                            RekapTheme.blue)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: _buildSummaryCard(
+                            'Disetujui',
+                            totalDisetujui.toString(),
+                            Icons.check_circle_outlined,
+                            RekapTheme.green)),
+                  ]),
+                  const SizedBox(height: 24),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _statusOptions
+                          .map((status) => _buildFilterChip(status))
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (filteredData.isEmpty)
+                    _buildEmptyState()
+                  else
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: filteredData.length,
+                      separatorBuilder: (ctx, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) =>
+                          _buildSiaCard(filteredData[index]),
+                    ),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+    );
   }
 
-  Widget _buildLoading() => const Center(child: CircularProgressIndicator(color: RekapTheme.primaryRed));
-  Widget _buildEmptyState() => Center(child: Padding(padding: const EdgeInsets.only(top: 40), child: Column(children: [
-        Icon(Icons.filter_list_off, size: 48, color: Colors.grey[300]),
-        const SizedBox(height: 16),
-        Text('Tidak ada data ditemukan', style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w500)),
-      ])));
+  Widget _buildLoading() => const Center(
+      child: CircularProgressIndicator(color: RekapTheme.primaryRed));
+
+  Widget _buildEmptyState() => Center(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 40),
+          child: Column(
+            children: [
+              Icon(Icons.filter_list_off, size: 48, color: Colors.grey[300]),
+              const SizedBox(height: 16),
+              Text(
+                'Tidak ada data ditemukan',
+                style: TextStyle(
+                    color: Colors.grey[500], fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Geser dari atas untuk refresh',
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
 
   Widget _buildFilterChip(String status) {
     final bool isSelected = _filterStatus == status;
@@ -253,34 +355,59 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
           decoration: BoxDecoration(
             color: isSelected ? RekapTheme.primaryRed : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: isSelected ? RekapTheme.primaryRed : RekapTheme.border),
-            boxShadow: isSelected ? [BoxShadow(color: RekapTheme.primaryRed.withValues(alpha:0.3), blurRadius: 8, offset: const Offset(0, 2))] : [],
+            border: Border.all(
+                color: isSelected ? RekapTheme.primaryRed : RekapTheme.border),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                        color: RekapTheme.primaryRed.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2))
+                  ]
+                : [],
           ),
-          child: Text(status, style: TextStyle(color: isSelected ? Colors.white : RekapTheme.textGrey, fontWeight: FontWeight.w600, fontSize: 13)),
+          child: Text(status,
+              style: TextStyle(
+                  color: isSelected ? Colors.white : RekapTheme.textGrey,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13)),
         ),
       ),
     );
   }
 
-  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
+  Widget _buildSummaryCard(
+      String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: RekapTheme.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4))
+        ],
       ),
       child: Row(children: [
         Container(
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: color.withValues(alpha:0.1), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: color, size: 20),
         ),
         const SizedBox(width: 12),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
-          Text(title, style: const TextStyle(fontSize: 12, color: RekapTheme.textGrey)),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: RekapTheme.textDark)),
+          Text(title,
+              style: const TextStyle(fontSize: 12, color: RekapTheme.textGrey)),
         ]),
       ]),
     );
@@ -294,9 +421,13 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
     final createdAt = data['created_at']?.toString();
     final decidedAt = data['decided_at']?.toString();
     final rejectionReason = data['rejection_reason']?.toString();
-    final buktiFotoUrls = data['bukti_foto_urls'] is List ? data['bukti_foto_urls'] as List<dynamic> : [];
-    final isPending = status.toLowerCase().contains('menunggu') || status.toLowerCase().contains('pending');
-    final isDitolak = status.toLowerCase().contains('ditolak') || status.toLowerCase().contains('rejected');
+    final buktiFotoUrls = data['bukti_foto_urls'] is List
+        ? data['bukti_foto_urls'] as List<dynamic>
+        : [];
+    final isPending = status.toLowerCase().contains('menunggu') ||
+        status.toLowerCase().contains('pending');
+    final isDitolak = status.toLowerCase().contains('ditolak') ||
+        status.toLowerCase().contains('rejected');
 
     return GestureDetector(
       onTap: () => _showDetailIzin(data),
@@ -306,13 +437,20 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: RekapTheme.border),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 8, offset: const Offset(0, 2))],
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2))
+          ],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: RekapTheme.background, borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                  color: RekapTheme.background,
+                  borderRadius: BorderRadius.circular(8)),
               child: Row(children: [
                 Icon(
                   jenis.toLowerCase().contains('sakit')
@@ -324,61 +462,99 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
                   color: RekapTheme.textDark,
                 ),
                 const SizedBox(width: 6),
-                Text(jenis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: RekapTheme.textDark)),
+                Text(jenis,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: RekapTheme.textDark)),
               ]),
             ),
             _buildStatusBadge(status),
           ]),
           const SizedBox(height: 12),
-          Text('Tanggal: ${_formatTanggal(tanggal)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: RekapTheme.textDark)),
+          Text('Tanggal: ${_formatTanggal(tanggal)}',
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: RekapTheme.textDark)),
           const SizedBox(height: 4),
-          Text('Alasan: $keterangan', style: const TextStyle(color: RekapTheme.textGrey, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+          Text('Alasan: $keterangan',
+              style: const TextStyle(color: RekapTheme.textGrey, fontSize: 13),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis),
           if (buktiFotoUrls.isNotEmpty) ...[
             const SizedBox(height: 8),
             Row(children: [
               const Icon(Icons.image, size: 12, color: RekapTheme.blue),
               const SizedBox(width: 4),
-              Text('${buktiFotoUrls.length} foto terlampir', style: const TextStyle(color: RekapTheme.blue, fontSize: 11, fontWeight: FontWeight.w500)),
+              Text('${buktiFotoUrls.length} foto terlampir',
+                  style: const TextStyle(
+                      color: RekapTheme.blue,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500)),
             ]),
           ],
           if (isDitolak && rejectionReason != null) ...[
-            const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: RekapTheme.border)),
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Divider(height: 1, color: RekapTheme.border)),
             Row(children: [
               const Icon(Icons.info_outline, size: 14, color: RekapTheme.red),
               const SizedBox(width: 6),
-              Expanded(child: Text('Alasan Ditolak: $rejectionReason', style: const TextStyle(color: RekapTheme.red, fontSize: 12, fontWeight: FontWeight.w500))),
+              Expanded(
+                  child: Text('Alasan Ditolak: $rejectionReason',
+                      style: const TextStyle(
+                          color: RekapTheme.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500))),
             ]),
           ],
           const SizedBox(height: 8),
-          Text('Diajukan: ${_formatDateTime(createdAt)}', style: const TextStyle(color: RekapTheme.textGrey, fontSize: 11)),
+          Text('Diajukan: ${_formatDateTime(createdAt)}',
+              style: const TextStyle(color: RekapTheme.textGrey, fontSize: 11)),
           if (decidedAt != null) ...[
             const SizedBox(height: 4),
-            Text('Diputuskan: ${_formatDateTime(decidedAt)}', style: const TextStyle(color: RekapTheme.textGrey, fontSize: 11)),
+            Text('Diputuskan: ${_formatDateTime(decidedAt)}',
+                style:
+                    const TextStyle(color: RekapTheme.textGrey, fontSize: 11)),
           ],
           const SizedBox(height: 4),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Klik untuk detail →', style: TextStyle(color: RekapTheme.primaryRed, fontSize: 10, fontStyle: FontStyle.italic)),
-            if (isPending) Row(children: [
-              _buildActionButton(Icons.edit_outlined, 'Edit', RekapTheme.blue, () => _showEditIzinBottomSheet(data)),
-              const SizedBox(width: 8),
-              _buildActionButton(Icons.delete_outline, 'Hapus', RekapTheme.red, () => _showDeleteBottomSheet(data['id'])),
-            ]),
+            const Text('Klik untuk detail →',
+                style: TextStyle(
+                    color: RekapTheme.primaryRed,
+                    fontSize: 10,
+                    fontStyle: FontStyle.italic)),
+            if (isPending)
+              Row(children: [
+                _buildActionButton(Icons.edit_outlined, 'Edit', RekapTheme.blue,
+                    () => _showEditIzinBottomSheet(data)),
+                const SizedBox(width: 8),
+                _buildActionButton(Icons.delete_outline, 'Hapus',
+                    RekapTheme.red, () => _showDeleteBottomSheet(data['id'])),
+              ]),
           ]),
         ]),
       ),
     );
   }
 
-  Widget _buildActionButton(IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _buildActionButton(
+      IconData icon, String label, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(color: color.withValues(alpha:0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha:0.3))),
+        decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.3))),
         child: Row(children: [
           Icon(icon, size: 12, color: color),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w500)),
+          Text(label,
+              style: TextStyle(
+                  color: color, fontSize: 10, fontWeight: FontWeight.w500)),
         ]),
       ),
     );
@@ -386,167 +562,330 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
 
   void _showEditIzinBottomSheet(Map<String, dynamic> izinData) {
     final jenisController = TextEditingController(text: izinData['jenis']);
-    final keteranganController = TextEditingController(text: izinData['keterangan']);
+    final keteranganController =
+        TextEditingController(text: izinData['keterangan']);
     final tanggal = izinData['tanggal']?.toString();
     final List<XFile> selectedImages = [];
+    final bool isPending = (izinData['status']?.toString().toLowerCase() ?? '')
+        .contains('pending');
+
+    // Periksa status izin - hanya bisa edit jika pending
+    if (!isPending) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Hanya izin dengan status "Menunggu" yang dapat diedit'),
+          backgroundColor: RekapTheme.orange,
+        ),
+      );
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(25), topRight: Radius.circular(25))),
       builder: (context) => StatefulBuilder(builder: (context, setState) {
         return SingleChildScrollView(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const SizedBox(height: 16),
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+            Center(
+                child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 20),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Row(children: [
-              Icon(Icons.edit_rounded, color: RekapTheme.blue, size: 24),
-              SizedBox(width: 12),
-              Text('Edit Pengajuan Izin', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
-            ])),
+            const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Row(children: [
+                  Icon(Icons.edit_rounded, color: RekapTheme.blue, size: 24),
+                  SizedBox(width: 12),
+                  Text('Edit Pengajuan Izin',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: RekapTheme.textDark)),
+                ])),
             const SizedBox(height: 8),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Text('Tanggal: ${_formatTanggal(tanggal)}', style: const TextStyle(color: RekapTheme.textGrey, fontSize: 14))),
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text('Tanggal: ${_formatTanggal(tanggal)}',
+                    style: const TextStyle(
+                        color: RekapTheme.textGrey, fontSize: 14))),
             const SizedBox(height: 24),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Jenis Izin', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: RekapTheme.textDark)),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(color: RekapTheme.background, borderRadius: BorderRadius.circular(12), border: Border.all(color: RekapTheme.border)),
-                child: TextField(
-                  controller: jenisController,
-                  decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14), hintText: 'Misal: Sakit, Izin, Alpha'),
-                  style: const TextStyle(fontSize: 15),
-                ),
+
+            // Informasi penting
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: RekapTheme.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: RekapTheme.orange.withValues(alpha: 0.3)),
               ),
-            ])),
-            const SizedBox(height: 20),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Keterangan', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: RekapTheme.textDark)),
-              const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(color: RekapTheme.background, borderRadius: BorderRadius.circular(12), border: Border.all(color: RekapTheme.border)),
-                child: TextField(
-                  controller: keteranganController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14), hintText: 'Tuliskan alasan pengajuan izin'),
-                  style: const TextStyle(fontSize: 15),
-                ),
-              ),
-            ])),
-            const SizedBox(height: 24),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Bukti Foto', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: RekapTheme.textDark)),
-              const SizedBox(height: 8),
-              const Text('Upload 1-3 foto baru (akan menggantikan foto lama)', style: TextStyle(color: RekapTheme.textGrey, fontSize: 12)),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final picker = ImagePicker();
-                    final images = await picker.pickMultiImage(maxWidth: 1080, maxHeight: 1080, imageQuality: 85);
-                    if (images.isNotEmpty) {
-                      setState(() {
-                        if (selectedImages.length + images.length <= 3) {
-                          selectedImages.addAll(images);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maksimal 3 foto'), backgroundColor: Colors.red));
-                        }
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.photo_library_outlined, size: 20),
-                  label: const Text('Pilih Foto'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: RekapTheme.primaryRed.withValues(alpha:0.1),
-                    foregroundColor: RekapTheme.primaryRed,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: RekapTheme.primaryRed.withValues(alpha:0.3))),
-                  ),
-                )),
-                if (selectedImages.isNotEmpty) ...[
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => setState(() => selectedImages.clear()),
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    label: const Text('Hapus'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: RekapTheme.red.withValues(alpha:0.1),
-                      foregroundColor: RekapTheme.red,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: RekapTheme.red.withValues(alpha:0.3))),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber, color: RekapTheme.orange, size: 20),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Semua data termasuk foto akan diganti',
+                      style: TextStyle(
+                        color: RekapTheme.orange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],
-              ]),
-            ])),
-            if (selectedImages.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Foto Terpilih (${selectedImages.length}/3)', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: RekapTheme.textDark)),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(children: selectedImages.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final image = entry.value;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Stack(children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.grey[100]),
-                          child: ClipRRect(
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Jenis Izin *',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: RekapTheme.textDark)),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                            color: RekapTheme.background,
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.file(File(image.path), fit: BoxFit.cover),
+                            border: Border.all(color: RekapTheme.border)),
+                        child: TextField(
+                          controller: jenisController,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            hintText: 'Misal: Sakit, Izin, Alpha',
                           ),
+                          style: const TextStyle(fontSize: 15),
                         ),
-                        Positioned(top: 4, right: 4, child: GestureDetector(
-                          onTap: () => setState(() => selectedImages.removeAt(index)),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(color: Colors.red.withValues(alpha:0.9), shape: BoxShape.circle),
-                            child: const Icon(Icons.close, size: 16, color: Colors.white),
+                      ),
+                    ])),
+            const SizedBox(height: 20),
+
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Keterangan *',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: RekapTheme.textDark)),
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                            color: RekapTheme.background,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: RekapTheme.border)),
+                        child: TextField(
+                          controller: keteranganController,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            hintText: 'Tuliskan alasan pengajuan izin',
+                          ),
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                      ),
+                    ])),
+            const SizedBox(height: 24),
+
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Bukti Foto Baru *',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: RekapTheme.textDark)),
+                      const SizedBox(height: 8),
+                      const Text(
+                          'Upload 1-3 foto baru (akan menggantikan semua foto lama)',
+                          style: TextStyle(
+                              color: RekapTheme.textGrey, fontSize: 12)),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Expanded(
+                            child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final picker = ImagePicker();
+                            final images = await picker.pickMultiImage(
+                                maxWidth: 1080,
+                                maxHeight: 1080,
+                                imageQuality: 85);
+                            if (images.isNotEmpty) {
+                              setState(() {
+                                if (selectedImages.length + images.length <=
+                                    3) {
+                                  selectedImages.addAll(images);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                          content: Text('Maksimal 3 foto'),
+                                          backgroundColor: Colors.red));
+                                }
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.photo_library_outlined,
+                              size: 20),
+                          label: const Text('Pilih Foto'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                RekapTheme.primaryRed.withValues(alpha: 0.1),
+                            foregroundColor: RekapTheme.primaryRed,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                    color: RekapTheme.primaryRed
+                                        .withValues(alpha: 0.3))),
                           ),
                         )),
+                        if (selectedImages.isNotEmpty) ...[
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: () =>
+                                setState(() => selectedImages.clear()),
+                            icon: const Icon(Icons.delete_outline, size: 20),
+                            label: const Text('Hapus Semua'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: RekapTheme.red.withValues(alpha: 0.1),
+                              foregroundColor: RekapTheme.red,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  side: BorderSide(
+                                      color: RekapTheme.red.withValues(alpha: 0.3))),
+                            ),
+                          ),
+                        ],
                       ]),
-                    );
-                  }).toList()),
-                ),
-              ])),
+                    ])),
+
+            if (selectedImages.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Foto Terpilih (${selectedImages.length}/3)',
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: RekapTheme.textDark)),
+                        const SizedBox(height: 12),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                              children:
+                                  selectedImages.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final image = entry.value;
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 12),
+                              child: Stack(children: [
+                                Container(
+                                  width: 100,
+                                  height: 100,
+                                  decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      color: Colors.grey[100]),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.file(File(image.path),
+                                        fit: BoxFit.cover),
+                                  ),
+                                ),
+                                Positioned(
+                                    top: 4,
+                                    right: 4,
+                                    child: GestureDetector(
+                                      onTap: () => setState(
+                                          () => selectedImages.removeAt(index)),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                            color: Colors.red.withValues(alpha: 0.9),
+                                            shape: BoxShape.circle),
+                                        child: const Icon(Icons.close,
+                                            size: 16, color: Colors.white),
+                                      ),
+                                    )),
+                              ]),
+                            );
+                          }).toList()),
+                        ),
+                      ])),
             ],
+
             const SizedBox(height: 32),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 24), child: Row(children: [
-              Expanded(child: OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  side: const BorderSide(color: RekapTheme.border),
-                ),
-                child: const Text('Batal', style: TextStyle(color: RekapTheme.textGrey, fontWeight: FontWeight.w600)),
-              )),
-              const SizedBox(width: 16),
-              Expanded(child: ElevatedButton(
-                onPressed: () => _updateIzin(izinData['id'], jenisController.text, keteranganController.text, selectedImages).then((success) {
-                  if (success) {
-                    Navigator.pop(context);
-                    _loadIzinData();
-                  }
-                }),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: RekapTheme.primaryRed,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: const Text('Simpan Perubahan', style: TextStyle(fontWeight: FontWeight.w600)),
-              )),
-            ])),
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(children: [
+                  Expanded(
+                      child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      side: const BorderSide(color: RekapTheme.border),
+                    ),
+                    child: const Text('Batal',
+                        style: TextStyle(
+                            color: RekapTheme.textGrey,
+                            fontWeight: FontWeight.w600)),
+                  )),
+                  const SizedBox(width: 16),
+                  Expanded(
+                      child: ElevatedButton(
+                    onPressed: () => _updateIzin(
+                            izinData['id'],
+                            jenisController.text,
+                            keteranganController.text,
+                            selectedImages)
+                        .then((success) {
+                      if (success) {
+                        Navigator.pop(context);
+                        _refreshData(); // Gunakan refreshData setelah edit
+                      }
+                    }),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: RekapTheme.primaryRed,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: const Text('Simpan Perubahan',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                  )),
+                ])),
             const SizedBox(height: 24),
           ]),
         );
@@ -554,54 +893,216 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
     );
   }
 
+  Future<bool> _updateIzin(
+      int id, String jenis, String keterangan, List<XFile> images) async {
+    if (jenis.isEmpty || keterangan.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Harap isi semua field'), backgroundColor: Colors.red));
+      return false;
+    }
+    if (images.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Harap upload minimal 1 foto'),
+          backgroundColor: Colors.red));
+      return false;
+    }
+
+    if (images.length > 3) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Maksimal 3 foto'), backgroundColor: Colors.red));
+      return false;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Sesi telah berakhir, silakan login kembali'),
+          backgroundColor: Colors.red));
+      return false;
+    }
+
+    // Tampilkan loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        backgroundColor: RekapTheme.surface,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: RekapTheme.primaryRed),
+            SizedBox(height: 20),
+            Text(
+              'Menyimpan perubahan...',
+              style: TextStyle(color: RekapTheme.textDark),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      await dotenv.load();
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final url = Uri.parse('$baseUrl/api/izin/$id');
+
+      final request = http.MultipartRequest('PUT', url);
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Tambahkan text fields
+      request.fields['jenis'] = jenis;
+      request.fields['keterangan'] = keterangan;
+
+      // Tambahkan files
+      for (final image in images) {
+        try {
+          final file = await http.MultipartFile.fromPath('files', image.path);
+          request.files.add(file);
+        } catch (e) {
+          print('Error adding file: $e');
+          if (context.mounted) {
+            Navigator.pop(context); // Tutup loading dialog
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Gagal mengupload foto'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return false;
+        }
+      }
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      // Tutup loading dialog
+      if (context.mounted) Navigator.pop(context);
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        print('Response: $responseData');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Izin berhasil diperbarui'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        return true;
+      } else {
+        print('Error response: ${response.statusCode} - ${response.body}');
+
+        String errorMessage = 'Gagal memperbarui izin';
+        try {
+          final errorData = jsonDecode(response.body);
+          if (errorData is Map && errorData.containsKey('detail')) {
+            errorMessage = errorData['detail'].toString();
+          } else if (errorData is Map && errorData.containsKey('message')) {
+            errorMessage = errorData['message'].toString();
+          }
+        } catch (e) {
+          errorMessage = 'Status: ${response.statusCode} - ${response.body}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal: $errorMessage'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return false;
+      }
+    } catch (e) {
+      print('Error: $e');
+      if (context.mounted) {
+        Navigator.pop(context); // Tutup loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Terjadi kesalahan, periksa koneksi internet Anda'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
   void _showDeleteBottomSheet(int id) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(25), topRight: Radius.circular(25))),
       builder: (context) => Container(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 8),
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+          Center(
+              child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 32),
           Container(
             width: 80,
             height: 80,
-            decoration: BoxDecoration(color: RekapTheme.red.withValues(alpha:0.1), shape: BoxShape.circle),
-            child: const Icon(Icons.delete_forever_rounded, color: RekapTheme.red, size: 40),
+            decoration: BoxDecoration(
+                color: RekapTheme.red.withValues(alpha: 0.1),
+                shape: BoxShape.circle),
+            child: const Icon(Icons.delete_forever_rounded,
+                color: RekapTheme.red, size: 40),
           ),
           const SizedBox(height: 24),
-          const Text('Hapus Pengajuan Izin?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
+          const Text('Hapus Pengajuan Izin?',
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: RekapTheme.textDark)),
           const SizedBox(height: 12),
-          const Text('Tindakan ini tidak dapat dibatalkan. Data pengajuan akan dihapus secara permanen.', style: TextStyle(color: RekapTheme.textGrey, fontSize: 14), textAlign: TextAlign.center),
+          const Text(
+              'Tindakan ini tidak dapat dibatalkan. Data pengajuan akan dihapus secara permanen.',
+              style: TextStyle(color: RekapTheme.textGrey, fontSize: 14),
+              textAlign: TextAlign.center),
           const SizedBox(height: 32),
           Row(children: [
-            Expanded(child: OutlinedButton(
+            Expanded(
+                child: OutlinedButton(
               onPressed: () => Navigator.pop(context),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 side: const BorderSide(color: RekapTheme.border),
               ),
-              child: const Text('Batal', style: TextStyle(color: RekapTheme.textGrey, fontWeight: FontWeight.w600)),
+              child: const Text('Batal',
+                  style: TextStyle(
+                      color: RekapTheme.textGrey, fontWeight: FontWeight.w600)),
             )),
             const SizedBox(width: 16),
-            Expanded(child: ElevatedButton(
+            Expanded(
+                child: ElevatedButton(
               onPressed: () => _deleteIzin(id).then((success) {
                 if (success) {
                   Navigator.pop(context);
-                  _loadIzinData();
+                  _refreshData(); // Gunakan refreshData setelah delete
                 }
               }),
               style: ElevatedButton.styleFrom(
                 backgroundColor: RekapTheme.red,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
-              child: const Text('Hapus', style: TextStyle(fontWeight: FontWeight.w600)),
+              child: const Text('Hapus',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
             )),
           ]),
           const SizedBox(height: 16),
@@ -610,210 +1111,32 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
     );
   }
 
-  Future<bool> _updateIzin(int id, String jenis, String keterangan, List<XFile> images) async {
-    if (jenis.isEmpty || keterangan.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Harap isi semua field'), backgroundColor: Colors.red));
-      return false;
-    }
-    if (images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Harap upload minimal 1 foto'), backgroundColor: Colors.red));
-      return false;
-    }
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if (token == null) return false;
-    try {
-      await dotenv.load();
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      final url = Uri.parse('$baseUrl/api/izin/$id');
-      final request = http.MultipartRequest('PUT', url);
-      request.headers['Authorization'] = 'Bearer $token';
-      request.fields['jenis'] = jenis;
-      request.fields['keterangan'] = keterangan;
-      for (final image in images) {
-        final file = await http.MultipartFile.fromPath('files', image.path);
-        request.files.add(file);
-      }
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Izin berhasil diperbarui'), backgroundColor: Colors.green));
-        return true;
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: ${response.body}'), backgroundColor: Colors.red));
-        return false;
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Terjadi kesalahan'), backgroundColor: Colors.red));
-      return false;
-    }
-  }
-
   Future<bool> _deleteIzin(int id) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
     if (token == null) return false;
     try {
       await dotenv.load();
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      final response = await http.delete(Uri.parse('$baseUrl/api/izin/$id'), headers: {'Authorization': 'Bearer $token'});
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final response = await http.delete(Uri.parse('$baseUrl/api/izin/$id'),
+          headers: {'Authorization': 'Bearer $token'});
       if (response.statusCode == 204) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Izin berhasil dihapus'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Izin berhasil dihapus'),
+            backgroundColor: Colors.green));
         return true;
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: ${response.body}'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Gagal: ${response.body}'),
+            backgroundColor: Colors.red));
         return false;
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Terjadi kesalahan'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Terjadi kesalahan'), backgroundColor: Colors.red));
       return false;
     }
-  }
-}
-
-class SiswaPengajuanPklContent extends StatefulWidget {
-  const SiswaPengajuanPklContent({super.key});
-  @override
-  State<SiswaPengajuanPklContent> createState() => _SiswaPengajuanPklContentState();
-}
-
-class _SiswaPengajuanPklContentState extends State<SiswaPengajuanPklContent> {
-  final List<Map<String, dynamic>> _pengajuanData = [
-    {
-      'id': 'PKL001',
-      'jenis': 'Pengajuan Baru',
-      'industri': 'PT. Teknologi Indonesia',
-      'alamat': 'Jl. Sudirman No. 123, Jakarta',
-      'tanggal_ajukan': '15 Jan 2026',
-      'status': 'Disetujui',
-      'statusColor': RekapTheme.green,
-      'guru_pembimbing': 'Dr. Budi Santoso',
-      'tanggal_mulai': '1 Feb 2026',
-      'is_ditolak': false,
-    },
-    {
-      'id': 'PKL002',
-      'jenis': 'Pindah PKL',
-      'industri': 'CV. Digital Solusi',
-      'alamat': 'Jl. Thamrin No. 45, Jakarta',
-      'tanggal_ajukan': '14 Jan 2026',
-      'status': 'Menunggu',
-      'statusColor': RekapTheme.orange,
-      'is_ditolak': false,
-    },
-    {
-      'id': 'PKL003',
-      'jenis': 'Pengajuan Baru',
-      'industri': 'PT. Media Kreatif',
-      'alamat': 'Jl. Gatot Subroto No. 67, Jakarta',
-      'tanggal_ajukan': '13 Jan 2026',
-      'status': 'Ditolak',
-      'statusColor': RekapTheme.red,
-      'is_ditolak': true,
-      'alasan_tolak': 'Kuota industri sudah penuh',
-    },
-  ];
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
-      child: Column(children: [
-        Row(children: [
-          Expanded(child: _buildSummaryCard('Total', _pengajuanData.length.toString(), Icons.assignment, RekapTheme.primaryRed)),
-          const SizedBox(width: 12),
-          Expanded(child: _buildSummaryCard('Disetujui', _pengajuanData.where((e) => e['status'] == 'Disetujui').length.toString(), Icons.check_circle, RekapTheme.green)),
-        ]),
-        const SizedBox(height: 24),
-        const Row(children: [Text('Riwayat Pengajuan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: RekapTheme.textDark))]),
-        const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _pengajuanData.length,
-          separatorBuilder: (ctx, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) => _buildPklCard(_pengajuanData[index]),
-        ),
-        const SizedBox(height: 40),
-      ]),
-    );
-  }
-  Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: RekapTheme.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
-          Icon(icon, color: color.withValues(alpha:0.5), size: 24),
-        ]),
-        const SizedBox(height: 4),
-        Text(title, style: const TextStyle(fontSize: 12, color: RekapTheme.textGrey, fontWeight: FontWeight.w600)),
-      ]),
-    );
-  }
-  Widget _buildPklCard(Map<String, dynamic> data) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: RekapTheme.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: RekapTheme.background, borderRadius: BorderRadius.circular(12)),
-            child: const Icon(Icons.business_rounded, color: RekapTheme.textDark, size: 24),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(data['industri'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: RekapTheme.textDark)),
-            const SizedBox(height: 4),
-            Text(data['jenis'], style: const TextStyle(color: RekapTheme.textGrey, fontSize: 12)),
-          ])),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: data['statusColor'].withValues(alpha:0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: data['statusColor'].withValues(alpha:0.2))),
-            child: Text(data['status'], style: TextStyle(color: data['statusColor'], fontSize: 11, fontWeight: FontWeight.bold)),
-          ),
-        ]),
-        const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Divider(height: 1, color: RekapTheme.border)),
-        _buildInfoRow(Icons.location_on_outlined, data['alamat']),
-        if (data['guru_pembimbing'] != null) ...[
-          const SizedBox(height: 8),
-          _buildInfoRow(Icons.person_outline, 'Pembimbing: ${data['guru_pembimbing']}'),
-        ],
-        const SizedBox(height: 8),
-        _buildInfoRow(Icons.calendar_today_outlined, 'Diajukan: ${data['tanggal_ajukan']}'),
-        if (data['is_ditolak'] == true) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: RekapTheme.red.withValues(alpha:0.05), borderRadius: BorderRadius.circular(8), border: Border.all(color: RekapTheme.red.withValues(alpha:0.1))),
-            child: Row(children: [
-              const Icon(Icons.error_outline, size: 16, color: RekapTheme.red),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Alasan: ${data['alasan_tolak']}', style: const TextStyle(color: RekapTheme.red, fontSize: 12, fontWeight: FontWeight.w600))),
-            ]),
-          ),
-        ],
-      ]),
-    );
-  }
-  Widget _buildInfoRow(IconData icon, String text) {
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(icon, size: 14, color: RekapTheme.textGrey),
-      const SizedBox(width: 8),
-      Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: RekapTheme.textDark))),
-    ]);
   }
 }
 
@@ -826,8 +1149,13 @@ class DetailIzinScreen extends StatefulWidget {
 
 class _DetailIzinScreenState extends State<DetailIzinScreen> {
   void _showImagePreview(int index, List<dynamic> buktiFotoUrls) {
-    showDialog(context: context, barrierColor: Colors.black.withValues(alpha:0.9), builder: (context) => ImagePreviewDialog(imageUrls: buktiFotoUrls.cast<String>(), initialIndex: index));
+    showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.9),
+        builder: (context) => ImagePreviewDialog(
+            imageUrls: buktiFotoUrls.cast<String>(), initialIndex: index));
   }
+
   @override
   Widget build(BuildContext context) {
     final status = widget.izinData['status']?.toString() ?? 'Pending';
@@ -838,9 +1166,13 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
     final decidedAt = widget.izinData['decided_at']?.toString();
     final rejectionReason = widget.izinData['rejection_reason']?.toString();
     final note = widget.izinData['note']?.toString();
-    final buktiFotoUrls = widget.izinData['bukti_foto_urls'] is List ? (widget.izinData['bukti_foto_urls'] as List<dynamic>) : [];
-    final isDitolak = status.toLowerCase().contains('ditolak') || status.toLowerCase().contains('rejected');
-    final isDisetujui = status.toLowerCase().contains('disetujui') || status.toLowerCase().contains('approved');
+    final buktiFotoUrls = widget.izinData['bukti_foto_urls'] is List
+        ? (widget.izinData['bukti_foto_urls'] as List<dynamic>)
+        : [];
+    final isDitolak = status.toLowerCase().contains('ditolak') ||
+        status.toLowerCase().contains('rejected');
+    final isDisetujui = status.toLowerCase().contains('disetujui') ||
+        status.toLowerCase().contains('approved');
     Color statusColor = RekapTheme.orange;
     String statusDisplay = 'Menunggu';
     IconData statusIcon = Icons.access_time;
@@ -862,8 +1194,14 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.2), blurRadius: 20, offset: const Offset(0, -5))],
+            borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, -5))
+            ],
           ),
           child: SingleChildScrollView(
             controller: scrollController,
@@ -873,70 +1211,146 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(child: Container(width: 60, height: 5, margin: const EdgeInsets.only(bottom: 20), decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)))),
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('Detail Pengajuan Izin', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: statusColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: statusColor.withValues(alpha:0.3), width: 1)),
-                      child: Row(children: [Icon(statusIcon, size: 16, color: statusColor), const SizedBox(width: 6), Text(statusDisplay, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12))]),
-                    ),
-                  ]),
+                  Center(
+                      child: Container(
+                          width: 60,
+                          height: 5,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(10)))),
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Detail Pengajuan Izin',
+                            style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: RekapTheme.textDark)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: statusColor.withValues(alpha: 0.3),
+                                  width: 1)),
+                          child: Row(children: [
+                            Icon(statusIcon, size: 16, color: statusColor),
+                            const SizedBox(width: 6),
+                            Text(statusDisplay,
+                                style: TextStyle(
+                                    color: statusColor,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12))
+                          ]),
+                        ),
+                      ]),
                   const SizedBox(height: 30),
-                  _buildDetailSection('Informasi Pengajuan', Icons.info_outline, [
+                  _buildDetailSection(
+                      'Informasi Pengajuan', Icons.info_outline, [
                     _buildDetailItem('Jenis Pengajuan', jenis),
-                    _buildDetailItem('Tanggal Izin', _formatTanggalDetail(tanggal)),
-                    _buildDetailItem('Waktu Pengajuan', _formatDateTimeDetail(createdAt)),
-                    if (decidedAt != null) _buildDetailItem('Waktu Diputuskan', _formatDateTimeDetail(decidedAt)),
+                    _buildDetailItem(
+                        'Tanggal Izin', _formatTanggalDetail(tanggal)),
+                    _buildDetailItem(
+                        'Waktu Pengajuan', _formatDateTimeDetail(createdAt)),
+                    if (decidedAt != null)
+                      _buildDetailItem(
+                          'Waktu Diputuskan', _formatDateTimeDetail(decidedAt)),
                   ]),
                   const SizedBox(height: 24),
-                  _buildDetailSection('Alasan Pengajuan', Icons.description, [_buildDetailItem('Keterangan', keterangan)]),
+                  _buildDetailSection('Alasan Pengajuan', Icons.description,
+                      [_buildDetailItem('Keterangan', keterangan)]),
                   if (note != null && note.isNotEmpty) ...[
                     const SizedBox(height: 24),
-                    _buildDetailSection('Catatan', Icons.notes, [_buildDetailItem('Catatan Tambahan', note)]),
+                    _buildDetailSection('Catatan', Icons.notes,
+                        [_buildDetailItem('Catatan Tambahan', note)]),
                   ],
                   if (isDitolak && rejectionReason != null) ...[
                     const SizedBox(height: 24),
-                    _buildDetailSection('Informasi Penolakan', Icons.warning_amber_rounded, [_buildDetailItem('Alasan Penolakan', rejectionReason)], backgroundColor: RekapTheme.red.withValues(alpha:0.05), borderColor: RekapTheme.red.withValues(alpha:0.2)),
+                    _buildDetailSection(
+                        'Informasi Penolakan',
+                        Icons.warning_amber_rounded,
+                        [_buildDetailItem('Alasan Penolakan', rejectionReason)],
+                        backgroundColor: RekapTheme.red.withValues(alpha: 0.05),
+                        borderColor: RekapTheme.red.withValues(alpha: 0.2)),
                   ],
                   if (buktiFotoUrls.isNotEmpty) ...[
                     const SizedBox(height: 24),
                     _buildDetailSection('Bukti Foto', Icons.photo_library, [
                       const SizedBox(height: 12),
-                      if (buktiFotoUrls.length == 1) _buildSingleImagePreview(buktiFotoUrls.first, 0, buktiFotoUrls)
-                      else GridView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1),
-                        itemCount: buktiFotoUrls.length,
-                        itemBuilder: (context, index) {
-                          final imageUrl = buktiFotoUrls[index]?.toString() ?? '';
-                          return _buildImageThumbnail(imageUrl, index, buktiFotoUrls);
-                        },
-                      ),
+                      if (buktiFotoUrls.length == 1)
+                        _buildSingleImagePreview(
+                            buktiFotoUrls.first, 0, buktiFotoUrls)
+                      else
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: 10,
+                                  mainAxisSpacing: 10,
+                                  childAspectRatio: 1),
+                          itemCount: buktiFotoUrls.length,
+                          itemBuilder: (context, index) {
+                            final imageUrl =
+                                buktiFotoUrls[index]?.toString() ?? '';
+                            return _buildImageThumbnail(
+                                imageUrl, index, buktiFotoUrls);
+                          },
+                        ),
                       const SizedBox(height: 12),
-                      const Text('Klik gambar untuk melihat lebih besar', style: TextStyle(color: RekapTheme.textGrey, fontSize: 12, fontStyle: FontStyle.italic), textAlign: TextAlign.center),
+                      const Text('Klik gambar untuk melihat lebih besar',
+                          style: TextStyle(
+                              color: RekapTheme.textGrey,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic),
+                          textAlign: TextAlign.center),
                     ]),
                   ],
                   const SizedBox(height: 32),
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: RekapTheme.background, borderRadius: BorderRadius.circular(16), border: Border.all(color: RekapTheme.border)),
+                    decoration: BoxDecoration(
+                        color: RekapTheme.background,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: RekapTheme.border)),
                     child: const Row(children: [
-                      Icon(Icons.info_outline, color: RekapTheme.blue, size: 24),
+                      Icon(Icons.info_outline,
+                          color: RekapTheme.blue, size: 24),
                       SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('Informasi', style: TextStyle(fontWeight: FontWeight.bold, color: RekapTheme.textDark, fontSize: 14)),
-                        SizedBox(height: 4),
-                        Text('Silakan hubungi guru pembimbing atau administrator jika ada pertanyaan terkait pengajuan ini.', style: TextStyle(color: RekapTheme.textGrey, fontSize: 12)),
-                      ])),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text('Informasi',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: RekapTheme.textDark,
+                                    fontSize: 14)),
+                            SizedBox(height: 4),
+                            Text(
+                                'Silakan hubungi guru pembimbing atau administrator jika ada pertanyaan terkait pengajuan ini.',
+                                style: TextStyle(
+                                    color: RekapTheme.textGrey, fontSize: 12)),
+                          ])),
                     ]),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(backgroundColor: RekapTheme.primaryRed, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 2),
-                    child: const Text('Tutup Detail', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: RekapTheme.primaryRed,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        elevation: 2),
+                    child: const Text('Tutup Detail',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -948,72 +1362,150 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
     );
   }
 
-  Widget _buildSingleImagePreview(String imageUrl, int index, List<dynamic> buktiFotoUrls) {
+  Widget _buildSingleImagePreview(
+      String imageUrl, int index, List<dynamic> buktiFotoUrls) {
     return GestureDetector(
       onTap: () => _showImagePreview(index, buktiFotoUrls),
       child: Container(
         height: 200,
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.grey[100]),
+        decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12), color: Colors.grey[100]),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
           child: Stack(children: [
-            if (imageUrl.isNotEmpty) Image.network(imageUrl, width: double.infinity, height: 200, fit: BoxFit.cover, loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(child: CircularProgressIndicator(value: loadingProgress.expectedTotalBytes != null ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes! : null));
-            }, errorBuilder: (context, error, stackTrace) {
-              return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(Icons.broken_image, size: 40, color: Colors.grey[400]),
-                const SizedBox(height: 8),
-                Text('Gagal memuat gambar', style: TextStyle(color: Colors.grey[500])),
-              ]));
-            }) else Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.broken_image, size: 40, color: Colors.grey[400]),
-              const SizedBox(height: 8),
-              Text('Tidak ada gambar', style: TextStyle(color: Colors.grey[500])),
-            ])),
-            Positioned(bottom: 8, right: 8, child: Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.black.withValues(alpha:0.5), borderRadius: BorderRadius.circular(20)), child: const Icon(Icons.zoom_in, color: Colors.white, size: 16))),
+            if (imageUrl.isNotEmpty)
+              Image.network(imageUrl,
+                  width: double.infinity, height: 200, fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                    child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null));
+              }, errorBuilder: (context, error, stackTrace) {
+                return Center(
+                    child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                      Icon(Icons.broken_image,
+                          size: 40, color: Colors.grey[400]),
+                      const SizedBox(height: 8),
+                      Text('Gagal memuat gambar',
+                          style: TextStyle(color: Colors.grey[500])),
+                    ]));
+              })
+            else
+              Center(
+                  child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                    Icon(Icons.broken_image, size: 40, color: Colors.grey[400]),
+                    const SizedBox(height: 8),
+                    Text('Tidak ada gambar',
+                        style: TextStyle(color: Colors.grey[500])),
+                  ])),
+            Positioned(
+                bottom: 8,
+                right: 8,
+                child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(20)),
+                    child: const Icon(Icons.zoom_in,
+                        color: Colors.white, size: 16))),
           ]),
         ),
       ),
     );
   }
 
-  Widget _buildImageThumbnail(String imageUrl, int index, List<dynamic> buktiFotoUrls) {
+  Widget _buildImageThumbnail(
+      String imageUrl, int index, List<dynamic> buktiFotoUrls) {
     return GestureDetector(
       onTap: () => _showImagePreview(index, buktiFotoUrls),
       child: Container(
-        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Colors.grey[100]),
+        decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8), color: Colors.grey[100]),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Stack(children: [
-            if (imageUrl.isNotEmpty) Image.network(imageUrl, width: double.infinity, height: double.infinity, fit: BoxFit.cover, loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Center(child: CircularProgressIndicator(color: RekapTheme.primaryRed, strokeWidth: 2, value: loadingProgress.expectedTotalBytes != null ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes! : null));
-            }, errorBuilder: (context, error, stackTrace) {
-              return Center(child: Icon(Icons.broken_image, color: Colors.grey[400]));
-            }) else Center(child: Icon(Icons.broken_image, color: Colors.grey[400])),
-            Positioned.fill(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.black.withValues(alpha:0.1), width: 1)))),
-            Positioned(bottom: 4, right: 4, child: Container(padding: const EdgeInsets.all(3), decoration: BoxDecoration(color: Colors.black.withValues(alpha:0.6), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.zoom_in, color: Colors.white, size: 12))),
+            if (imageUrl.isNotEmpty)
+              Image.network(imageUrl,
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                    child: CircularProgressIndicator(
+                        color: RekapTheme.primaryRed,
+                        strokeWidth: 2,
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null));
+              }, errorBuilder: (context, error, stackTrace) {
+                return Center(
+                    child: Icon(Icons.broken_image, color: Colors.grey[400]));
+              })
+            else
+              Center(child: Icon(Icons.broken_image, color: Colors.grey[400])),
+            Positioned.fill(
+                child: Container(
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            width: 1)))),
+            Positioned(
+                bottom: 4,
+                right: 4,
+                child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(15)),
+                    child: const Icon(Icons.zoom_in,
+                        color: Colors.white, size: 12))),
           ]),
         ),
       ),
     );
   }
 
-  Widget _buildDetailSection(String title, IconData icon, List<Widget> children, {Color? backgroundColor, Color? borderColor}) {
+  Widget _buildDetailSection(String title, IconData icon, List<Widget> children,
+      {Color? backgroundColor, Color? borderColor}) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: backgroundColor ?? Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor ?? RekapTheme.border.withValues(alpha:0.5)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.02), blurRadius: 10, offset: const Offset(0, 3))],
+        border: Border.all(
+            color: borderColor ?? RekapTheme.border.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 3))
+        ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: RekapTheme.primaryRed.withValues(alpha:0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: RekapTheme.primaryRed, size: 20)),
+          Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: RekapTheme.primaryRed.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: RekapTheme.primaryRed, size: 20)),
           const SizedBox(width: 12),
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: RekapTheme.textDark)),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: RekapTheme.textDark)),
         ]),
         const SizedBox(height: 16),
         ...children,
@@ -1025,9 +1517,17 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(fontSize: 13, color: RekapTheme.textGrey, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13,
+                color: RekapTheme.textGrey,
+                fontWeight: FontWeight.w500)),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 15, color: RekapTheme.textDark, fontWeight: FontWeight.w600)),
+        Text(value,
+            style: const TextStyle(
+                fontSize: 15,
+                color: RekapTheme.textDark,
+                fontWeight: FontWeight.w600)),
       ]),
     );
   }
@@ -1036,8 +1536,29 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
     if (dateString == null) return '-';
     try {
       final date = DateTime.parse(dateString);
-      final hari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      final bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      final hari = [
+        'Senin',
+        'Selasa',
+        'Rabu',
+        'Kamis',
+        'Jumat',
+        'Sabtu',
+        'Minggu'
+      ];
+      final bulan = [
+        'Januari',
+        'Februari',
+        'Maret',
+        'April',
+        'Mei',
+        'Juni',
+        'Juli',
+        'Agustus',
+        'September',
+        'Oktober',
+        'November',
+        'Desember'
+      ];
       return '${hari[date.weekday - 1]}, ${date.day} ${bulan[date.month - 1]} ${date.year}';
     } catch (e) {
       return dateString;
@@ -1048,8 +1569,29 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
     if (dateTimeString == null) return '-';
     try {
       final dateTime = DateTime.parse(dateTimeString);
-      final hari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-      final bulan = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+      final hari = [
+        'Senin',
+        'Selasa',
+        'Rabu',
+        'Kamis',
+        'Jumat',
+        'Sabtu',
+        'Minggu'
+      ];
+      final bulan = [
+        'Januari',
+        'Februari',
+        'Maret',
+        'April',
+        'Mei',
+        'Juni',
+        'Juli',
+        'Agustus',
+        'September',
+        'Oktober',
+        'November',
+        'Desember'
+      ];
       return '${hari[dateTime.weekday - 1]}, ${dateTime.day} ${bulan[dateTime.month - 1]} ${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} WIB';
     } catch (e) {
       return dateTimeString;
@@ -1060,7 +1602,8 @@ class _DetailIzinScreenState extends State<DetailIzinScreen> {
 class ImagePreviewDialog extends StatefulWidget {
   final List<String> imageUrls;
   final int initialIndex;
-  const ImagePreviewDialog({super.key, required this.imageUrls, required this.initialIndex});
+  const ImagePreviewDialog(
+      {super.key, required this.imageUrls, required this.initialIndex});
   @override
   State<ImagePreviewDialog> createState() => _ImagePreviewDialogState();
 }
@@ -1068,15 +1611,19 @@ class ImagePreviewDialog extends StatefulWidget {
 class _ImagePreviewDialogState extends State<ImagePreviewDialog> {
   late PageController _pageController;
   late int _currentIndex;
-  @override void initState() {
+  @override
+  void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
   }
-  @override void dispose() {
+
+  @override
+  void dispose() {
     _pageController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -1098,15 +1645,26 @@ class _ImagePreviewDialogState extends State<ImagePreviewDialog> {
                     panEnabled: true,
                     minScale: 0.5,
                     maxScale: 3,
-                    child: Image.network(imageUrl, fit: BoxFit.contain, loadingBuilder: (context, child, loadingProgress) {
+                    child: Image.network(imageUrl, fit: BoxFit.contain,
+                        loadingBuilder: (context, child, loadingProgress) {
                       if (loadingProgress == null) return child;
-                      return Center(child: CircularProgressIndicator(value: loadingProgress.expectedTotalBytes != null ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes! : null));
+                      return Center(
+                          child: CircularProgressIndicator(
+                              value: loadingProgress.expectedTotalBytes != null
+                                  ? loadingProgress.cumulativeBytesLoaded /
+                                      loadingProgress.expectedTotalBytes!
+                                  : null));
                     }, errorBuilder: (context, error, stackTrace) {
-                      return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Icon(Icons.broken_image, size: 60, color: Colors.white),
-                        SizedBox(height: 16),
-                        Text('Gagal memuat gambar', style: TextStyle(color: Colors.white)),
-                      ]));
+                      return const Center(
+                          child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                            Icon(Icons.broken_image,
+                                size: 60, color: Colors.white),
+                            SizedBox(height: 16),
+                            Text('Gagal memuat gambar',
+                                style: TextStyle(color: Colors.white)),
+                          ]));
                     }),
                   ),
                 ),
@@ -1114,17 +1672,75 @@ class _ImagePreviewDialogState extends State<ImagePreviewDialog> {
             );
           },
         ),
-        Positioned(top: 40, right: 20, child: GestureDetector(onTap: () => Navigator.pop(context), child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.black.withValues(alpha:0.5), shape: BoxShape.circle), child: const Icon(Icons.close, color: Colors.white, size: 24)))),
-        Positioned(top: 40, left: 20, child: GestureDetector(onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur download akan segera tersedia'), backgroundColor: Colors.green)), child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.black.withValues(alpha:0.5), shape: BoxShape.circle), child: const Icon(Icons.download, color: Colors.white, size: 24)))),
-        if (widget.imageUrls.length > 1) Positioned(bottom: 40, left: 0, right: 0, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(widget.imageUrls.length, (index) => GestureDetector(
-          onTap: () => _pageController.animateToPage(index, duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
-          child: Container(width: 8, height: 8, margin: const EdgeInsets.symmetric(horizontal: 4), decoration: BoxDecoration(shape: BoxShape.circle, color: _currentIndex == index ? Colors.white : Colors.white.withValues(alpha:0.5))),
-        )))),
-        if (widget.imageUrls.length > 1) Positioned(bottom: 80, left: 0, right: 0, child: Center(child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(color: Colors.black.withValues(alpha:0.5), borderRadius: BorderRadius.circular(20)),
-          child: Text('${_currentIndex + 1} / ${widget.imageUrls.length}', style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
-        ))),
+        Positioned(
+            top: 40,
+            right: 20,
+            child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle),
+                    child: const Icon(Icons.close,
+                        color: Colors.white, size: 24)))),
+        Positioned(
+            top: 40,
+            left: 20,
+            child: GestureDetector(
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Fitur download akan segera tersedia'),
+                        backgroundColor: Colors.green)),
+                child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle),
+                    child: const Icon(Icons.download,
+                        color: Colors.white, size: 24)))),
+        if (widget.imageUrls.length > 1)
+          Positioned(
+              bottom: 40,
+              left: 0,
+              right: 0,
+              child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                      widget.imageUrls.length,
+                      (index) => GestureDetector(
+                            onTap: () => _pageController.animateToPage(index,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut),
+                            child: Container(
+                                width: 8,
+                                height: 8,
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _currentIndex == index
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.5))),
+                          )))),
+        if (widget.imageUrls.length > 1)
+          Positioned(
+              bottom: 80,
+              left: 0,
+              right: 0,
+              child: Center(
+                  child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(20)),
+                child: Text('${_currentIndex + 1} / ${widget.imageUrls.length}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500)),
+              ))),
       ]),
     );
   }

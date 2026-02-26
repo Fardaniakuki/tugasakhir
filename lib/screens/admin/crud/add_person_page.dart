@@ -271,7 +271,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
               ),
               items: [
                 // Opsi "Tidak ada kaprog"
-                const {'id': null, 'nama': 'Tidak ada kaprog'},
+                const {'id': null, 'nama': 'Tidak ada pokja'},
                 ..._kaprogList,
               ],
               itemAsString: (item) => item['nama'] ?? '-',
@@ -304,15 +304,15 @@ class _AddPersonPageState extends State<AddPersonPage> {
               selectedItem: _selectedKaprogId != null
                   ? _kaprogList.firstWhere(
                       (kaprog) => kaprog['id'] == _selectedKaprogId,
-                      orElse: () => {'id': null, 'nama': 'Tidak ada kaprog'},
+                      orElse: () => {'id': null, 'nama': 'Tidak ada pokja'},
                     )
-                  : {'id': null, 'nama': 'Tidak ada kaprog'},
+                  : {'id': null, 'nama': 'Tidak ada pokja'},
             ),
           if (!_isLoadingKaprog && _kaprogList.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Tidak ada guru yang terdaftar sebagai kaprog',
+                'Tidak ada guru yang terdaftar sebagai pokja',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],
@@ -1440,7 +1440,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                                   fontWeight: FontWeight.w600, fontSize: 16),
                             ),
                             const SizedBox(height: 12),
-                            _buildCheckbox('Kaprog', isKaprog, (value) {
+                            _buildCheckbox('Kepala Konsentrasi', isKaprog, (value) {
                               setState(() {
                                 isKaprog = value ?? false;
                               });

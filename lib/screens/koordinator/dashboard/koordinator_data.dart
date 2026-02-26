@@ -33,7 +33,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
   String _statusMessageGuru = '';
   bool _hasErrorGuru = false;
   List<Map<String, dynamic>> _guruPembimbing = [];
-  List<int> _selectedGuruIds = [];
+  Map<String, dynamic>? _selectedGuru;
 
   // State variables for Lembar Persetujuan
   bool _isLoadingSiswa = false;
@@ -43,7 +43,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
   List<String> _industriList = [];
   String? _selectedIndustri;
   List<String> _selectedSiswaIds = [];
-  DateTime _selectedDate = DateTime.now(); // Tanggal otomatis hari ini
+  DateTime _selectedDate = DateTime.now();
 
   @override
   void initState() {
@@ -54,10 +54,20 @@ class _KoordinatorDataState extends State<KoordinatorData>
 
   String _formatDate(DateTime date) {
     final months = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember'
     ];
-    
+
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
@@ -81,9 +91,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
         _redirectToLogin();
         return;
       }
-
-      setState(() {
-      });
 
       await Future.wait([
         _loadDataGuru(),
@@ -109,8 +116,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
     });
   }
 
-  // Function to get headers with auth token
-
   // Function to launch URL
   Future<void> _launchUrl(String urlString) async {
     try {
@@ -121,20 +126,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
     } catch (e) {
       _showErrorSnackbar('Gagal membuka URL: $e');
     }
-  }
-
-  // Snackbar helpers
-  void _showSuccessSnackbar(String message) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: _successColor,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
-      ),
-    );
   }
 
   void _showErrorSnackbar(String message) {
@@ -162,22 +153,20 @@ class _KoordinatorDataState extends State<KoordinatorData>
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
+
       if (token == null) {
         _redirectToLogin();
         return;
       }
 
-      final response = await http
-          .get(
-            Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(const Duration(seconds: 30));
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 401) {
         _showErrorSnackbar('Sesi telah berakhir, silakan login kembali');
@@ -208,17 +197,14 @@ class _KoordinatorDataState extends State<KoordinatorData>
               ...guru,
               'id': guru['id'] ?? 0,
               'nama': guru['nama'] ?? 'N/A',
-              'nip': guru['nip'] ?? '-',
-              'no_telp': guru['no_telp'] ?? '',
-              'kode_guru': guru['kode_guru'] ?? '',
             };
           }).toList();
 
           setState(() {
             _guruPembimbing = formattedGuruPembimbing;
             _hasErrorGuru = false;
+            _selectedGuru = null;
           });
-
         } else {
           final errorMsg = responseData['message'] ?? 'Gagal memuat data guru';
           throw Exception(errorMsg);
@@ -242,13 +228,19 @@ class _KoordinatorDataState extends State<KoordinatorData>
     }
   }
 
-  Future<void> _generateSuratTugas(Map<String, dynamic> guru) async {
+  Future<void> _generateSuratTugas() async {
     if (_isLoadingGuru) return;
+
+    if (_selectedGuru == null) {
+      _showErrorSnackbar('Pilih guru pembimbing terlebih dahulu');
+      return;
+    }
 
     setState(() {
       _isLoadingGuru = true;
       _hasErrorGuru = false;
-      _statusMessageGuru = 'Membuat Surat Tugas untuk ${guru['nama']}...';
+      _statusMessageGuru =
+          'Membuat Surat Tugas untuk ${_selectedGuru!['nama']}...';
     });
 
     try {
@@ -285,8 +277,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
           {
             'instansi': 'SMK Negeri 2 Singosari',
             'jabatan': 'Guru Pembimbing PKL',
-            'nama': guru['nama'],
-            'nip': guru['nip'] ?? '',
+            'nama': _selectedGuru!['nama'],
+            'nip': '',
           }
         ],
         'details': [
@@ -344,11 +336,13 @@ class _KoordinatorDataState extends State<KoordinatorData>
               : '$apiBaseUrl$finalDownloadUrl';
 
           setState(() {
-            _statusMessageGuru = '✅ Surat Tugas untuk ${guru['nama']} berhasil dibuat!';
+            _statusMessageGuru =
+                '✅ Surat Tugas untuk ${_selectedGuru!['nama']} berhasil dibuat!';
             _hasErrorGuru = false;
           });
 
-          _showSuccessDialogSuratTugas(guru['nama'], filename, fullDownloadUrl);
+          _showSuccessDialogSuratTugas(
+              _selectedGuru!['nama'], filename, fullDownloadUrl);
         } else {
           throw Exception('Format response tidak lengkap');
         }
@@ -368,55 +362,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
           _isLoadingGuru = false;
         });
       }
-    }
-  }
-
-  Future<void> _generateSemuaSuratTugas() async {
-    if (_isLoadingGuru || _selectedGuruIds.isEmpty) {
-      _showErrorSnackbar('Pilih minimal 1 guru pembimbing');
-      return;
-    }
-
-    final selectedGurus = _guruPembimbing
-        .where((guru) => _selectedGuruIds.contains(guru['id']))
-        .toList();
-
-    setState(() {
-      _isLoadingGuru = true;
-      _hasErrorGuru = false;
-      _statusMessageGuru = 'Membuat ${selectedGurus.length} Surat Tugas...';
-    });
-
-    int successCount = 0;
-    int failedCount = 0;
-
-    for (var guru in selectedGurus) {
-      try {
-        await _generateSuratTugas(guru);
-        successCount++;
-      } catch (e) {
-        failedCount++;
-      }
-    }
-
-    setState(() {
-      _statusMessageGuru = successCount > 0 
-          ? '✅ $successCount surat berhasil dibuat'
-          : '❌ Gagal membuat surat';
-      _hasErrorGuru = failedCount > 0;
-    });
-
-    if (successCount > 0) {
-      _showSuccessSnackbar('$successCount surat tugas berhasil dibuat');
-    }
-    if (failedCount > 0) {
-      _showErrorSnackbar('$failedCount surat gagal dibuat');
-    }
-
-    if (mounted) {
-      setState(() {
-        _isLoadingGuru = false;
-      });
     }
   }
 
@@ -462,12 +407,12 @@ class _KoordinatorDataState extends State<KoordinatorData>
     );
   }
 
-  // Card for each guru pembimbing
-  Widget _buildGuruCard(Map<String, dynamic> guru) {
-    final isSelected = _selectedGuruIds.contains(guru['id']);
-
+// Dropdown untuk Pilih Guru Pembimbing - UKURAN BESAR
+  Widget _buildGuruDropdown() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -478,150 +423,302 @@ class _KoordinatorDataState extends State<KoordinatorData>
             offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(
-          color: isSelected ? _primaryColor : Colors.transparent,
-          width: isSelected ? 2 : 0,
-        ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        _primaryColor.withValues(alpha: 0.9),
-                        _primaryColor,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.person_search,
+                  color: _primaryColor,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pilih Guru Pembimbing',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _textPrimary,
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        guru['nama'] ?? 'N/A',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: _textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    SizedBox(height: 4),
+                    Text(
+                      'Surat tugas akan dibuat untuk guru yang dipilih',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _textSecondary,
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'NIP: ${guru['nip'] ?? '-'}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: _textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _successColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.school,
-                              size: 14,
-                              color: _successColor,
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              'Guru Pembimbing PKL',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: _successColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Transform.scale(
-                  scale: 1.3,
-                  child: Checkbox(
-                    value: isSelected,
-                    onChanged: (value) {
-                      setState(() {
-                        if (value == true) {
-                          _selectedGuruIds.add(guru['id']);
-                        } else {
-                          _selectedGuruIds.remove(guru['id']);
-                        }
-                      });
-                    },
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
                     ),
-                    activeColor: _primaryColor,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed:
-                    _isLoadingGuru ? null : () => _generateSuratTugas(guru),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  elevation: 0,
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _infoColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                icon: _isLoadingGuru
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.file_download_outlined, size: 22),
-                label: Text(
-                  _isLoadingGuru ? 'Memproses...' : 'Buat Surat Tugas',
+                child: Text(
+                  '${_guruPembimbing.length} Guru',
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _infoColor,
                   ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // DROPDOWN GURU - UKURAN SANGAT BESAR
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: _borderColor, width: 1.8),
+              borderRadius: BorderRadius.circular(14),
             ),
-          ],
-        ),
+            child: DropdownButtonFormField<Map<String, dynamic>>(
+              initialValue: _selectedGuru,
+              hint: const Text(
+                '-- Pilih Guru Pembimbing --',
+                style: TextStyle(
+                  color: _textSecondary,
+                  fontSize: 17,
+                ),
+              ),
+              isExpanded: true,
+              decoration: InputDecoration(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Icon(Icons.person, color: _primaryColor, size: 28),
+                ),
+                suffixIcon: _selectedGuru != null
+                    ? IconButton(
+                        icon: const Icon(Icons.close,
+                            size: 24, color: _textSecondary),
+                        onPressed: () {
+                          setState(() {
+                            _selectedGuru = null;
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              icon: const Padding(
+                padding: EdgeInsets.all(14),
+                child:
+                    Icon(Icons.arrow_drop_down, color: _primaryColor, size: 36),
+              ),
+              dropdownColor: Colors.white,
+              style: const TextStyle(
+                fontSize: 17,
+                color: _textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+              menuMaxHeight: 450,
+              // selectedItemBuilder untuk mengubah tampilan item yang terpilih
+              selectedItemBuilder: (BuildContext context) {
+                return _guruPembimbing.map((guru) {
+                  return Container(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      guru['nama'] ?? 'N/A',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 17,
+                        color: _textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList();
+              },
+              items: _guruPembimbing.map((guru) {
+                return DropdownMenuItem<Map<String, dynamic>>(
+                  value: guru,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.school,
+                            color: _primaryColor,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                guru['nama'] ?? 'N/A',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 17,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (Map<String, dynamic>? newValue) {
+                setState(() {
+                  _selectedGuru = newValue;
+                });
+              },
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Selected Guru Info Card
+          if (_selectedGuru != null)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: _primaryColor.withValues(alpha: 0.2), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          _primaryColor.withValues(alpha: 0.9),
+                          _primaryColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _selectedGuru!['nama'] ?? 'N/A',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: _textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _successColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Guru Pembimbing PKL',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _successColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 20),
+
+          // Generate Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isLoadingGuru || _selectedGuru == null
+                  ? null
+                  : _generateSuratTugas,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+                disabledForegroundColor: Colors.grey.shade600,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                elevation: 0,
+              ),
+              icon: _isLoadingGuru
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.file_download_outlined, size: 24),
+              label: Text(
+                _isLoadingGuru
+                    ? 'Memproses...'
+                    : _selectedGuru == null
+                        ? 'Pilih Guru Terlebih Dahulu'
+                        : 'Buat Surat Tugas',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -633,28 +730,28 @@ class _KoordinatorDataState extends State<KoordinatorData>
     setState(() {
       _isLoadingSiswa = true;
       _statusMessageSiswa = '';
-      _selectedSiswaIds.clear(); // Clear selection saat reload
+      _selectedSiswaIds.clear();
+      _selectedIndustri = null;
     });
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
+
       if (token == null) {
         _redirectToLogin();
         return;
       }
 
-      final response = await http
-          .get(
-            Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/applications?status=Approved'),
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          )
-          .timeout(const Duration(seconds: 30));
+      final response = await http.get(
+        Uri.parse(
+            '${dotenv.env['API_BASE_URL']}/api/pkl/applications?status=Approved'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 401) {
         _showErrorSnackbar('Sesi telah berakhir, silakan login kembali');
@@ -664,32 +761,34 @@ class _KoordinatorDataState extends State<KoordinatorData>
 
       if (response.statusCode == 200) {
         final dynamic responseData = jsonDecode(response.body);
-        
+
         List<dynamic> applications = [];
-        
+
         if (responseData is Map<String, dynamic>) {
           if (responseData.containsKey('data')) {
             applications = responseData['data'] ?? [];
-          } else if (responseData.containsKey('success') && responseData['success'] == true) {
+          } else if (responseData.containsKey('success') &&
+              responseData['success'] == true) {
             applications = responseData['data'] ?? [];
           }
         } else if (responseData is List) {
           applications = responseData;
         }
-        
-        // Reset data
+
         _siswaByIndustri = {};
         _industriList = [];
-        
+
         for (var app in applications) {
           try {
             if (app is! Map<String, dynamic>) continue;
-            
+
             final appMap = app;
-            final applicationData = appMap['application'] as Map<String, dynamic>?;
+            final applicationData =
+                appMap['application'] as Map<String, dynamic>?;
             final siswaId = applicationData?['siswa_id']?.toString();
-            final industriNama = appMap['industri_nama']?.toString() ?? 'Industri Tidak Diketahui';
-            
+            final industriNama = appMap['industri_nama']?.toString() ??
+                'Industri Tidak Diketahui';
+
             if (siswaId != null && industriNama.isNotEmpty) {
               final siswaData = {
                 'id': siswaId,
@@ -699,14 +798,12 @@ class _KoordinatorDataState extends State<KoordinatorData>
                 'status': applicationData?['status']?.toString() ?? 'Approved',
                 'nisn': appMap['siswa_nisn']?.toString() ?? '',
               };
-              
-              // Group by industri
+
               if (!_siswaByIndustri.containsKey(industriNama)) {
                 _siswaByIndustri[industriNama] = [];
               }
               _siswaByIndustri[industriNama]!.add(siswaData);
-              
-              // Add to industri list if not exists
+
               if (!_industriList.contains(industriNama)) {
                 _industriList.add(industriNama);
               }
@@ -715,20 +812,13 @@ class _KoordinatorDataState extends State<KoordinatorData>
             print('Error processing application: $e');
           }
         }
-        
-        // Sort industri list alphabetically
+
         _industriList.sort();
-        
-        // Set selected industri to first one if available
-        if (_industriList.isNotEmpty && _selectedIndustri == null) {
-          _selectedIndustri = _industriList.first;
-        }
-        
+
         setState(() {
           _hasErrorSiswa = false;
-          _selectedDate = DateTime.now(); // Update tanggal ke hari ini
+          _selectedDate = DateTime.now();
         });
-
       } else {
         throw Exception('HTTP ${response.statusCode}: Gagal memuat data siswa');
       }
@@ -748,10 +838,222 @@ class _KoordinatorDataState extends State<KoordinatorData>
     }
   }
 
+// Dropdown untuk Pilih Industri - UKURAN BESAR
+  Widget _buildIndustriDropdown() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.factory,
+                  color: _primaryColor,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pilih Industri / DU/DI',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Lembar persetujuan akan dibuat untuk industri yang dipilih',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _infoColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${_industriList.length} Industri',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: _infoColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // DROPDOWN INDUSTRI - UKURAN SANGAT BESAR
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: _borderColor, width: 1.8),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: DropdownButtonFormField<String>(
+              initialValue: _selectedIndustri,
+              hint: const Text(
+                '-- Pilih Industri --',
+                style: TextStyle(
+                  color: _textSecondary,
+                  fontSize: 17,
+                ),
+              ),
+              isExpanded: true,
+              decoration: InputDecoration(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                prefixIcon: const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: Icon(Icons.apartment, color: _primaryColor, size: 28),
+                ),
+                suffixIcon: _selectedIndustri != null
+                    ? IconButton(
+                        icon: const Icon(Icons.close,
+                            size: 24, color: _textSecondary),
+                        onPressed: () {
+                          setState(() {
+                            _selectedIndustri = null;
+                            _selectedSiswaIds.clear();
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              icon: const Padding(
+                padding: EdgeInsets.all(14),
+                child:
+                    Icon(Icons.arrow_drop_down, color: _primaryColor, size: 36),
+              ),
+              dropdownColor: Colors.white,
+              style: const TextStyle(
+                fontSize: 17,
+                color: _textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+              menuMaxHeight: 450,
+              // selectedItemBuilder untuk mengubah tampilan item yang terpilih
+              selectedItemBuilder: (BuildContext context) {
+                return _industriList.map((industri) {
+                  return Container(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      industri,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 17,
+                        color: _textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList();
+              },
+              items: _industriList.map((industri) {
+                final siswaCount = _siswaByIndustri[industri]?.length ?? 0;
+
+                return DropdownMenuItem<String>(
+                  value: industri,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.business,
+                            color: _primaryColor,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                industri,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 17,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '$siswaCount siswa',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: _textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedIndustri = newValue;
+                  _selectedSiswaIds.clear();
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _generateLembarPersetujuan() async {
     if (_isLoadingSiswa) return;
 
-    // Validasi input
     if (_selectedIndustri == null || _selectedIndustri!.isEmpty) {
       _showErrorSnackbar('Pilih industri terlebih dahulu');
       return;
@@ -772,14 +1074,12 @@ class _KoordinatorDataState extends State<KoordinatorData>
       const String apiBaseUrl = 'https://sertif.gedanggoreng.com';
       const String endpoint = '$apiBaseUrl/api/v1/letters/lembar-persetujuan';
 
-      // Ambil hanya siswa yang dipilih
       final selectedStudents = _siswaByIndustri[_selectedIndustri]!
           .where((siswa) => _selectedSiswaIds.contains(siswa['id']))
           .toList();
 
-      final List<Map<String, dynamic>> selectedStudentsData = selectedStudents
-          .map((siswa) => {'nama': siswa['nama']})
-          .toList();
+      final List<Map<String, dynamic>> selectedStudentsData =
+          selectedStudents.map((siswa) => {'nama': siswa['nama']}).toList();
 
       final Map<String, dynamic> requestData = {
         'nama_perusahaan': _selectedIndustri!,
@@ -830,12 +1130,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
             _hasErrorSiswa = false;
           });
 
-          _showSuccessDialogLembarPersetujuan(
-            _selectedIndustri!,
-            filename,
-            fullDownloadUrl,
-            selectedStudents.length
-          );
+          _showSuccessDialogLembarPersetujuan(_selectedIndustri!, filename,
+              fullDownloadUrl, selectedStudents.length);
         } else {
           throw Exception('Format response tidak lengkap');
         }
@@ -896,114 +1192,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // Industri Selection Card
-  Widget _buildIndustriCard(String industriName, bool isSelected) {
-    final siswaCount = _siswaByIndustri[industriName]?.length ?? 0;
-    
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedIndustri = industriName;
-          _selectedSiswaIds.clear(); // Clear siswa selection saat ganti industri
-        });
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: isSelected ? _primaryColor : Colors.transparent,
-            width: isSelected ? 2 : 0,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: isSelected ? _primaryColor : _primaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.apartment,
-                  color: isSelected ? Colors.white : _primaryColor,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      industriName,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _textPrimary,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _successColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.people,
-                                size: 14,
-                                color: _successColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$siswaCount siswa',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: _successColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (isSelected)
-                const Icon(
-                  Icons.check_circle,
-                  color: _primaryColor,
-                  size: 24,
-                ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1073,7 +1261,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${siswa['kelas']} • NISN: ${siswa['nisn']}',
+                    '${siswa['kelas']}',
                     style: const TextStyle(
                       fontSize: 12,
                       color: _textSecondary,
@@ -1106,12 +1294,68 @@ class _KoordinatorDataState extends State<KoordinatorData>
 
   // Form input untuk Lembar Persetujuan
   Widget _buildInputForm() {
-    final selectedStudents = _selectedIndustri != null 
+    final selectedStudents = _selectedIndustri != null
         ? _siswaByIndustri[_selectedIndustri!] ?? []
         : [];
-    
+
     final selectedCount = _selectedSiswaIds.length;
-    
+
+    if (_selectedIndustri == null) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Center(
+            child: Column(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: _primaryColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.business,
+                    color: _primaryColor,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Pilih Industri Terlebih Dahulu',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Pilih industri/DU/DI dari dropdown di atas untuk melihat daftar siswa',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1129,215 +1373,146 @@ class _KoordinatorDataState extends State<KoordinatorData>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Info Industri dan Action Buttons
-            if (_selectedIndustri != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: _primaryColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: _primaryColor.withValues(alpha: 0.2), width: 1.5),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              _primaryColor.withValues(alpha: 0.9),
+                              _primaryColor,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.apartment,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Industri / DU/DI',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _selectedIndustri!,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: _textPrimary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 5,
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Dipilih',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _textSecondary,
+                              ),
+                            ),
+                            Text(
+                              '$selectedCount/${selectedStudents.length}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: _primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _infoColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: _infoColor.withValues(alpha: 0.2), width: 1.5),
+              ),
+              child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: _primaryColor.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: _primaryColor.withValues(alpha: 0.2)),
+                      color: _infoColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: _primaryColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(
-                                Icons.apartment,
-                                color: _primaryColor,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Industri Terpilih',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: _textSecondary,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  Text(
-                                    _selectedIndustri!,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: _textPrimary,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              children: [
-                                const Text(
-                                  'Dipilih',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: _textSecondary,
-                                  ),
-                                ),
-                                Text(
-                                  '$selectedCount/${selectedStudents.length}',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: _primaryColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: selectedStudents.isNotEmpty
-                                    ? () {
-                                        setState(() {
-                                          // Pilih semua siswa
-                                          final allIds = selectedStudents
-                                              .map((s) => s['id'] as String)
-                                              .toList();
-                                          if (_selectedSiswaIds.length == allIds.length) {
-                                            _selectedSiswaIds.clear();
-                                          } else {
-                                            _selectedSiswaIds = List.from(allIds);
-                                          }
-                                        });
-                                      }
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _selectedSiswaIds.length == selectedStudents.length
-                                      ? _accentColor
-                                      : _primaryColor.withValues(alpha: 0.1),
-                                  foregroundColor: _selectedSiswaIds.length == selectedStudents.length
-                                      ? Colors.white
-                                      : _primaryColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      _selectedSiswaIds.length == selectedStudents.length
-                                          ? Icons.check_box
-                                          : Icons.check_box_outline_blank,
-                                      size: 18,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _selectedSiswaIds.length == selectedStudents.length
-                                          ? 'Batal Pilih Semua'
-                                          : 'Pilih Semua',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: _selectedSiswaIds.isNotEmpty && !_isLoadingSiswa
-                                    ? _generateLembarPersetujuan
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _primaryColor,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.file_download_outlined,
-                                      size: 18,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      'Buat Lembar',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                    child: const Icon(
+                      Icons.calendar_today,
+                      color: _infoColor,
+                      size: 22,
                     ),
                   ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Info Tanggal
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _infoColor.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: _infoColor.withValues(alpha: 0.2)),
-                    ),
-                    child: Row(
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          color: _infoColor,
-                          size: 18,
+                        const Text(
+                          'Tanggal Pembuatan',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Tanggal Pembuatan',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: _textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                _getTempatTanggal(),
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: _textPrimary,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(height: 2),
+                        Text(
+                          _getTempatTanggal(),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _textPrimary,
                           ),
                         ),
                       ],
@@ -1345,6 +1520,128 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: selectedStudents.isNotEmpty
+                        ? () {
+                            setState(() {
+                              final allIds = selectedStudents
+                                  .map((s) => s['id'] as String)
+                                  .toList();
+                              if (_selectedSiswaIds.length == allIds.length) {
+                                _selectedSiswaIds.clear();
+                              } else {
+                                _selectedSiswaIds = List.from(allIds);
+                              }
+                            });
+                          }
+                        : null,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor:
+                          _selectedSiswaIds.length == selectedStudents.length
+                              ? _accentColor
+                              : _primaryColor,
+                      side: BorderSide(
+                        color:
+                            _selectedSiswaIds.length == selectedStudents.length
+                                ? _accentColor
+                                : _primaryColor.withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    icon: Icon(
+                      _selectedSiswaIds.length == selectedStudents.length
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                      size: 20,
+                    ),
+                    label: Text(
+                      _selectedSiswaIds.length == selectedStudents.length
+                          ? 'Batal Pilih Semua'
+                          : 'Pilih Semua',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _selectedSiswaIds.isNotEmpty && !_isLoadingSiswa
+                        ? _generateLembarPersetujuan
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryColor,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      disabledForegroundColor: Colors.grey.shade600,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      elevation: 0,
+                    ),
+                    icon: _isLoadingSiswa
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.file_download_outlined, size: 22),
+                    label: Text(
+                      _isLoadingSiswa ? 'Memproses...' : 'Buat Lembar',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Daftar Siswa di Industri Ini',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary,
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _successColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$selectedCount/${selectedStudents.length} terpilih',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: _successColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -1352,7 +1649,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
   }
 
   // ==================== DIALOGS ====================
-  void _showSuccessDialogSuratTugas(String namaGuru, String filename, String downloadUrl) {
+  void _showSuccessDialogSuratTugas(
+      String namaGuru, String filename, String downloadUrl) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1380,7 +1678,10 @@ class _KoordinatorDataState extends State<KoordinatorData>
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [_primaryColor, _primaryColor.withValues(alpha: 0.8)],
+                    colors: [
+                      _primaryColor,
+                      _primaryColor.withValues(alpha: 0.8)
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -1431,7 +1732,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   ],
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -1487,9 +1787,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -1554,11 +1852,12 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   ],
                 ),
               ),
-
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: _borderColor, width: 1)),
+                  border:
+                      Border(top: BorderSide(color: _borderColor, width: 1)),
                 ),
                 child: Row(
                   children: [
@@ -1566,7 +1865,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _textSecondary.withValues(alpha: 0.3)),
+                          side: BorderSide(
+                              color: _textSecondary.withValues(alpha: 0.3)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -1624,8 +1924,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
     );
   }
 
-  void _showSuccessDialogLembarPersetujuan(
-      String namaPerusahaan, String filename, String downloadUrl, int jumlahSiswa) {
+  void _showSuccessDialogLembarPersetujuan(String namaPerusahaan,
+      String filename, String downloadUrl, int jumlahSiswa) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1653,7 +1953,10 @@ class _KoordinatorDataState extends State<KoordinatorData>
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [_primaryColor, _primaryColor.withValues(alpha: 0.8)],
+                    colors: [
+                      _primaryColor,
+                      _primaryColor.withValues(alpha: 0.8)
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -1704,7 +2007,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   ],
                 ),
               ),
-
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -1762,9 +2064,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                         ],
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -1826,8 +2126,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             decoration: BoxDecoration(
                               color: _successColor.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border:
-                                  Border.all(color: _successColor.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                  color: _successColor.withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               children: [
@@ -1854,11 +2154,12 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   ],
                 ),
               ),
-
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: _borderColor, width: 1)),
+                  border:
+                      Border(top: BorderSide(color: _borderColor, width: 1)),
                 ),
                 child: Row(
                   children: [
@@ -1866,7 +2167,8 @@ class _KoordinatorDataState extends State<KoordinatorData>
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: _textSecondary.withValues(alpha: 0.3)),
+                          side: BorderSide(
+                              color: _textSecondary.withValues(alpha: 0.3)),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -1982,10 +2284,10 @@ class _KoordinatorDataState extends State<KoordinatorData>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -2009,22 +2311,6 @@ class _KoordinatorDataState extends State<KoordinatorData>
                               ],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _primaryColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '${_guruPembimbing.length}',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: _primaryColor,
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -2035,7 +2321,74 @@ class _KoordinatorDataState extends State<KoordinatorData>
 
                 const SizedBox(height: 20),
 
-                // Bulk Actions Section
+                _isLoadingGuru
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              color: _primaryColor,
+                              strokeWidth: 3,
+                            ),
+                            SizedBox(height: 20),
+                            Text(
+                              'Memuat data guru...',
+                              style: TextStyle(
+                                color: _textSecondary,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _guruPembimbing.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.group_off,
+                                  color: _textSecondary.withValues(alpha: 0.3),
+                                  size: 80,
+                                ),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Tidak Ada Data Guru',
+                                  style: TextStyle(
+                                    color: _textSecondary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 40),
+                                  child: Text(
+                                    'Belum ada guru yang terdaftar sebagai pembimbing PKL',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color:
+                                          _textSecondary.withValues(alpha: 0.7),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _buildGuruDropdown(),
+              ],
+            ),
+          ),
+
+          // TAB 2: LEMBAR PERSETUJUAN
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // Header
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -2050,84 +2403,29 @@ class _KoordinatorDataState extends State<KoordinatorData>
                     ],
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed:
-                                  _selectedGuruIds.isNotEmpty && !_isLoadingGuru
-                                      ? _generateSemuaSuratTugas
-                                      : null,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _successColor,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 16, horizontal: 20),
-                                elevation: 0,
-                              ),
-                              icon: const Icon(Icons.all_inclusive, size: 22),
-                              label: Text(
-                                _selectedGuruIds.isEmpty
-                                    ? 'Buat Semua'
-                                    : 'Buat ${_selectedGuruIds.length} Surat',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                if (_selectedGuruIds.length ==
-                                    _guruPembimbing.length) {
-                                  _selectedGuruIds.clear();
-                                } else {
-                                  _selectedGuruIds = _guruPembimbing
-                                      .map<int>((guru) => guru['id'] as int)
-                                      .toList();
-                                }
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _selectedGuruIds.length ==
-                                      _guruPembimbing.length
-                                  ? _accentColor
-                                  : _primaryColor.withValues(alpha: 0.1),
-                              foregroundColor: _selectedGuruIds.length ==
-                                      _guruPembimbing.length
-                                  ? Colors.white
-                                  : _primaryColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 16, horizontal: 20),
-                              elevation: 0,
-                            ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  _selectedGuruIds.length ==
-                                          _guruPembimbing.length
-                                      ? Icons.check_box
-                                      : Icons.check_box_outline_blank,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
                                 Text(
-                                  _selectedGuruIds.length ==
-                                          _guruPembimbing.length
-                                      ? 'Batal Pilih'
-                                      : 'Pilih Semua',
-                                  style: const TextStyle(
+                                  'Lembar Persetujuan PKL',
+                                  style: TextStyle(
+                                    fontSize: 20,
                                     fontWeight: FontWeight.w800,
+                                    color: _textPrimary,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Pilih industri/DU/DI dan siswa untuk membuat lembar persetujuan',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: _textSecondary,
                                   ),
                                 ),
                               ],
@@ -2135,29 +2433,19 @@ class _KoordinatorDataState extends State<KoordinatorData>
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _selectedGuruIds.isEmpty
-                            ? 'Pilih guru terlebih dahulu'
-                            : '${_selectedGuruIds.length} guru terpilih',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: _textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      const SizedBox(height: 16),
+                      _buildStatusBannerSiswa(),
                     ],
                   ),
                 ),
 
                 const SizedBox(height: 20),
 
-                // Guru List Section
-                Expanded(
-                  child: _isLoadingGuru
-                      ? const Center(
+                _isLoadingSiswa
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(40),
                           child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               CircularProgressIndicator(
                                 color: _primaryColor,
@@ -2165,7 +2453,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                               ),
                               SizedBox(height: 20),
                               Text(
-                                'Memuat data guru...',
+                                'Memuat data siswa...',
                                 style: TextStyle(
                                   color: _textSecondary,
                                   fontSize: 14,
@@ -2174,253 +2462,89 @@ class _KoordinatorDataState extends State<KoordinatorData>
                               ),
                             ],
                           ),
-                        )
-                      : _guruPembimbing.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.group_off,
-                                    color: _textSecondary.withValues(alpha: 0.3),
-                                    size: 80,
+                        ),
+                      )
+                    : _industriList.isEmpty
+                        ? Container(
+                            padding: const EdgeInsets.all(40),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.business_center,
+                                  color: _textSecondary.withValues(alpha: 0.3),
+                                  size: 80,
+                                ),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Belum Ada Data Industri',
+                                  style: TextStyle(
+                                    color: _textSecondary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
                                   ),
-                                  const SizedBox(height: 20),
-                                  const Text(
-                                    'Tidak Ada Data Guru',
+                                ),
+                                const SizedBox(height: 10),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20),
+                                  child: Text(
+                                    'Belum ada pengajuan PKL dengan status Approved',
+                                    textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      color: _textSecondary,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
+                                      color:
+                                          _textSecondary.withValues(alpha: 0.7),
+                                      fontSize: 14,
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.symmetric(horizontal: 40),
-                                    child: Text(
-                                      'Belum ada guru yang terdaftar sebagai pembimbing PKL',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: _textSecondary.withValues(alpha: 0.7),
-                                        fontSize: 14,
+                                ),
+                              ],
+                            ),
+                          )
+                        : Column(
+                            children: [
+                              _buildIndustriDropdown(),
+                              const SizedBox(height: 20),
+                              _buildInputForm(),
+                              const SizedBox(height: 20),
+                              if (_selectedIndustri != null &&
+                                  _siswaByIndustri[_selectedIndustri] != null &&
+                                  _siswaByIndustri[_selectedIndustri]!
+                                      .isNotEmpty)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 15,
+                                        offset: const Offset(0, 4),
                                       ),
+                                    ],
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(20),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        ..._siswaByIndustri[_selectedIndustri]!
+                                            .map((siswa) {
+                                          return _buildSiswaCard(siswa);
+                                        }),
+                                      ],
                                     ),
                                   ),
-                                ],
-                              ),
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.only(bottom: 20),
-                              itemCount: _guruPembimbing.length,
-                              itemBuilder: (context, index) {
-                                return _buildGuruCard(_guruPembimbing[index]);
-                              },
-                            ),
-                ),
+                                ),
+                              const SizedBox(height: 40),
+                            ],
+                          ),
               ],
-            ),
-          ),
-
-          // TAB 2: LEMBAR PERSETUJUAN
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  // Header
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 15,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Lembar Persetujuan PKL',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w800,
-                                      color: _textPrimary,
-                                      height: 1.2,
-                                    ),
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    'Pilih industri dan siswa untuk membuat lembar persetujuan',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: _textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: _primaryColor.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                '${_industriList.length}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  color: _primaryColor,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildStatusBannerSiswa(),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Form Input dengan Action Buttons
-                  _buildInputForm(),
-
-                  const SizedBox(height: 20),
-
-                  // Daftar Industri
-                  if (_industriList.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 15,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Pilih Industri',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: _textPrimary,
-                                ),
-                              ),
-                              Text(
-                                '${_industriList.length} industri tersedia',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: _textSecondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          if (_isLoadingSiswa)
-                            const Center(
-                              child: CircularProgressIndicator(
-                                color: _primaryColor,
-                              ),
-                            )
-                          else
-                            ..._industriList.map((industri) {
-                              return _buildIndustriCard(
-                                industri,
-                                _selectedIndustri == industri,
-                              );
-                            }),
-                        ],
-                      ),
-                    ),
-
-                  // Daftar Siswa per Industri dengan Checkbox
-                  if (_selectedIndustri != null && 
-                      _siswaByIndustri[_selectedIndustri] != null &&
-                      _siswaByIndustri[_selectedIndustri]!.isNotEmpty)
-                    Container(
-                      margin: const EdgeInsets.only(top: 20),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 15,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Pilih Siswa di $_selectedIndustri',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: _textPrimary,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: _successColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '${_selectedSiswaIds.length}/${_siswaByIndustri[_selectedIndustri]!.length} terpilih',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: _successColor,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          ..._siswaByIndustri[_selectedIndustri]!.map((siswa) {
-                            return _buildSiswaCard(siswa);
-                          }),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 40),
-                ],
-              ),
             ),
           ),
         ],

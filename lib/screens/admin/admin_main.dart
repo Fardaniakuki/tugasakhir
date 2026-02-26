@@ -149,7 +149,7 @@ class _AdminMainState extends State<AdminMain> {
               ),
               _buildAddTile(Icons.person, 'Tambah Murid', 'Siswa'),
               _buildAddTile(Icons.school, 'Tambah Guru', 'Guru'),
-              _buildAddTile(Icons.category, 'Tambah Jurusan', 'Jurusan'),
+              _buildAddTile(Icons.category, 'Tambah Program Keahlian', 'Program Keahlian'),
               _buildAddTile(Icons.business, 'Tambah Industri', 'Industri'),
               _buildAddTile(Icons.class_, 'Tambah Kelas', 'Kelas'),
               const SizedBox(height: 20),

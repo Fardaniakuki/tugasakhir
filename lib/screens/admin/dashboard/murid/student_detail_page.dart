@@ -830,7 +830,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                                                           Icon(Icons.edit_rounded, size: 18),
                                                           SizedBox(width: 6),
                                                           Text(
-                                                            'Edit',
+                                                            'Ubah',
                                                             style: TextStyle(
                                                               fontSize: 14,
                                                               fontWeight: FontWeight.w600,

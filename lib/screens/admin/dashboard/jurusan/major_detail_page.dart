@@ -650,7 +650,7 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
       final kaprogNama = kaprog['nama'] ?? 'Unknown';
       return _buildProfileItem(
         icon: Icons.person_rounded,
-        title: 'Kaprog',
+        title: 'Pokja',
         value: kaprogNama,
       );
     }
@@ -692,7 +692,7 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
               ),
               const SizedBox(width: 16),
               const Text(
-                'Kelas dalam Jurusan',
+                'Kelas dalam Program Keahlian',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -797,7 +797,7 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
                   ),
                   const SizedBox(width: 8),
                   const Text(
-                    'Profil Jurusan',
+                    'Profil Program Keahlian',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -926,14 +926,14 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
                                               children: [
                                                 _buildProfileItem(
                                                   icon: Icons.code_rounded,
-                                                  title: 'Kode Jurusan',
+                                                  title: 'Kode Program Keahlian',
                                                   value: majorData!['kode'] ?? '-',
                                                 ),
                                                 const SizedBox(height: 16),
                                                 
                                                 _buildProfileItem(
                                                   icon: Icons.school_rounded,
-                                                  title: 'Nama Jurusan',
+                                                  title: 'Nama Program Keahlian',
                                                   value: majorData!['nama'] ?? '-',
                                                 ),
                                                 const SizedBox(height: 16),
@@ -1034,7 +1034,7 @@ class _MajorDetailPageState extends State<MajorDetailPage> {
                                                           Icon(Icons.edit_rounded, size: 18),
                                                           SizedBox(width: 6),
                                                           Text(
-                                                            'Edit',
+                                                            'Ubah',
                                                             style: TextStyle(
                                                               fontSize: 14,
                                                               fontWeight: FontWeight.w600,

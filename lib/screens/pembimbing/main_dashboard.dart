@@ -3,27 +3,29 @@ import 'dashboard_page.dart';
 import 'masalah_ijin_page.dart';
 import 'pengaturan_page.dart';
 import 'upload_page.dart';
+import 'permasalahan_siswa_page.dart'; // IMPORT PAGE BARU
 
 class PembimbingMainScreen extends StatefulWidget {
-  const PembimbingMainScreen ({super.key});
+  const PembimbingMainScreen({super.key});
 
   @override
-  State<PembimbingMainScreen > createState() => _PembimbingMainScreen ();
+  State<PembimbingMainScreen> createState() => _PembimbingMainScreen();
 }
 
-class _PembimbingMainScreen  extends State<PembimbingMainScreen > {
+class _PembimbingMainScreen extends State<PembimbingMainScreen> {
   int _currentIndex = 0;
   
-  // Cache untuk menyimpan widget halaman
+  // Cache untuk menyimpan widget halaman - SEKARANG 5 HALAMAN
   final Map<int, Widget> _pageCache = {};
   final Map<int, bool> _pageLoaded = {};
   
-  // Controller untuk mempertahankan scroll position
+  // Controller untuk mempertahankan scroll position - SEKARANG 5 CONTROLLER
   final List<ScrollController> _scrollControllers = [
-    ScrollController(),
-    ScrollController(),
-    ScrollController(),
-    ScrollController(),
+    ScrollController(), // index 0: Dashboard
+    ScrollController(), // index 1: Upload
+    ScrollController(), // index 2: Perizinan
+    ScrollController(), // index 3: Permasalahan
+    ScrollController(), // index 4: Pengaturan
   ];
 
   late final List<Widget> _pageBuilders;
@@ -32,12 +34,13 @@ class _PembimbingMainScreen  extends State<PembimbingMainScreen > {
   void initState() {
     super.initState();
     
-    // Inisialisasi page builders
+    // Inisialisasi page builders - SEKARANG 5 HALAMAN
     _pageBuilders = [
-      _buildDashboardPage(),
-      _buildUploadPage(),
-      _buildMasalahIjinPage(),
-      _buildPengaturanPage(),
+      _buildDashboardPage(),    // index 0
+      _buildUploadPage(),       // index 1
+      _buildMasalahIjinPage(),  // index 2
+      _buildPermasalahanPage(), // index 3 (HALAMAN BARU)
+      _buildPengaturanPage(),   // index 4
     ];
   }
 
@@ -63,8 +66,6 @@ class _PembimbingMainScreen  extends State<PembimbingMainScreen > {
     return _buildCachedPage(
       index: 0,
       builder: () {
-
-
         return const PembimbingDashboard(
           key: ValueKey('dashboard_page'),
         );
@@ -84,7 +85,7 @@ class _PembimbingMainScreen  extends State<PembimbingMainScreen > {
         );
 
         final lightShadow = BoxShadow(
-          color: Colors.black.withValues(alpha:0.2),
+          color: Colors.black.withValues(alpha: 0.2),
           offset: const Offset(4, 4),
           blurRadius: 0,
         );
@@ -105,12 +106,24 @@ class _PembimbingMainScreen  extends State<PembimbingMainScreen > {
     );
   }
 
-  // Builder untuk halaman Masalah Ijin dengan caching sederhana
+  // Builder untuk halaman Masalah Ijin (Perizinan) dengan caching sederhana
   Widget _buildMasalahIjinPage() {
     return _buildCachedPage(
       index: 2,
       builder: () => const KelolaPerizinanTabScreen(
         key: ValueKey('masalah_ijin_page'),
+        scrollController: null,
+      ),
+    );
+  }
+
+  // ============== HALAMAN BARU: PERMASALAHAN SISWA ==============
+  Widget _buildPermasalahanPage() {
+    return _buildCachedPage(
+      index: 3,
+      builder: () => PermasalahanSiswaScreen(
+        key: const ValueKey('permasalahan_siswa_page'),
+        scrollController: _scrollControllers[3],
       ),
     );
   }
@@ -118,12 +131,9 @@ class _PembimbingMainScreen  extends State<PembimbingMainScreen > {
   // Builder untuk halaman Pengaturan dengan caching sederhana
   Widget _buildPengaturanPage() {
     return _buildCachedPage(
-      index: 3,
+      index: 4,
       builder: () {
-
-
         return const PengaturanPage(
-      
           key: ValueKey('pengaturan_page'),
         );
       },
@@ -208,7 +218,7 @@ class _PembimbingMainScreen  extends State<PembimbingMainScreen > {
   }
 }
 
-// ============== BOTTOM NAVIGATION BAR ==============
+// ============== BOTTOM NAVIGATION BAR DENGAN 5 MENU ==============
 
 class _PembimbingBottomBar extends StatefulWidget {
   final int currentIndex;
@@ -240,15 +250,9 @@ class __PembimbingBottomBarState extends State<_PembimbingBottomBar> {
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
-        // HAPUS BORDER DI SINI ↓↓↓
-        // border: Border(  // ← HAPUS BARIS INI
-        //   top: BorderSide(color: widget.blackColor, width: 1),  // ← HAPUS
-        //   left: BorderSide(color: widget.blackColor, width: 1), // ← HAPUS
-        //   right: BorderSide(color: widget.blackColor, width: 1),// ← HAPUS
-        // ), // ← HAPUS BARIS INI JUGA
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -276,20 +280,28 @@ class __PembimbingBottomBarState extends State<_PembimbingBottomBar> {
             index: 1,
             icon: Icons.cloud_upload_outlined,
             activeIcon: Icons.cloud_upload,
-            label: 'Upload',
+            label: 'Unggah',
           ),
 
-          // Menu 3: Masalah Ijin
+          // Menu 3: Perizinan
           _buildTabItem(
             index: 2,
             icon: Icons.report_problem_outlined,
             activeIcon: Icons.report_problem,
+            label: 'Perizinan',
+          ),
+
+          // Menu 4: Permasalahan (HALAMAN BARU)
+          _buildTabItem(
+            index: 3,
+            icon: Icons.warning_amber_outlined,
+            activeIcon: Icons.warning_amber,
             label: 'Masalah',
           ),
 
-          // Menu 4: Pengaturan
+          // Menu 5: Pengaturan
           _buildTabItem(
-            index: 3,
+            index: 4,
             icon: Icons.settings_outlined,
             activeIcon: Icons.settings,
             label: 'Pengaturan',
@@ -322,7 +334,7 @@ class __PembimbingBottomBarState extends State<_PembimbingBottomBar> {
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: isActive 
-                    ? activeColor.withValues(alpha:0.1)
+                    ? activeColor.withValues(alpha: 0.1)
                     : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),

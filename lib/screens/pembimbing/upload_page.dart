@@ -58,8 +58,8 @@ class _UploadPageState extends State<UploadPage> {
   String? _accessToken;
 
   // Upload state - SIMPLE VERSION
-  final Map<String, bool> _isUploading = {}; // Key: "${industriId}_${kegiatanId}"
-  final Map<String, List<String>> _uploadedFiles = {}; // Key: "${industriId}_${kegiatanId}"
+  final Map<String, bool> _isUploading = {};
+  final Map<String, List<String>> _uploadedFiles = {};
   
   // Untuk modal upload sementara
   List<XFile> _selectedImages = [];
@@ -71,7 +71,38 @@ class _UploadPageState extends State<UploadPage> {
   late List<List<DateTime?>> _calendarDays;
   late String _currentMonth;
 
-  // Statistik
+  // Fungsi untuk mengubah nama hari ke Bahasa Indonesia
+  String _getIndonesianDayName(String englishDay) {
+    switch (englishDay.toLowerCase()) {
+      case 'monday': return 'Senin';
+      case 'tuesday': return 'Selasa';
+      case 'wednesday': return 'Rabu';
+      case 'thursday': return 'Kamis';
+      case 'friday': return 'Jumat';
+      case 'saturday': return 'Sabtu';
+      case 'sunday': return 'Minggu';
+      default: return englishDay;
+    }
+  }
+
+  // Fungsi untuk mengubah nama bulan ke Bahasa Indonesia
+  String _getIndonesianMonthName(String englishMonth) {
+    switch (englishMonth.toLowerCase()) {
+      case 'january': return 'Januari';
+      case 'february': return 'Februari';
+      case 'march': return 'Maret';
+      case 'april': return 'April';
+      case 'may': return 'Mei';
+      case 'june': return 'Juni';
+      case 'july': return 'Juli';
+      case 'august': return 'Agustus';
+      case 'september': return 'September';
+      case 'october': return 'Oktober';
+      case 'november': return 'November';
+      case 'december': return 'Desember';
+      default: return englishMonth;
+    }
+  }
 
   @override
   void initState() {
@@ -79,12 +110,13 @@ class _UploadPageState extends State<UploadPage> {
     _selectedDate = DateTime.now();
     _generateCalendar();
     _loadTokenAndData();
-    _fetchKegiatanPkl(); // Load data jadwal
+    _fetchKegiatanPkl();
   }
 
   // ========== GENERATE KALENDER ==========
   void _generateCalendar() {
-    _currentMonth = DateFormat('MMMM yyyy').format(_currentDate);
+    final englishMonth = DateFormat('MMMM').format(_currentDate);
+    _currentMonth = '${_getIndonesianMonthName(englishMonth)} ${_currentDate.year}';
     _calendarDays = [];
 
     final firstDayOfMonth = DateTime(_currentDate.year, _currentDate.month, 1);
@@ -93,7 +125,6 @@ class _UploadPageState extends State<UploadPage> {
 
     final List<DateTime?> currentWeek = [];
 
-    // Tambahkan hari dari bulan sebelumnya
     if (startingWeekday > 0) {
       final previousMonthLastDay = DateTime(_currentDate.year, _currentDate.month, 0);
       for (int i = startingWeekday - 1; i >= 0; i--) {
@@ -106,7 +137,6 @@ class _UploadPageState extends State<UploadPage> {
       }
     }
 
-    // Tambahkan hari dari bulan ini
     for (int day = 1; day <= lastDayOfMonth.day; day++) {
       final date = DateTime(_currentDate.year, _currentDate.month, day);
       currentWeek.add(date);
@@ -117,7 +147,6 @@ class _UploadPageState extends State<UploadPage> {
       }
     }
 
-    // Tambahkan hari dari bulan berikutnya
     if (currentWeek.isNotEmpty) {
       int nextMonthDay = 1;
       while (currentWeek.length < 7) {
@@ -208,7 +237,6 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // ========== LOAD DATA JADWAL AKTIF ==========
   Future<void> _fetchKegiatanPkl() async {
     setState(() {
     });
@@ -265,7 +293,6 @@ class _UploadPageState extends State<UploadPage> {
       }
     }
   }
-  // ============================================
 
   Future<void> _loadIndustriData() async {
     try {
@@ -399,11 +426,9 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  // Fungsi untuk mengecek apakah ada event di hari tertentu (JADWAL + RIWAYAT)
   List<dynamic> _getEventsForDay(DateTime day) {
     final List<dynamic> events = [];
     
-    // Cek jadwal kegiatan
     final jadwalDateKey = DateTime(day.year, day.month, day.day);
     if (_jadwalEvents.containsKey(jadwalDateKey)) {
       events.addAll(_jadwalEvents[jadwalDateKey]!.map((kegiatan) => {
@@ -412,7 +437,6 @@ class _UploadPageState extends State<UploadPage> {
       }));
     }
     
-    // Cek riwayat upload
     if (_events.containsKey(jadwalDateKey)) {
       events.addAll(_events[jadwalDateKey]!.map((riwayat) => {
         'type': 'riwayat',
@@ -429,27 +453,22 @@ class _UploadPageState extends State<UploadPage> {
     return hasJadwal || hasRiwayat;
   }
 
-  // ==================== FUNGSI UPLOAD SEDERHANA ====================
   Future<void> _startUploadProcess({
     required int industriId,
     required int kegiatanId,
     required dynamic kegiatan,
   }) async {
     
-    // VALIDASI: Cek apakah sudah pernah upload
     if (_isTaskAlreadyUploaded(industriId, kegiatanId)) {
       _showSnackBar('⚠️ Task ini sudah pernah diupload!', isError: true);
       
-      // Tampilkan dialog konfirmasi untuk lihat bukti
       await _showAlreadyUploadedDialog(industriId, kegiatanId);
       return;
     }
     
-    // Reset data sebelumnya
     _selectedImages.clear();
     _catatanController.clear();
     
-    // Tampilkan dialog pilihan sumber gambar
     await _showImageSourceDialog(industriId, kegiatanId, kegiatan);
   }
 
@@ -613,14 +632,13 @@ class _UploadPageState extends State<UploadPage> {
           builder: (context, setDialogState) {
             return AlertDialog(
               title: Text(
-                'Upload Bukti ${kegiatan['jenis']}',
+                'Unggah Bukti ${kegiatan['jenis']}',
                 style: TextStyle(color: widget.primaryColor),
               ),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Preview Gambar
                     if (_selectedImages.isNotEmpty)
                       Container(
                         width: 200,
@@ -644,7 +662,6 @@ class _UploadPageState extends State<UploadPage> {
                         ),
                       ),
                     
-                    // Input Catatan
                     TextField(
                       controller: _catatanController,
                       decoration: const InputDecoration(
@@ -655,7 +672,6 @@ class _UploadPageState extends State<UploadPage> {
                       maxLines: 3,
                     ),
                     
-                    // Status Upload
                     if (status.isNotEmpty)
                       Container(
                         margin: const EdgeInsets.only(top: 16),
@@ -708,7 +724,7 @@ class _UploadPageState extends State<UploadPage> {
                   onPressed: isUploading ? null : () async {
                     setDialogState(() {
                       isUploading = true;
-                      status = 'Mengupload gambar...';
+                      status = 'Mengunggah gambar...';
                     });
 
                     try {
@@ -729,7 +745,7 @@ class _UploadPageState extends State<UploadPage> {
 
                         if (success) {
                           setDialogState(() {
-                            status = '✅ Upload berhasil!';
+                            status = '✅ Mengunggah berhasil!';
                           });
 
                           if (mounted) {
@@ -763,12 +779,12 @@ class _UploadPageState extends State<UploadPage> {
                         }
                       } else {
                         setDialogState(() {
-                          status = '❌ Gagal upload gambar';
+                          status = '❌ Gagal unggah gambar';
                           isUploading = false;
                         });
                         
                         if (mounted) {
-                          _showSnackBar('❌ Gagal upload gambar', isError: true);
+                          _showSnackBar('❌ Gagal unggah gambar', isError: true);
                         }
                       }
                     } catch (e) {
@@ -794,7 +810,7 @@ class _UploadPageState extends State<UploadPage> {
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : const Text('Upload'),
+                      : const Text('Unggah'),
                 ),
               ],
             );
@@ -821,7 +837,6 @@ class _UploadPageState extends State<UploadPage> {
       
       print('🟡 Uploading file: ${imageFile.name}');
       print('🟡 File size: ${bytes.length} bytes');
-      print('🟡 Access token: ${_accessToken!.substring(0, 20)}...');
       
       if (bytes.length > 5 * 1024 * 1024) {
         print('❌ File terlalu besar (${bytes.length} bytes > 5MB)');
@@ -838,11 +853,7 @@ class _UploadPageState extends State<UploadPage> {
         mimeType = 'image/gif';
       }
 
-      print('🟡 Content-Type: $mimeType');
-
       final uploadUrl = Uri.parse('$baseUrl/api/upload/image');
-      
-      print('🟡 Upload URL: $uploadUrl');
       
       final response = await http.post(
         uploadUrl,
@@ -854,13 +865,9 @@ class _UploadPageState extends State<UploadPage> {
         body: bytes,
       );
 
-      print('🟡 Upload response status: ${response.statusCode}');
-      print('🟡 Upload response body: ${response.body}');
-
       if (response.statusCode == 200 || response.statusCode == 201) {
         try {
           final data = jsonDecode(response.body);
-          print('✅ Upload success data: $data');
           
           if (data is Map<String, dynamic>) {
             if (data.containsKey('url') && data['url'] is String) {
@@ -899,7 +906,6 @@ class _UploadPageState extends State<UploadPage> {
           
         } catch (e) {
           print('❌ Error parsing upload response: $e');
-          print('❌ Raw response: ${response.body}');
           return null;
         }
       } else {
@@ -954,9 +960,6 @@ class _UploadPageState extends State<UploadPage> {
         'tanggal_realisasi': tanggalRealisasi,
       };
 
-      print('🟡 Submitting to: $submitUrl');
-      print('🟡 Request body: ${jsonEncode(body)}');
-
       final response = await http.post(
         submitUrl,
         headers: {
@@ -966,9 +969,6 @@ class _UploadPageState extends State<UploadPage> {
         },
         body: jsonEncode(body),
       );
-
-      print('🟡 Submit response status: ${response.statusCode}');
-      print('🟡 Submit response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         print('✅ Submit berhasil!');
@@ -1067,7 +1067,6 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
-  // ==================== WIDGETS ====================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1151,7 +1150,6 @@ class _UploadPageState extends State<UploadPage> {
           controller: widget.scrollController,
           child: Column(
             children: [
-              // HEADER
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(20),
@@ -1282,7 +1280,6 @@ class _UploadPageState extends State<UploadPage> {
 
               const SizedBox(height: 20),
 
-              // KONTROL BULAN
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(16),
@@ -1344,7 +1341,6 @@ class _UploadPageState extends State<UploadPage> {
               ),
               const SizedBox(height: 10),
 
-              // KALENDER
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(20),
@@ -1362,9 +1358,8 @@ class _UploadPageState extends State<UploadPage> {
                 ),
                 child: Column(
                   children: [
-                    // HEADER HARI
                     Row(
-                      children: ['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day) {
+                      children: ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map((day) {
                         return Expanded(
                           child: Center(
                             child: Text(
@@ -1381,7 +1376,6 @@ class _UploadPageState extends State<UploadPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // HARI-HARI
                     Column(
                       children: _calendarDays.map((week) {
                         return Container(
@@ -1456,7 +1450,6 @@ class _UploadPageState extends State<UploadPage> {
                                     child: Stack(
                                       alignment: Alignment.center,
                                       children: [
-                                        // ANGKA TANGGAL
                                         Column(
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
@@ -1477,7 +1470,6 @@ class _UploadPageState extends State<UploadPage> {
                                                             : Colors.grey[400],
                                               ),
                                             ),
-                                            // Tanda event untuk hari lewat
                                             if (hasEvent && isPastDay)
                                               Container(
                                                 margin: const EdgeInsets.only(
@@ -1489,7 +1481,6 @@ class _UploadPageState extends State<UploadPage> {
                                                   shape: BoxShape.circle,
                                                 ),
                                               ),
-                                            // Tanda event untuk hari yang belum lewat
                                             if (hasEvent && !isPastDay)
                                               Container(
                                                 margin: const EdgeInsets.only(
@@ -1521,7 +1512,6 @@ class _UploadPageState extends State<UploadPage> {
 
               const SizedBox(height: 20),
 
-              // DETAIL HARI TERPILIH DENGAN JADWAL
               if (_selectedDate != null) ...[
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1548,7 +1538,7 @@ class _UploadPageState extends State<UploadPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                DateFormat('EEEE, dd MMMM yyyy').format(_selectedDate!),
+                                '${_getIndonesianDayName(DateFormat('EEEE').format(_selectedDate!))}, ${_selectedDate!.day} ${_getIndonesianMonthName(DateFormat('MMMM').format(_selectedDate!))} ${_selectedDate!.year}',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -1594,7 +1584,6 @@ class _UploadPageState extends State<UploadPage> {
                       ),
                       const SizedBox(height: 16),
 
-                      // LIST JADWAL PADA HARI INI
                       if (_getEventsForDay(_selectedDate!).isEmpty)
                         Container(
                           padding: const EdgeInsets.all(40),
@@ -1725,8 +1714,7 @@ class _UploadPageState extends State<UploadPage> {
                                                 : const Color(0xFF666666)),
                                         const SizedBox(width: 6),
                                         Text(
-                                          DateFormat('dd MMM yyyy')
-                                              .format(kegiatan.tanggalMulai),
+                                          '${kegiatan.tanggalMulai.day} ${_getIndonesianMonthName(DateFormat('MMMM').format(kegiatan.tanggalMulai))} ${kegiatan.tanggalMulai.year}',
                                           style: TextStyle(
                                             color: isPastEvent
                                                 ? Colors.grey[600]
@@ -1746,8 +1734,7 @@ class _UploadPageState extends State<UploadPage> {
                                                           : const Color(0xFF666666))),
                                               const SizedBox(width: 8),
                                               Text(
-                                                DateFormat('dd MMM yyyy')
-                                                    .format(kegiatan.tanggalSelesai),
+                                                '${kegiatan.tanggalSelesai.day} ${_getIndonesianMonthName(DateFormat('MMMM').format(kegiatan.tanggalSelesai))} ${kegiatan.tanggalSelesai.year}',
                                                 style: TextStyle(
                                                   color: isPastEvent
                                                       ? Colors.grey[600]
@@ -1783,7 +1770,6 @@ class _UploadPageState extends State<UploadPage> {
                               ),
                             );
                           } else {
-                            // Tampilkan riwayat upload
                             return _riwayatCard(event['data']);
                           }
                         }),
@@ -1793,7 +1779,6 @@ class _UploadPageState extends State<UploadPage> {
                 const SizedBox(height: 20),
               ],
 
-              // Daftar Industri dengan Tasks
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
@@ -1828,7 +1813,6 @@ class _UploadPageState extends State<UploadPage> {
 
               const SizedBox(height: 32),
 
-              // RIWAYAT REALISASI
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
@@ -1895,7 +1879,6 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
-  // Helper functions
   bool _isToday(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year &&
@@ -1975,7 +1958,6 @@ class _UploadPageState extends State<UploadPage> {
     );
   }
 
-
   Widget _buildIndustriCard(Map<String, dynamic> industriData) {
     final industri = industriData['industri'] ?? {};
     final siswaCount = industriData['siswa_count'] ?? 0;
@@ -1998,7 +1980,6 @@ class _UploadPageState extends State<UploadPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Industri
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -2086,13 +2067,11 @@ class _UploadPageState extends State<UploadPage> {
             ),
           ),
 
-          // Tabel Kegiatan
           if (tasks.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  // Header Tabel
                   Container(
                     padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                     decoration: BoxDecoration(
@@ -2141,7 +2120,6 @@ class _UploadPageState extends State<UploadPage> {
                     ),
                   ),
 
-                  // List Kegiatan
                   ...tasks.map((taskData) {
                     final kegiatan = taskData['kegiatan'] ?? {};
                     final isActive = kegiatan['is_active'] ?? false;
@@ -2169,7 +2147,6 @@ class _UploadPageState extends State<UploadPage> {
                       ),
                       child: Row(
                         children: [
-                          // Kolom Jenis Kegiatan
                           Expanded(
                             flex: 3,
                             child: Column(
@@ -2196,7 +2173,6 @@ class _UploadPageState extends State<UploadPage> {
                             ),
                           ),
 
-                          // Kolom Rentang Waktu
                           Expanded(
                             flex: 2,
                             child: Column(
@@ -2230,7 +2206,6 @@ class _UploadPageState extends State<UploadPage> {
                             ),
                           ),
 
-                          // Kolom Status
                           Expanded(
                             flex: 2,
                             child: Column(
@@ -2285,7 +2260,7 @@ class _UploadPageState extends State<UploadPage> {
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          'Uploading...',
+                                          'Mengunggah...',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: widget.primaryColor,
@@ -2574,7 +2549,6 @@ class _UploadPageState extends State<UploadPage> {
   }
 }
 
-// ========== MODEL KEGIATAN PKL ==========
 class KegiatanPkl {
   final int id;
   final String deskripsi;

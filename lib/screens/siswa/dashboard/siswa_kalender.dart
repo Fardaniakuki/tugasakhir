@@ -85,7 +85,7 @@ class _SiswaKalenderState extends State<SiswaKalender> {
       KegiatanPkl(
         id: 2,
         judul: 'Monitoring #1',
-        deskripsi: 'Kunjungan Bpk. Budi Santoso.',
+        deskripsi: 'Kunjungan Bpk. Gayan Laga, S.Pd',
         jenis: 'Monitoring',
         warna: KalenderTheme.purple,
         mulai: now,
@@ -94,7 +94,7 @@ class _SiswaKalenderState extends State<SiswaKalender> {
       KegiatanPkl(
         id: 3,
         judul: 'Monirtoring #2',
-        deskripsi: 'Kunjungan Bpk. Budi Santoso.',
+        deskripsi: 'Kunjungan Bpk. Gayan Laga, S.Pd',
         jenis: 'Monitoring',
         warna: KalenderTheme.blue,
         mulai: now.add(const Duration(days: 2)),
@@ -103,7 +103,7 @@ class _SiswaKalenderState extends State<SiswaKalender> {
       KegiatanPkl(
         id: 4,
         judul: 'Monitoring Guru #3',
-        deskripsi: 'Evaluasi pertengahan.',
+        deskripsi: 'Evaluasi akhir.',
         jenis: 'Monitoring',
         warna: KalenderTheme.purple,
         mulai: now.add(const Duration(days: 10)),
@@ -297,6 +297,7 @@ class _SiswaKalenderState extends State<SiswaKalender> {
                                 },
                               ),
                         ),
+                        const SizedBox(height: 80),
                       ],
                     ),
                   ),

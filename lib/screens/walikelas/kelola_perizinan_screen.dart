@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class KelolaPerizinanTabScreen extends StatefulWidget {
   final ScrollController? scrollController;
@@ -25,6 +29,7 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
   final Color _orange = const Color(0xFFFF9800);
   final Color _red = const Color(0xFFF44336);
   final Color _blue = const Color(0xFF2196F3);
+  final Color _purple = const Color(0xFF9C27B0); // Untuk status opened
   
   late TabController _tabController;
 
@@ -84,7 +89,7 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
                         fontSize: 14,
                       ),
                       tabs: const [
-                        Tab(text: 'Pengajuan Pindah PKL'),
+                        Tab(text: 'Permasalahan Siswa'),
                       ],
                     ),
                   ),
@@ -95,8 +100,8 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
           body: TabBarView(
             controller: _tabController,
             children: [
-              // TAB 1: Kelola Pengajuan Pindah PKL
-              KelolaPengajuanPklContent(
+              // TAB 1: Permasalahan Siswa dengan API
+              PermasalahanSiswaContent(
                 primaryRed: _primaryRed,
                 bgSoft: _bgSoft,
                 secondaryColor: _secondaryColor,
@@ -107,6 +112,7 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
                 orange: _orange,
                 red: _red,
                 blue: _blue,
+                purple: _purple,
               ),
             ],
           ),
@@ -138,7 +144,7 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Kelola Perizinan PKL',
+                'Permasalahan Siswa',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
@@ -149,7 +155,7 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
           ),
           SizedBox(height: 8),
           Text(
-            'Kelola pengajuan pindah PKL siswa',
+            'Pantau permasalahan siswa selama PKL',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey,
@@ -163,10 +169,10 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
 }
 
 // ==============================================
-// TAB: KELOLA PENGAJUAN PINDAH PKL
+// TAB: PERMASALAHAN SISWA DENGAN API
 // ==============================================
 
-class KelolaPengajuanPklContent extends StatefulWidget {
+class PermasalahanSiswaContent extends StatefulWidget {
   final Color primaryRed;
   final Color bgSoft;
   final Color secondaryColor;
@@ -177,8 +183,9 @@ class KelolaPengajuanPklContent extends StatefulWidget {
   final Color orange;
   final Color red;
   final Color blue;
+  final Color purple;
 
-  const KelolaPengajuanPklContent({
+  const PermasalahanSiswaContent({
     super.key,
     required this.primaryRed,
     required this.bgSoft,
@@ -190,95 +197,41 @@ class KelolaPengajuanPklContent extends StatefulWidget {
     required this.orange,
     required this.red,
     required this.blue,
+    required this.purple,
   });
 
   @override
-  State<KelolaPengajuanPklContent> createState() => _KelolaPengajuanPklContentState();
+  State<PermasalahanSiswaContent> createState() => _PermasalahanSiswaContentState();
 }
 
-class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent> 
+class _PermasalahanSiswaContentState extends State<PermasalahanSiswaContent> 
     with AutomaticKeepAliveClientMixin {
   
-  final List<Map<String, dynamic>> _pengajuanPklData = [
-    {
-      'id': 'P001',
-      'nama': 'Ahmad Rizki',
-      'kelas': 'XII TKJ 1',
-      'industri': 'PT. Teknologi Indonesia',
-      'industri_asal': 'PT. Jaringan Nusantara',
-      'tanggal_diajukan': '15 Jan 2024',
-      'status': 'Menunggu',
-      'statusColor': Colors.orange,
-      'tipe': 'Pindah PKL',
-      'is_ditolak': false,
-      'is_diterima': false,
-      'alasan': 'Ingin mendapatkan pengalaman di bidang teknologi',
-    },
-    {
-      'id': 'P002',
-      'nama': 'Siti Nurhaliza',
-      'kelas': 'XII RPL 2',
-      'industri': 'CV. Digital Solusi',
-      'industri_asal': 'PT. Media Kreatif',
-      'tanggal_diajukan': '14 Jan 2024',
-      'status': 'Ditolak',
-      'statusColor': Colors.red,
-      'tipe': 'Pindah PKL',
-      'is_ditolak': true,
-      'is_diterima': false,
-      'alasan_tolak': 'Kuota industri sudah penuh',
-      'alasan': 'Ingin belajar programming lebih dalam',
-    },
-    {
-      'id': 'P003',
-      'nama': 'Budi Santoso',
-      'kelas': 'XII MM 1',
-      'industri': 'PT. Media Kreatif',
-      'industri_asal': 'CV. Tech Solution',
-      'tanggal_diajukan': '13 Jan 2024',
-      'status': 'Disetujui',
-      'statusColor': Colors.green,
-      'tipe': 'Pindah PKL',
-      'is_ditolak': false,
-      'is_diterima': true,
-      'guru_pembimbing': 'Dr. Budi Santoso, M.Kom.',
-      'alasan': 'Ingin fokus pada multimedia',
-    },
-    {
-      'id': 'P004',
-      'nama': 'Dewi Lestari',
-      'kelas': 'XII TKJ 2',
-      'industri': 'PT. Network Indonesia',
-      'industri_asal': 'PT. Telkom Indonesia',
-      'tanggal_diajukan': '12 Jan 2024',
-      'status': 'Menunggu',
-      'statusColor': Colors.orange,
-      'tipe': 'Pindah PKL',
-      'is_ditolak': false,
-      'is_diterima': false,
-      'alasan': 'Ingin belajar jaringan komputer',
-    },
-    {
-      'id': 'P005',
-      'nama': 'Rizky Pratama',
-      'kelas': 'XII RPL 1',
-      'industri': 'PT. Software House',
-      'industri_asal': 'CV. Digital Kreatif',
-      'tanggal_diajukan': '11 Jan 2024',
-      'status': 'Ditolak',
-      'statusColor': Colors.red,
-      'tipe': 'Pindah PKL',
-      'is_ditolak': true,
-      'is_diterima': false,
-      'alasan_tolak': 'Tidak ada alasan yang jelas',
-      'alasan': 'Ingin fokus pada pengembangan aplikasi',
-    },
-  ];
-
+  // Data dari API
+  List<Map<String, dynamic>> _permasalahanData = [];
   List<Map<String, dynamic>> _filteredData = [];
-  String _filterStatus = 'Semua';
+  
   final TextEditingController _searchController = TextEditingController();
-  final List<String> _statusOptions = ['Semua', 'Menunggu', 'Disetujui', 'Ditolak'];
+  
+  // Loading states
+  bool _isLoading = false;
+  
+  // Pagination
+  int _currentPage = 1;
+  int _totalPages = 1;
+  int _totalItems = 0;
+  final int _itemsPerPage = 10;
+  
+  // Filter
+  String? _filterStatus;
+
+  // Kategori display mapping
+  final Map<String, String> _kategoriDisplay = {
+    'kedisiplinan': 'Kedisiplinan',
+    'absensi': 'Absensi',
+    'performa': 'Performa',
+    'lainnya': 'Lainnya',
+  };
 
   @override
   bool get wantKeepAlive => true;
@@ -286,48 +239,238 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
   @override
   void initState() {
     super.initState();
-    _filteredData = _pengajuanPklData;
+    _fetchStudentIssues();
   }
 
-  void _filterByStatus(String status) {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // ============== API METHODS ==============
+
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('access_token');
+  }
+
+  String _getBaseUrl() {
+    return dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+  }
+
+  // GET /api/student-issues/wali-kelas
+  Future<void> _fetchStudentIssues({int page = 1, String? status}) async {
     setState(() {
-      _filterStatus = status;
-      if (status == 'Semua') {
-        _filteredData = _pengajuanPklData;
-      } else {
-        _filteredData = _pengajuanPklData.where((item) => item['status'] == status).toList();
-      }
+      _isLoading = true;
     });
-  }
 
-  void _performSearch() {
-    final query = _searchController.text.toLowerCase().trim();
-    if (query.isNotEmpty) {
-      setState(() {
-        _filteredData = _pengajuanPklData.where((item) {
-          return item['nama'].toLowerCase().contains(query) ||
-                 item['kelas'].toLowerCase().contains(query) ||
-                 item['industri'].toLowerCase().contains(query) ||
-                 item['industri_asal'].toLowerCase().contains(query);
-        }).toList();
-      });
-    } else {
-      _filterByStatus(_filterStatus);
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        _showSnackBar('Token tidak ditemukan', isError: true);
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final baseUrl = _getBaseUrl();
+      var uri = Uri.parse('$baseUrl/api/student-issues/wali-kelas');
+      
+      // Build query parameters
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': _itemsPerPage.toString(),
+      };
+      
+      if (status != null && status != 'Semua' && status != 'semua') {
+        // Konversi display status ke API status
+        String apiStatus = status;
+        if (status == 'Menunggu') apiStatus = 'opened';
+        else if (status == 'Diproses') apiStatus = 'in_progress';
+        else if (status == 'Selesai') apiStatus = 'resolved';
+        
+        queryParams['status'] = apiStatus;
+      }
+      
+      if (_searchController.text.isNotEmpty) {
+        queryParams['search'] = _searchController.text.trim();
+      }
+      
+      uri = uri.replace(queryParameters: queryParams);
+
+      print('📡 Fetching issues from: $uri');
+      
+      final response = await http.get(
+        uri,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('📡 Response status: ${response.statusCode}');
+      print('📡 Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        
+        if (jsonResponse.containsKey('items') && jsonResponse['items'] is List) {
+          final List<dynamic> items = jsonResponse['items'];
+          
+          setState(() {
+            _permasalahanData = items.map((item) {
+              final siswa = item['siswa'] ?? {};
+              final pembimbing = item['pembimbing'];
+              
+              // Format tanggal
+              String formattedDate = _formatDate(item['created_at']);
+              
+              return {
+                'id': item['id'].toString(),
+                'judul': item['judul'] ?? 'Tidak ada judul',
+                'deskripsi': item['deskripsi'] ?? '',
+                'kategori': item['kategori'] ?? 'lainnya',
+                'status': item['status'] ?? 'opened',
+                'tindak_lanjut': item['tindak_lanjut'],
+                'created_at': item['created_at'],
+                'resolved_at': item['resolved_at'],
+                'siswa_id': siswa['id'],
+                'siswa_nama': siswa['nama'] ?? 'Siswa Tidak Diketahui',
+                'siswa_nisn': siswa['nisn'] ?? '-',
+                'pembimbing_nama': pembimbing?['nama'],
+                // Format untuk tampilan card (sesuai dengan dummy)
+                'nama': siswa['nama'] ?? 'Siswa Tidak Diketahui',
+                'kelas': '-', // Kelas tidak ada di response, bisa ditambahkan nanti jika ada
+                'industri': '-', // Industri tidak ada di response
+                'jenis': _kategoriDisplay[item['kategori']] ?? item['kategori'] ?? 'Lainnya',
+                'tanggal': formattedDate,
+              };
+            }).toList();
+            
+            _filteredData = List.from(_permasalahanData);
+            
+            // Set pagination info
+            if (jsonResponse.containsKey('pagination')) {
+              final pagination = jsonResponse['pagination'];
+              _totalPages = pagination['total_pages'] ?? 1;
+              _totalItems = pagination['total_items'] ?? 0;
+              _currentPage = pagination['page'] ?? 1;
+            }
+          });
+          
+          print('✅ Loaded ${_permasalahanData.length} issues');
+        } else {
+          setState(() {
+            _permasalahanData = [];
+            _filteredData = [];
+          });
+          print('⚠️ No items found in response');
+        }
+      } else if (response.statusCode == 401) {
+        _showSnackBar('Sesi habis, silakan login ulang', isError: true);
+      } else {
+        _showSnackBar('Gagal mengambil data: ${response.statusCode}', isError: true);
+        print('❌ Error response: ${response.body}');
+      }
+    } catch (e) {
+      print('❌ Error fetching issues: $e');
+      _showSnackBar('Error: $e', isError: true);
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
+  // Format tanggal
+  String _formatDate(String? dateString) {
+    if (dateString == null) return '-';
+    try {
+      final date = DateTime.parse(dateString);
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  // Translate status API ke display
+  String _translateStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return 'Menunggu';
+      case 'in_progress':
+        return 'Diproses';
+      case 'resolved':
+        return 'Selesai';
+      default:
+        return status;
+    }
+  }
+
+  // Get status color
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return widget.purple;
+      case 'in_progress':
+        return widget.blue;
+      case 'resolved':
+        return widget.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  // Get status icon
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return Icons.access_time;
+      case 'in_progress':
+        return Icons.autorenew;
+      case 'resolved':
+        return Icons.check_circle;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  // Search
+  void _performSearch() {
+    if (_searchController.text.isEmpty) {
+      setState(() {
+        _filteredData = List.from(_permasalahanData);
+      });
+    } else {
+      final query = _searchController.text.toLowerCase().trim();
+      setState(() {
+        _filteredData = _permasalahanData.where((item) {
+          return item['nama'].toLowerCase().contains(query) ||
+                 item['judul'].toLowerCase().contains(query) ||
+                 item['deskripsi'].toLowerCase().contains(query) ||
+                 (item['jenis'] ?? '').toLowerCase().contains(query);
+        }).toList();
+      });
+    }
+  }
+
+  // Filter by status
+  void _filterByStatus(String? status) {
+    setState(() {
+      _filterStatus = status;
+      _currentPage = 1; // Reset ke halaman 1
+      _fetchStudentIssues(page: 1, status: status);
+    });
+  }
+
+  // Snackbar helper
   void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
+        content: Text(message),
         backgroundColor: isError ? widget.red : widget.green,
-        duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
@@ -336,7 +479,17 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
     );
   }
 
+  // Refresh data
+  Future<void> _refreshData() async {
+    await _fetchStudentIssues(page: _currentPage, status: _filterStatus);
+  }
+
+  // Show detail dialog
   void _showDetailDialog(Map<String, dynamic> data) {
+    final status = _translateStatus(data['status']);
+    final statusColor = _getStatusColor(data['status']);
+    final statusIcon = _getStatusIcon(data['status']);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -347,7 +500,7 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
       builder: (context) {
         return Container(
           padding: const EdgeInsets.all(24),
-          height: MediaQuery.of(context).size.height * 0.85,
+          height: MediaQuery.of(context).size.height * 0.75,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -357,7 +510,7 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Detail Pengajuan Pindah PKL',
+                      'Detail Permasalahan',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -379,6 +532,7 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Header Card dengan status
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -386,65 +540,69 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(color: widget.borderColor),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
-                                  decoration: BoxDecoration(
-                                    color: widget.primaryRed.withValues(alpha:0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: widget.primaryRed.withValues(alpha:0.3)),
-                                  ),
-                                  child: Icon(
-                                    Icons.person,
-                                    color: widget.primaryRed,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        data['nama'],
-                                        style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        data['kelas'],
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: widget.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: data['statusColor'].withValues(alpha:0.1),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: data['statusColor'].withValues(alpha:0.3)),
-                                  ),
-                                  child: Text(
-                                    data['status'],
-                                    style: TextStyle(
-                                      color: data['statusColor'],
+                            Container(
+                              width: 50,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha:0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: statusColor.withValues(alpha:0.3)),
+                              ),
+                              child: Icon(
+                                statusIcon,
+                                color: statusColor,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    data['nama'],
+                                    style: const TextStyle(
+                                      fontSize: 18,
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 12,
                                     ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withValues(alpha:0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: statusColor.withValues(alpha:0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          statusIcon,
+                                          size: 12,
+                                          color: statusColor,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          status,
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -452,7 +610,7 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
                       const SizedBox(height: 24),
 
                       const Text(
-                        'Informasi Pengajuan Pindah PKL',
+                        'Informasi Permasalahan',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
@@ -470,23 +628,46 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
                         ),
                         child: Column(
                           children: [
-                            _infoRow('Jenis Pengajuan', data['tipe']),
+                            _infoRow('Judul', data['judul']),
                             const SizedBox(height: 12),
-                            _infoRow('Industri Tujuan', data['industri']),
+                            _infoRow('Permasalahan', data['jenis']),
                             const SizedBox(height: 12),
-                            _infoRow('Industri Asal', data['industri_asal']),
-                            const SizedBox(height: 12),
-                            _infoRow('Tanggal Diajukan', data['tanggal_diajukan']),
-                            const SizedBox(height: 12),
-                            _infoRow('Alasan Siswa', data['alasan']),
-                            if (data['is_diterima'] && data['guru_pembimbing'] != null) ...[
+                            _infoRow('Tanggal Laporan', data['tanggal']),
+                            if (data['pembimbing_nama'] != null) ...[
                               const SizedBox(height: 12),
-                              _infoRow('Guru Pembimbing', data['guru_pembimbing']),
+                              _infoRow('Pembimbing', data['pembimbing_nama']),
                             ],
-                            if (data['is_ditolak'] && data['alasan_tolak'] != null) ...[
+                            if (data['tindak_lanjut'] != null) ...[
                               const SizedBox(height: 12),
-                              _infoRow('Alasan Penolakan', data['alasan_tolak']),
+                              _infoRow('Tindak Lanjut', data['tindak_lanjut']),
                             ],
+                            const SizedBox(height: 12),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(
+                                  width: 120,
+                                  child: Text(
+                                    'Deskripsi:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: widget.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    data['deskripsi'],
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -495,57 +676,30 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
                 ),
               ),
               
+              // HANYA TOMBOL TUTUP - READ ONLY UNTUK WALI KELAS
               Padding(
                 padding: const EdgeInsets.only(top: 16),
-                child: data['status'] == 'Menunggu' 
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _rejectApplication(data),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: widget.red,
-                              side: BorderSide(color: widget.red),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            icon: const Icon(Icons.close, size: 20),
-                            label: const Text(
-                              'TOLAK',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _approveApplication(data),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: widget.green,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                            ),
-                            icon: const Icon(Icons.check, size: 20),
-                            label: const Text(
-                              'SETUJUI',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Container(),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: widget.primaryRed,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text(
+                      'TUTUP',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -583,404 +737,6 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
     );
   }
 
-  void _rejectApplication(Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final TextEditingController alasanController = TextEditingController();
-        
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: SingleChildScrollView(
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: widget.red.withValues(alpha:0.1),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          color: widget.red,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'TOLAK PENGAJUAN PINDAH PKL',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF6B1B1B),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Siswa: ${data['nama']}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  const Text(
-                    'Alasan Penolakan',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF6B1B1B),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: TextField(
-                      controller: alasanController,
-                      maxLines: 4,
-                      decoration: const InputDecoration.collapsed(
-                        hintText: 'Masukkan alasan penolakan...',
-                        hintStyle: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: widget.primaryRed,
-                            side: BorderSide(color: widget.primaryRed),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'BATAL',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (alasanController.text.trim().isEmpty) {
-                              _showSnackBar('Masukkan alasan penolakan', isError: true);
-                              return;
-                            }
-
-                            setState(() {
-                              final index = _pengajuanPklData.indexWhere((item) => item['id'] == data['id']);
-                              if (index != -1) {
-                                _pengajuanPklData[index]['status'] = 'Ditolak';
-                                _pengajuanPklData[index]['statusColor'] = widget.red;
-                                _pengajuanPklData[index]['is_ditolak'] = true;
-                                _pengajuanPklData[index]['alasan_tolak'] = alasanController.text.trim();
-                              }
-                            });
-
-                            _showSnackBar('Pengajuan pindah PKL berhasil ditolak');
-                            Navigator.pop(context);
-                            _filterByStatus(_filterStatus);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: widget.red,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'TOLAK',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _approveApplication(Map<String, dynamic> data) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        final TextEditingController catatanController = TextEditingController();
-        String? selectedGuruId;
-        final List<Map<String, dynamic>> guruList = [
-          {'id': '1', 'nama': 'Dr. Budi Santoso, M.Kom.'},
-          {'id': '2', 'nama': 'Dr. Siti Aminah, M.Pd.'},
-          {'id': '3', 'nama': 'Ir. Joko Susilo, M.T.'},
-        ];
-        
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: SingleChildScrollView(
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: widget.green.withValues(alpha:0.1),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(
-                          Icons.check,
-                          color: widget.green,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'SETUJUI PENGAJUAN PINDAH PKL',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF6B1B1B),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Siswa: ${data['nama']}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  const Text(
-                    'Guru Pembimbing',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF6B1B1B),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: selectedGuruId,
-                        hint: const Text(
-                          'Pilih guru pembimbing',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                        isExpanded: true,
-                        items: guruList.map((guru) {
-                          return DropdownMenuItem<String>(
-                            value: guru['id'],
-                            child: Text(guru['nama']),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          selectedGuruId = newValue;
-                        },
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    'Catatan (Opsional)',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF6B1B1B),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[50],
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: TextField(
-                      controller: catatanController,
-                      maxLines: 3,
-                      decoration: const InputDecoration.collapsed(
-                        hintText: 'Masukkan catatan...',
-                        hintStyle: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                      ),
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: widget.primaryRed,
-                            side: BorderSide(color: widget.primaryRed),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'BATAL',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (selectedGuruId == null) {
-                              _showSnackBar('Pilih guru pembimbing terlebih dahulu', isError: true);
-                              return;
-                            }
-
-                            final guruNama = guruList.firstWhere(
-                              (g) => g['id'] == selectedGuruId,
-                              orElse: () => {'nama': 'Guru'},
-                            )['nama'];
-
-                            setState(() {
-                              final index = _pengajuanPklData.indexWhere((item) => item['id'] == data['id']);
-                              if (index != -1) {
-                                _pengajuanPklData[index]['status'] = 'Disetujui';
-                                _pengajuanPklData[index]['statusColor'] = widget.green;
-                                _pengajuanPklData[index]['is_diterima'] = true;
-                                _pengajuanPklData[index]['guru_pembimbing'] = guruNama;
-                              }
-                            });
-
-                            _showSnackBar('Pengajuan pindah PKL berhasil disetujui');
-                            Navigator.pop(context);
-                            _filterByStatus(_filterStatus);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: widget.green,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text(
-                            'SETUJUI',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _refreshData() async {
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -994,11 +750,9 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
         child: Column(
           children: [
             const SizedBox(height: 16),
-            _filterSection(),
+            _searchAndFilterSection(),
             const SizedBox(height: 20),
-            _statisticsSection(),
-            const SizedBox(height: 20),
-            _documentList(),
+            _problemList(),
             const SizedBox(height: 40),
           ],
         ),
@@ -1006,7 +760,9 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
     );
   }
 
-  Widget _filterSection() {
+  Widget _searchAndFilterSection() {
+    final statusOptions = ['Semua', 'Menunggu', 'Diproses', 'Selesai'];
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -1023,34 +779,47 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Status Pengajuan',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF6B1B1B),
-            ),
-          ),
-          const SizedBox(height: 12),
+          // Status Filter
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: _statusOptions.map((status) {
+              children: statusOptions.map((status) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
-                  child: _FilterChip(
-                    text: status,
-                    isSelected: _filterStatus == status,
+                  child: GestureDetector(
                     onTap: () => _filterByStatus(status),
-                    primaryRed: widget.primaryRed,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _filterStatus == status
+                            ? widget.primaryRed
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: widget.primaryRed),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: _filterStatus == status
+                              ? Colors.white
+                              : widget.primaryRed,
+                        ),
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
             ),
           ),
           const SizedBox(height: 16),
+
+          // Search Field
           _searchField(),
         ],
       ),
@@ -1081,7 +850,7 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
             child: TextField(
               controller: _searchController,
               decoration: const InputDecoration.collapsed(
-                hintText: 'Cari nama siswa, kelas, industri...',
+                hintText: 'Cari nama siswa, judul, atau kategori...',
                 hintStyle: TextStyle(color: Colors.grey, fontSize: 13),
               ),
               onChanged: (value) => _performSearch(),
@@ -1102,71 +871,22 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
     );
   }
 
-  Widget _statisticsSection() {
-    final menungguCount = _pengajuanPklData.where((item) => item['status'] == 'Menunggu').length;
-    final disetujuiCount = _pengajuanPklData.where((item) => item['status'] == 'Disetujui').length;
-    final ditolakCount = _pengajuanPklData.where((item) => item['status'] == 'Ditolak').length;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _StatItem('Total', _pengajuanPklData.length.toString(), Icons.list_alt, widget.primaryRed),
-          _StatItem('Menunggu', menungguCount.toString(), Icons.access_time, widget.orange),
-          _StatItem('Disetujui', disetujuiCount.toString(), Icons.check_circle, widget.green),
-          _StatItem('Ditolak', ditolakCount.toString(), Icons.close, widget.red),
-        ],
-      ),
-    );
-  }
-
-  // ignore: non_constant_identifier_names
-  Widget _StatItem(String title, String value, IconData icon, Color color) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha:0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 20, color: color),
+  Widget _problemList() {
+    if (_isLoading) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.grey[200]!),
         ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Colors.black,
-          ),
+        child: const Center(
+          child: CircularProgressIndicator(),
         ),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
+      );
+    }
 
-  Widget _documentList() {
     if (_filteredData.isEmpty) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1178,10 +898,10 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
         ),
         child: Column(
           children: [
-            Icon(Icons.inbox, size: 64, color: Colors.grey[400]),
+            Icon(Icons.warning_outlined, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
             const Text(
-              'Tidak ada data pengajuan pindah PKL',
+              'Tidak ada data permasalahan',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey,
@@ -1189,12 +909,10 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              _filterStatus == 'Semua' 
-                ? 'Belum ada pengajuan pindah PKL dari siswa'
-                : 'Tidak ada pengajuan dengan status "$_filterStatus"',
+            const Text(
+              'Belum ada laporan permasalahan dari siswa',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey,
               ),
@@ -1212,7 +930,7 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Daftar Pengajuan Pindah PKL',
+                'Daftar Permasalahan',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -1227,7 +945,7 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
                   border: Border.all(color: widget.primaryRed.withValues(alpha:0.2)),
                 ),
                 child: Text(
-                  '${_filteredData.length} pengajuan',
+                  '${_filteredData.length} masalah',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1238,67 +956,182 @@ class _KelolaPengajuanPklContentState extends State<KelolaPengajuanPklContent>
             ],
           ),
           const SizedBox(height: 16),
-          ..._filteredData.map((data) => _DocumentCard(
+          ..._filteredData.map((data) => _ProblemCard(
             data: data,
             onTap: () => _showDetailDialog(data),
             primaryRed: widget.primaryRed,
+            purple: widget.purple,
+            blue: widget.blue,
+            green: widget.green,
           )),
+
+          // Pagination
+          if (_totalPages > 1) ...[
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Previous button
+                InkWell(
+                  onTap: _currentPage > 1
+                      ? () {
+                          setState(() {
+                            _currentPage--;
+                            _fetchStudentIssues(page: _currentPage, status: _filterStatus);
+                          });
+                        }
+                      : null,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _currentPage > 1
+                          ? widget.primaryRed
+                          : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.chevron_left,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+
+                // Page indicator
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE5E5E5)),
+                  ),
+                  child: Text(
+                    '$_currentPage',
+                    style: const TextStyle(
+                      color: Color(0xFF6B1B1B),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+
+                if (_totalPages > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(
+                      '/ $_totalPages',
+                      style: const TextStyle(
+                        color: Color(0xFF666666),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(width: 10),
+
+                // Next button
+                InkWell(
+                  onTap: _currentPage < _totalPages
+                      ? () {
+                          setState(() {
+                            _currentPage++;
+                            _fetchStudentIssues(page: _currentPage, status: _filterStatus);
+                          });
+                        }
+                      : null,
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: _currentPage < _totalPages
+                          ? widget.primaryRed
+                          : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.chevron_right,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String text;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final Color primaryRed;
+// ==============================================
+// WIDGET CARD PERMASALAHAN
+// ==============================================
 
-  const _FilterChip({
-    required this.text,
-    required this.isSelected,
-    required this.onTap,
-    required this.primaryRed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryRed : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: primaryRed),
-        ),
-        child: Text(
-          text,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: isSelected ? Colors.white : primaryRed,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DocumentCard extends StatelessWidget {
+class _ProblemCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final VoidCallback onTap;
   final Color primaryRed;
+  final Color purple;
+  final Color blue;
+  final Color green;
 
-  const _DocumentCard({
+  const _ProblemCard({
     required this.data,
     required this.onTap,
     required this.primaryRed,
+    required this.purple,
+    required this.blue,
+    required this.green,
   });
+
+  String _translateStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return 'Menunggu';
+      case 'in_progress':
+        return 'Diproses';
+      case 'resolved':
+        return 'Selesai';
+      default:
+        return status;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return purple;
+      case 'in_progress':
+        return blue;
+      case 'resolved':
+        return green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return Icons.access_time;
+      case 'in_progress':
+        return Icons.autorenew;
+      case 'resolved':
+        return Icons.check_circle;
+      default:
+        return Icons.help_outline;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final status = _translateStatus(data['status']);
+    final statusColor = _getStatusColor(data['status']);
+    final statusIcon = _getStatusIcon(data['status']);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -1335,8 +1168,8 @@ class _DocumentCard extends StatelessWidget {
                         border: Border.all(color: primaryRed.withValues(alpha:0.3)),
                       ),
                       child: Icon(
-                        Icons.swap_horiz,
-                        color: primaryRed,
+                        statusIcon,
+                        color: statusColor,
                         size: 28,
                       ),
                     ),
@@ -1354,37 +1187,33 @@ class _DocumentCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.grey[100],
+                              color: statusColor.withValues(alpha:0.1),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[300]!),
+                              border: Border.all(color: statusColor.withValues(alpha:0.3)),
                             ),
-                            child: Text(
-                              data['kelas'],
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  statusIcon,
+                                  size: 12,
+                                  color: statusColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  status,
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: data['statusColor'].withValues(alpha:0.1),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: data['statusColor'].withValues(alpha:0.3)),
-                      ),
-                      child: Text(
-                        data['status'],
-                        style: TextStyle(
-                          color: data['statusColor'],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
                       ),
                     ),
                   ],
@@ -1393,15 +1222,17 @@ class _DocumentCard extends StatelessWidget {
                 
                 Row(
                   children: [
-                    Icon(Icons.business, size: 16, color: Colors.grey[600]),
+                    Icon(Icons.title, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Industri Asal: ${data['industri_asal']}',
+                        data['judul'],
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -1410,32 +1241,31 @@ class _DocumentCard extends StatelessWidget {
                 
                 Row(
                   children: [
-                    Icon(Icons.arrow_forward, size: 16, color: Colors.grey[600]),
+                    Icon(Icons.category, size: 16, color: Colors.grey[600]),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Industri Tujuan: ${data['industri']}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Tanggal Diajukan: ${data['tanggal_diajukan']}',
+                        data['jenis'],
                         style: const TextStyle(
                           fontSize: 14,
-                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
                         ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                    const SizedBox(width: 4),
+                    Text(
+                      data['tanggal'],
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
                       ),
                     ),
                   ],

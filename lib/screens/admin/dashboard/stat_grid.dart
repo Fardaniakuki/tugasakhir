@@ -43,12 +43,12 @@ class StatGrid extends StatelessWidget {
             children: [
               Expanded(
                 child: _ModernStatCard(
-                  title: 'Jurusan',
+                  title: 'Program Keahlian',
                   count: totalJurusan,
                   icon: Icons.school,
                   color: const Color(0xFF8B0000),
-                  height: 75,
-                  onTap: () => onBoxTap?.call('Jurusan'),
+                  height: 100,
+                  onTap: () => onBoxTap?.call('Program Keahlian'),
                 ),
               ),
               const SizedBox(width: 10),
@@ -58,7 +58,7 @@ class StatGrid extends StatelessWidget {
                   count: totalSiswa,
                   icon: Icons.menu_book,
                   color: const Color(0xFFB22222),
-                  height: 75,
+                  height: 100,
                   onTap: () => onBoxTap?.call('Murid'),
                 ),
               ),

@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/services.dart';
+import 'package:vibration/vibration.dart';
 
 // Import screens
 import 'package:tes_flutter/screens/kapro/kaprog_main_screen.dart';
@@ -23,11 +25,19 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   String? selectedRole;
   bool isPasswordVisible = false;
   bool isAdminMode = false;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  
+  // Tambahkan variabel untuk menyimpan data sekolah
+  Map<String, dynamic>? _sekolahData;
+  bool _isLoadingSekolah = false;
+  
+  // Animation controller untuk efek geter
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -39,10 +49,30 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isNisnValid = false;
   bool _isGuruCodeValid = false;
 
+  // Untuk menampilkan pesan error di bawah field
+  String? _nameErrorText;
+  String? _passwordErrorText;
+  String? _nisnErrorText;
+  String? _guruCodeErrorText;
+
   @override
   void initState() {
     super.initState();
+    
+    // Inisialisasi animasi geter
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _shakeAnimation = Tween<double>(begin: 0, end: 10).animate(
+      CurvedAnimation(
+        parent: _shakeController,
+        curve: Curves.elasticIn,
+      ),
+    );
+    
     _checkLoginStatus();
+    _loadSekolahData(); // Panggil fungsi untuk load data sekolah
 
     nameController.addListener(_validateName);
     passwordController.addListener(_validatePassword);
@@ -50,13 +80,81 @@ class _LoginScreenState extends State<LoginScreen> {
     guruController.addListener(_validateGuruCode);
   }
 
+  // Fungsi untuk mengambil data sekolah
+  Future<void> _loadSekolahData() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoadingSekolah = true;
+    });
+
+    try {
+      await dotenv.load(fileName: '.env');
+      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      
+      debugPrint('🔍 Mencoba mengambil data sekolah dari: $baseUrl/api/sekolah');
+      
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/sekolah'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      debugPrint('📡 Response status: ${response.statusCode}');
+
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body);
+        debugPrint('✅ Data sekolah berhasil diambil');
+        debugPrint('🏫 Nama Sekolah: ${data['data']?['nama_sekolah']}');
+        debugPrint('🖼️ Logo URL: ${data['data']?['logo_url']}');
+        
+        setState(() {
+          _sekolahData = data['data'];
+          _isLoadingSekolah = false;
+        });
+      } else if (mounted) {
+        debugPrint('⚠️ Gagal mengambil data sekolah. Status: ${response.statusCode}');
+        if (response.body.isNotEmpty) {
+          debugPrint('Response body: ${response.body}');
+        }
+        setState(() {
+          _isLoadingSekolah = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading sekolah data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingSekolah = false;
+        });
+      }
+    }
+  }
+
+  // Fungsi untuk mengaktifkan geter pada HP
+  Future<void> _triggerVibration() async {
+    try {
+      final bool hasVibrator = await Vibration.hasVibrator();
+      if (hasVibrator == true) {
+        Vibration.vibrate(duration: 300);
+      }
+    } catch (e) {
+      // Abaikan error jika vibrasi tidak tersedia
+    }
+  }
+
   void _validateName() {
     final value = nameController.text.trim();
     setState(() {
       if (selectedRole == 'Siswa') {
         _isNameValid = value.length >= 3;
+        _nameErrorText = !_isNameValid && value.isNotEmpty 
+            ? 'Nama lengkap minimal 3 karakter' 
+            : null;
       } else if (selectedRole == 'Guru' && isAdminMode) {
         _isNameValid = value.isNotEmpty;
+        _nameErrorText = !_isNameValid && value.isNotEmpty 
+            ? 'Nama tidak boleh kosong' 
+            : null;
       } else {
         _isGuruCodeValid = value.isNotEmpty;
       }
@@ -67,6 +165,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final value = passwordController.text.trim();
     setState(() {
       _isPasswordValid = value.length >= 6;
+      _passwordErrorText = !_isPasswordValid && value.isNotEmpty 
+          ? 'Kata sandi minimal 6 karakter' 
+          : null;
     });
   }
 
@@ -74,18 +175,28 @@ class _LoginScreenState extends State<LoginScreen> {
     final value = nisnController.text.trim();
     setState(() {
       _isNisnValid = value.length == 10 && _isNumeric(value);
+      _nisnErrorText = !_isNisnValid && value.isNotEmpty 
+          ? 'NISN harus 10 digit angka' 
+          : null;
     });
   }
 
   void _validateGuruCode() {
     final value = guruController.text.trim();
     setState(() {
-      _isGuruCodeValid = value.isNotEmpty;
+      _isGuruCodeValid = value.isNotEmpty && _isNumeric(value);
+      _guruCodeErrorText = !_isGuruCodeValid && value.isNotEmpty 
+          ? 'Kode guru harus berupa angka' 
+          : null;
     });
   }
 
   bool _isNumeric(String value) {
-    return double.tryParse(value) != null;
+    if (value.isEmpty) {
+      return false;
+    }
+    final numericRegex = RegExp(r'^[0-9]+$');
+    return numericRegex.hasMatch(value);
   }
 
   Future<void> _checkLoginStatus() async {
@@ -140,6 +251,8 @@ class _LoginScreenState extends State<LoginScreen> {
     passwordController.removeListener(_validatePassword);
     nisnController.removeListener(_validateNisn);
     guruController.removeListener(_validateGuruCode);
+    
+    _shakeController.dispose();
 
     nameController.dispose();
     passwordController.dispose();
@@ -361,10 +474,105 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Terjadi kesalahan server';
       }
 
-      return errorMessage.isNotEmpty ? errorMessage : 'Terjadi kesalahan';
+      if (errorMessage.isNotEmpty) {
+        return errorMessage;
+      }
+      
+      if (endpoint == '/auth/siswa/login') {
+        return 'Nama lengkap atau NISN salah';
+      } else if (endpoint == '/auth/guru/login') {
+        return 'Kode guru atau password salah';
+      } else if (endpoint == '/auth/login') {
+        return 'Username atau password salah';
+      }
+      
+      return 'Login gagal';
     } catch (e) {
-      return 'Terjadi kesalahan, coba lagi';
+      if (endpoint == '/auth/siswa/login') {
+        return 'Nama lengkap atau NISN salah';
+      } else if (endpoint == '/auth/guru/login') {
+        return 'Kode guru atau password salah';
+      } else if (endpoint == '/auth/login') {
+        return 'Username atau password salah';
+      }
+      return 'Login gagal';
     }
+  }
+
+  // Fungsi untuk menampilkan notifikasi error
+  void _showErrorNotification(String message) {
+    // Jalankan animasi geter
+    _shakeController.forward(from: 0);
+    
+    // Jalankan geter pada HP
+    _triggerVibration();
+    
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).clearSnackBars();
+    
+    final isSiswa = selectedRole == 'Siswa';
+    final accentColor = isSiswa ? const Color(0xFF8A0000) : const Color(0xFF3B060A);
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha:0.3),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Login Gagal',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    message,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: accentColor,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        action: SnackBarAction(
+          label: 'Tutup',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> loginToAPI(String endpoint, Map<String, dynamic> body) async {
@@ -445,23 +653,48 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         if (!mounted) return;
+        
+        setState(() {
+          if (selectedRole == 'Siswa') {
+            _isNameValid = false;
+            _isNisnValid = false;
+            _nameErrorText = 'Nama lengkap atau NISN salah';
+            _nisnErrorText = 'Periksa kembali NISN Anda';
+          } else if (isAdminMode) {
+            _isNameValid = false;
+            _isPasswordValid = false;
+            _nameErrorText = 'Username atau password salah';
+            _passwordErrorText = 'Password yang Anda masukkan salah';
+          } else {
+            _isGuruCodeValid = false;
+            _isPasswordValid = false;
+            _guruCodeErrorText = 'Kode guru atau password salah';
+            _passwordErrorText = 'Password yang Anda masukkan salah';
+          }
+        });
+        
         final errorMessage = _getUserFriendlyError(endpoint, response.statusCode, response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.black87,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        _showErrorNotification(errorMessage);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Terjadi kesalahan: $e'),
-          backgroundColor: Colors.black87,
-        ),
-      );
+      
+      String errorMessage;
+      if (e.toString().contains('SocketException') || e.toString().contains('Connection refused')) {
+        errorMessage = 'Tidak dapat terhubung ke server';
+      } else if (e.toString().contains('Timeout')) {
+        errorMessage = 'Koneksi timeout, periksa jaringan Anda';
+      } else {
+        if (selectedRole == 'Siswa') {
+          errorMessage = 'Nama lengkap atau NISN salah';
+        } else if (isAdminMode) {
+          errorMessage = 'Username atau password salah';
+        } else {
+          errorMessage = 'Kode guru atau password salah';
+        }
+      }
+      
+      _showErrorNotification(errorMessage);
     }
   }
 
@@ -525,6 +758,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleLogin() {
+    setState(() {
+      _nameErrorText = null;
+      _passwordErrorText = null;
+      _nisnErrorText = null;
+      _guruCodeErrorText = null;
+    });
+    
     if (_formKey.currentState!.validate()) {
       if (selectedRole == 'Siswa') {
         loginToAPI('/auth/siswa/login', {
@@ -542,6 +782,9 @@ class _LoginScreenState extends State<LoginScreen> {
           'password': passwordController.text.trim(),
         });
       }
+    } else {
+      _shakeController.forward(from: 0);
+      _triggerVibration();
     }
   }
 
@@ -600,6 +843,7 @@ class _LoginScreenState extends State<LoginScreen> {
               fit: BoxFit.cover,
             ),
           ),
+          // Logo Sekolah - Diambil dari API
           Positioned(
             top: screenHeight * 0.15,
             left: 0,
@@ -614,19 +858,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(screenWidth * 0.19),
-                  child: Image.asset(
-                    'assets/images/smkn2.webp',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Center(
-                        child: Icon(
-                          Icons.school,
-                          size: screenWidth * 0.3,
-                          color: const Color(0xFF3B060A),
-                        ),
-                      );
-                    },
-                  ),
+                  child: _buildSchoolLogo(screenWidth),
                 ),
               ),
             ),
@@ -758,6 +990,91 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Widget untuk logo di halaman pemilihan role
+  Widget _buildSchoolLogo(double screenWidth) {
+    if (_isLoadingSekolah) {
+      debugPrint('⏳ Loading logo dari server...');
+      return Container(
+        color: Colors.grey[300],
+        child: const Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B060A)),
+          ),
+        ),
+      );
+    }
+
+    if (_sekolahData != null && 
+        _sekolahData!['logo_url'] != null && 
+        _sekolahData!['logo_url'].toString().isNotEmpty) {
+      
+      debugPrint('🖼️ Menampilkan logo dari URL: ${_sekolahData!['logo_url']}');
+      debugPrint('📋 Data diambil dari API sekolah (Admin)');
+      
+      return Image.network(
+        _sekolahData!['logo_url'],
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            debugPrint('✅ Logo berhasil dimuat dari server');
+            return child;
+          }
+          debugPrint('⏳ Memuat logo dari server... ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
+          return Container(
+            color: Colors.grey[300],
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / 
+                      loadingProgress.expectedTotalBytes!
+                    : null,
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B060A)),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ Gagal memuat logo dari server: $error');
+          debugPrint('⚠️ Fallback ke logo lokal assets/images/smkn2.webp');
+          return Image.asset(
+            'assets/images/smkn2.webp',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint('❌ Gagal memuat logo lokal, fallback ke icon');
+              return Center(
+                child: Icon(
+                  Icons.school,
+                  size: screenWidth * 0.3,
+                  color: const Color(0xFF3B060A),
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+
+    debugPrint('⚠️ Tidak ada logo_url dari server, menggunakan logo lokal');
+    debugPrint('📁 Menggunakan logo dari: assets/images/smkn2.webp');
+    
+    return Image.asset(
+      'assets/images/smkn2.webp',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('❌ Gagal memuat logo lokal, fallback ke icon');
+        return Center(
+          child: Icon(
+            Icons.school,
+            size: screenWidth * 0.3,
+            color: const Color(0xFF3B060A),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildLoginScreen() {
     final isSiswa = selectedRole == 'Siswa';
     final isGuru = selectedRole == 'Guru';
@@ -770,267 +1087,369 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      body: Stack(
-        children: [
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.1,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(containerRadius),
-                  topRight: Radius.circular(containerRadius),
+      body: AnimatedBuilder(
+        animation: _shakeAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(_shakeAnimation.value, 0),
+            child: child,
+          );
+        },
+        child: Stack(
+          children: [
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.1,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(containerRadius),
+                    topRight: Radius.circular(containerRadius),
+                  ),
                 ),
               ),
             ),
-          ),
-          SafeArea(
-            child: GestureDetector(
-              onTap: () => FocusScope.of(context).unfocus(),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const SizedBox(height: 40),
-                            Container(
-                              width: 140,
-                              height: 140,
-                              margin: const EdgeInsets.only(bottom: 20),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(60),
-                                child: Image.asset(
-                                  'assets/images/smkn2.webp',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      width: 120,
-                                      height: 120,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Colors.white,
-                                      ),
-                                      child: Center(
-                                        child: Icon(
-                                          isSiswa ? Icons.person : Icons.school,
-                                          size: 50,
-                                          color: accentColor,
-                                        ),
-                                      ),
-                                    );
-                                  },
+            SafeArea(
+              child: GestureDetector(
+                onTap: () => FocusScope.of(context).unfocus(),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 40),
+                              Container(
+                                width: 140,
+                                height: 140,
+                                margin: const EdgeInsets.only(bottom: 20),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(60),
+                                  child: _buildLoginScreenLogo(isSiswa, accentColor),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 20),
-                            Container(
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 20),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.grey[300]!,
-                                  width: 1.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha:0.05),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                              const SizedBox(height: 20),
+                              Container(
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Colors.grey[300]!,
+                                    width: 1.5,
                                   ),
-                                ],
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 25,
-                              ),
-                              child: Form(
-                                key: _formKey,
-                                child: Column(
-                                  children: [
-                                    if (isSiswa) ...[
-                                      _buildInputField(
-                                        label: 'Nama Lengkap',
-                                        hint: 'Masukkan Nama Lengkap',
-                                        controller: nameController,
-                                        isValid: _isNameValid,
-                                        accentColor: accentColor,
-                                      ),
-                                      const SizedBox(height: 15),
-                                      _buildInputField(
-                                        label: 'NISN',
-                                        hint: 'Masukkan NISN (10 digit)',
-                                        controller: nisnController,
-                                        isValid: _isNisnValid,
-                                        isNisn: true,
-                                        accentColor: accentColor,
-                                      ),
-                                    ] else if (isGuru && !isAdminMode) ...[
-                                      _buildInputField(
-                                        label: 'Kode Guru',
-                                        hint: 'Masukkan Kode Guru',
-                                        controller: guruController,
-                                        isValid: _isGuruCodeValid,
-                                        accentColor: accentColor,
-                                      ),
-                                      const SizedBox(height: 15),
-                                      _buildInputField(
-                                        label: 'Kata Sandi',
-                                        hint: 'Masukkan Kata Sandi',
-                                        controller: passwordController,
-                                        isValid: _isPasswordValid,
-                                        isPassword: true,
-                                        accentColor: accentColor,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      GestureDetector(
-                                        onTap: () {
-                                          setState(() {
-                                            isAdminMode = true;
-                                            guruController.clear();
-                                            nameController.clear();
-                                            passwordController.clear();
-                                          });
-                                        },
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                          ),
-                                          child: Center(
-                                            child: Text(
-                                              'Masuk sebagai Admin',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: accentColor,
-                                                fontWeight: FontWeight.bold,
-                                                decoration:
-                                                    TextDecoration.underline,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha:0.05),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 25,
+                                ),
+                                child: Form(
+                                  key: _formKey,
+                                  child: Column(
+                                    children: [
+                                      if (isSiswa) ...[
+                                        _buildInputField(
+                                          label: 'Nama Lengkap',
+                                          hint: 'Masukkan Nama Lengkap',
+                                          controller: nameController,
+                                          isValid: _isNameValid,
+                                          errorText: _nameErrorText,
+                                          accentColor: accentColor,
+                                        ),
+                                        const SizedBox(height: 15),
+                                        _buildInputField(
+                                          label: 'NISN',
+                                          hint: 'Masukkan NISN (10 digit)',
+                                          controller: nisnController,
+                                          isValid: _isNisnValid,
+                                          errorText: _nisnErrorText,
+                                          isNisn: true,
+                                          accentColor: accentColor,
+                                        ),
+                                      ] else if (isGuru && !isAdminMode) ...[
+                                        _buildGuruCodeField(
+                                          label: 'Kode Guru',
+                                          hint: 'Masukkan Kode Guru',
+                                          controller: guruController,
+                                          isValid: _isGuruCodeValid,
+                                          errorText: _guruCodeErrorText,
+                                          accentColor: accentColor,
+                                        ),
+                                        const SizedBox(height: 15),
+                                        _buildInputField(
+                                          label: 'Kata Sandi',
+                                          hint: 'Masukkan Kata Sandi',
+                                          controller: passwordController,
+                                          isValid: _isPasswordValid,
+                                          errorText: _passwordErrorText,
+                                          isPassword: true,
+                                          accentColor: accentColor,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        GestureDetector(
+                                          onTap: () {
+                                            setState(() {
+                                              isAdminMode = true;
+                                              guruController.clear();
+                                              nameController.clear();
+                                              passwordController.clear();
+                                              _nameErrorText = null;
+                                              _passwordErrorText = null;
+                                              _guruCodeErrorText = null;
+                                            });
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 8,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                'Masuk sebagai Admin',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: accentColor,
+                                                  fontWeight: FontWeight.bold,
+                                                  decoration:
+                                                      TextDecoration.underline,
+                                                ),
                                               ),
                                             ),
                                           ),
                                         ),
+                                      ] else if (isAdminMode) ...[
+                                        _buildInputField(
+                                          label: 'Nama',
+                                          hint: 'Masukkan Nama Anda',
+                                          controller: nameController,
+                                          isValid: _isNameValid,
+                                          errorText: _nameErrorText,
+                                          accentColor: accentColor,
+                                        ),
+                                        const SizedBox(height: 15),
+                                        _buildInputField(
+                                          label: 'Kata Sandi',
+                                          hint: 'Masukkan Kata Sandi',
+                                          controller: passwordController,
+                                          isValid: _isPasswordValid,
+                                          errorText: _passwordErrorText,
+                                          isPassword: true,
+                                          accentColor: accentColor,
+                                        ),
+                                      ],
+                                      const SizedBox(height: 20),
+                                      Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(15),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha:0.15),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ],
+                                        ),
+                                        child: ElevatedButton(
+                                          onPressed: _handleLogin,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: accentColor,
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 14),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(15),
+                                            ),
+                                            elevation: 0,
+                                          ),
+                                          child: Text(
+                                            isAdminMode
+                                                ? 'Masuk sebagai Admin'
+                                                : 'Masuk',
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                    ] else if (isAdminMode) ...[
-                                      _buildInputField(
-                                        label: 'Nama',
-                                        hint: 'Masukkan Nama Anda',
-                                        controller: nameController,
-                                        isValid: _isNameValid,
-                                        accentColor: accentColor,
-                                      ),
-                                      const SizedBox(height: 15),
-                                      _buildInputField(
-                                        label: 'Kata Sandi',
-                                        hint: 'Masukkan Kata Sandi',
-                                        controller: passwordController,
-                                        isValid: _isPasswordValid,
-                                        isPassword: true,
-                                        accentColor: accentColor,
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        width: double.infinity,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: accentColor,
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        child: TextButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              selectedRole = null;
+                                              isAdminMode = false;
+                                              nameController.clear();
+                                              passwordController.clear();
+                                              nisnController.clear();
+                                              guruController.clear();
+                                              _nameErrorText = null;
+                                              _passwordErrorText = null;
+                                              _nisnErrorText = null;
+                                              _guruCodeErrorText = null;
+                                            });
+                                          },
+                                          style: TextButton.styleFrom(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 12),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Ubah Jenis Akun?',
+                                            style: TextStyle(
+                                              color: accentColor,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                     ],
-                                    const SizedBox(height: 20),
-                                    Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(15),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black
-                                                .withValues(alpha:0.15),
-                                            blurRadius: 6,
-                                            offset: const Offset(0, 3),
-                                          ),
-                                        ],
-                                      ),
-                                      child: ElevatedButton(
-                                        onPressed: _handleLogin,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: accentColor,
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 14),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(15),
-                                          ),
-                                          elevation: 0,
-                                        ),
-                                        child: Text(
-                                          isAdminMode
-                                              ? 'Masuk sebagai Admin'
-                                              : 'Masuk',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: accentColor,
-                                          width: 1.5,
-                                        ),
-                                      ),
-                                      child: TextButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            selectedRole = null;
-                                            isAdminMode = false;
-                                            nameController.clear();
-                                            passwordController.clear();
-                                            nisnController.clear();
-                                            guruController.clear();
-                                          });
-                                        },
-                                        style: TextButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 12),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          'Ubah Jenis Akun?',
-                                          style: TextStyle(
-                                            color: accentColor,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 30),
-                          ],
+                              const SizedBox(height: 30),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  // Widget untuk logo di halaman login form
+  Widget _buildLoginScreenLogo(bool isSiswa, Color accentColor) {
+    if (_isLoadingSekolah) {
+      debugPrint('⏳ Loading logo dari server (halaman login)...');
+      return Container(
+        color: Colors.grey[300],
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+          ),
+        ),
+      );
+    }
+
+    if (_sekolahData != null && 
+        _sekolahData!['logo_url'] != null && 
+        _sekolahData!['logo_url'].toString().isNotEmpty) {
+      
+      debugPrint('🖼️ Menampilkan logo dari URL (halaman login): ${_sekolahData!['logo_url']}');
+      debugPrint('📋 Data diambil dari API sekolah (Admin)');
+      
+      return Image.network(
+        _sekolahData!['logo_url'],
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            debugPrint('✅ Logo berhasil dimuat dari server (halaman login)');
+            return child;
+          }
+          debugPrint('⏳ Memuat logo dari server (halaman login)... ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
+          return Container(
+            color: Colors.grey[300],
+            child: Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded / 
+                      loadingProgress.expectedTotalBytes!
+                    : null,
+                valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          debugPrint('❌ Gagal memuat logo dari server (halaman login): $error');
+          debugPrint('⚠️ Fallback ke logo lokal assets/images/smkn2.webp');
+          return Image.asset(
+            'assets/images/smkn2.webp',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint('❌ Gagal memuat logo lokal, fallback ke icon');
+              return Container(
+                width: 120,
+                height: 120,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+                child: Center(
+                  child: Icon(
+                    isSiswa ? Icons.person : Icons.school,
+                    size: 50,
+                    color: accentColor,
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+
+    debugPrint('⚠️ Tidak ada logo_url dari server, menggunakan logo lokal (halaman login)');
+    debugPrint('📁 Menggunakan logo dari: assets/images/smkn2.webp');
+    
+    return Image.asset(
+      'assets/images/smkn2.webp',
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('❌ Gagal memuat logo lokal, fallback ke icon');
+        return Container(
+          width: 120,
+          height: 120,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+          ),
+          child: Center(
+            child: Icon(
+              isSiswa ? Icons.person : Icons.school,
+              size: 50,
+              color: accentColor,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1040,6 +1459,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required TextEditingController controller,
     required bool isValid,
     required Color accentColor,
+    String? errorText,
     bool isPassword = false,
     bool isNisn = false,
   }) {
@@ -1058,6 +1478,9 @@ class _LoginScreenState extends State<LoginScreen> {
         TextFormField(
           controller: controller,
           keyboardType: isNisn ? TextInputType.number : TextInputType.text,
+          inputFormatters: isNisn
+              ? [FilteringTextInputFormatter.digitsOnly]
+              : null,
           style: const TextStyle(color: Colors.black),
           maxLength: isNisn ? 10 : null,
           obscureText: isPassword && !isPasswordVisible,
@@ -1074,12 +1497,31 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey[300]!),
+              borderSide: BorderSide(
+                color: errorText != null 
+                    ? Colors.red[300]! 
+                    : Colors.grey[300]!,
+                width: errorText != null ? 1.5 : 1,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: accentColor,
+                color: errorText != null ? Colors.red : accentColor,
+                width: errorText != null ? 2 : 2,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: Colors.red[300]!,
+                width: 1.5,
+              ),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Colors.red,
                 width: 2,
               ),
             ),
@@ -1090,7 +1532,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       isPasswordVisible
                           ? Icons.visibility_off
                           : Icons.visibility,
-                      color: accentColor,
+                      color: errorText != null ? Colors.red : accentColor,
                     ),
                     onPressed: () {
                       setState(() {
@@ -1099,15 +1541,108 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   )
                 : null,
+            errorText: errorText,
+            errorStyle: const TextStyle(
+              fontSize: 12,
+              color: Colors.red,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Tidak boleh kosong';
             }
-            if (!isValid) {
+            if (!isValid && errorText == null) {
               if (isNisn) return 'NISN harus 10 digit angka';
               if (isPassword) return 'Kata sandi minimal 6 karakter';
               return 'Input tidak valid';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGuruCodeField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    required bool isValid,
+    required Color accentColor,
+    String? errorText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: const TextStyle(color: Colors.black),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: Colors.black54),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: errorText != null 
+                    ? Colors.red[300]! 
+                    : Colors.grey[300]!,
+                width: errorText != null ? 1.5 : 1,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: errorText != null ? Colors.red : accentColor,
+                width: errorText != null ? 2 : 2,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: Colors.red[300]!,
+                width: 1.5,
+              ),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(
+                color: Colors.red,
+                width: 2,
+              ),
+            ),
+            errorText: errorText,
+            errorStyle: const TextStyle(
+              fontSize: 12,
+              color: Colors.red,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Tidak boleh kosong';
+            }
+            if (!isValid && errorText == null) {
+              return 'Kode guru harus angka';
             }
             return null;
           },

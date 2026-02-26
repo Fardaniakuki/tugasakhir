@@ -45,13 +45,13 @@ class _EditMajorPageState extends State<EditMajorPage> {
     _namaController = TextEditingController(text: widget.majorData['nama']);
     _kaprogController = TextEditingController();
     _selectedKaprogId = widget.majorData['kaprog_guru_id']?.toString();
-    
+
     _kodeFocusNode = FocusNode();
     _namaFocusNode = FocusNode();
     _kaprogFocusNode = FocusNode();
 
     _kaprogSearchController.addListener(_filterKaprogList);
-    
+
     _loadKaprogData();
   }
 
@@ -73,7 +73,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
         return (kaprog['nama']?.toString().toLowerCase() ?? '').contains(query);
       }).toList();
     });
-    
+
     // Update overlay jika sedang terbuka
     if (_kaprogOverlayEntry != null && _kaprogOverlayEntry!.mounted) {
       _kaprogOverlayEntry!.markNeedsBuild();
@@ -118,9 +118,11 @@ class _EditMajorPageState extends State<EditMajorPage> {
         setState(() {
           _kaprogList = kaprogData;
           _filteredKaprogList = List.from(kaprogData);
-          
+
           // Set nama kaprog yang terpilih ke controller
-          if (_selectedKaprogId != null && _selectedKaprogId!.isNotEmpty && _selectedKaprogId != 'null') {
+          if (_selectedKaprogId != null &&
+              _selectedKaprogId!.isNotEmpty &&
+              _selectedKaprogId != 'null') {
             try {
               final selectedKaprog = kaprogData.firstWhere(
                 (k) => k['id'] == _selectedKaprogId,
@@ -130,7 +132,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
               _kaprogController.clear();
             }
           }
-          
+
           _isLoading = false;
         });
       } else {
@@ -147,7 +149,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
   Future<void> _updateMajor() async {
     // Dismiss keyboard before validating
     FocusScope.of(context).unfocus();
-    
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSubmitting = true);
@@ -196,7 +198,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
         _showSuccessDialog();
       } else {
         final error = json.decode(response.body);
-        final String errorMessage = error['message'] ?? 'Gagal memperbarui jurusan';
+        final String errorMessage =
+            error['message'] ?? 'Gagal memperbarui jurusan';
         _showErrorDialog(errorMessage);
       }
     } catch (e) {
@@ -208,7 +211,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
   void _showSuccessDialog() {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withValues(alpha:0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (_) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         backgroundColor: Colors.white,
@@ -247,7 +250,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha:0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(Icons.check_circle_rounded,
@@ -265,7 +268,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 20, color: Colors.white),
+                      icon: const Icon(Icons.close,
+                          size: 20, color: Colors.white),
                       onPressed: () {
                         Navigator.pop(context);
                         Navigator.pop(context, true);
@@ -276,7 +280,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                   ],
                 ),
               ),
-              
+
               // Konten utama
               Padding(
                 padding: const EdgeInsets.all(24),
@@ -310,7 +314,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                   ],
                 ),
               ),
-              
+
               // Tombol OK
               Container(
                 padding: const EdgeInsets.all(16),
@@ -352,7 +356,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withValues(alpha:0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       builder: (_) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         backgroundColor: Colors.white,
@@ -391,7 +395,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha:0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Icon(Icons.error_outline_rounded,
@@ -409,7 +413,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 20, color: Colors.white),
+                      icon: const Icon(Icons.close,
+                          size: 20, color: Colors.white),
                       onPressed: () => Navigator.pop(context),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
@@ -417,7 +422,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                   ],
                 ),
               ),
-              
+
               // Konten utama
               Padding(
                 padding: const EdgeInsets.all(24),
@@ -451,7 +456,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                   ],
                 ),
               ),
-              
+
               // Tombol Tutup
               Container(
                 padding: const EdgeInsets.all(16),
@@ -495,7 +500,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
       return;
     }
 
-    final RenderBox renderBox = _kaprogFieldKey.currentContext!.findRenderObject() as RenderBox;
+    final RenderBox renderBox =
+        _kaprogFieldKey.currentContext!.findRenderObject() as RenderBox;
     final fieldOffset = renderBox.localToGlobal(Offset.zero);
     final fieldSize = renderBox.size;
     final screenSize = MediaQuery.of(context).size;
@@ -538,7 +544,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
                     children: [
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.grey[50],
                             borderRadius: BorderRadius.circular(8),
@@ -546,7 +553,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.search, color: Colors.grey, size: 20),
+                              const Icon(Icons.search,
+                                  color: Colors.grey, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: TextField(
@@ -564,7 +572,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
                               if (_kaprogSearchController.text.isNotEmpty)
                                 GestureDetector(
                                   onTap: () => _kaprogSearchController.clear(),
-                                  child: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                                  child: const Icon(Icons.clear,
+                                      size: 16, color: Colors.grey),
                                 ),
                             ],
                           ),
@@ -587,7 +596,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                     ],
                   ),
                 ),
-                
+
                 // List Kaprog
                 Expanded(
                   child: _buildKaprogList(),
@@ -645,9 +654,9 @@ class _EditMajorPageState extends State<EditMajorPage> {
       itemCount: options.length,
       itemBuilder: (context, index) {
         final kaprog = options[index];
-        final isSelected = _selectedKaprogId == kaprog['id']?.toString() || 
-                          (_selectedKaprogId == null && kaprog['id'] == null);
-        
+        final isSelected = _selectedKaprogId == kaprog['id']?.toString() ||
+            (_selectedKaprogId == null && kaprog['id'] == null);
+
         return InkWell(
           onTap: () {
             setState(() {
@@ -667,7 +676,9 @@ class _EditMajorPageState extends State<EditMajorPage> {
                   : Border(
                       top: BorderSide(color: Colors.grey[100]!),
                     ),
-              color: isSelected ? _primaryColor.withValues(alpha:0.1) : Colors.transparent,
+              color: isSelected
+                  ? _primaryColor.withValues(alpha: 0.1)
+                  : Colors.transparent,
             ),
             child: Row(
               children: [
@@ -721,10 +732,9 @@ class _EditMajorPageState extends State<EditMajorPage> {
     _kaprogSearchFocusNode.unfocus();
   }
 
-  // ========== FORM FIELDS ==========
-
-  Widget _buildFormField(
-      IconData icon, String label, TextEditingController controller, FocusNode focusNode) {
+// ========== FORM FIELDS ==========
+  Widget _buildFormField(IconData icon, String label,
+      TextEditingController controller, FocusNode focusNode) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -769,24 +779,53 @@ class _EditMajorPageState extends State<EditMajorPage> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                TextFormField(
-                  controller: controller,
-                  focusNode: focusNode,
-                  validator: (value) =>
-                      value == null || value.isEmpty ? 'Wajib diisi' : null,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                    isDense: true,
-                    errorStyle: TextStyle(
-                      fontSize: 12,
-                      color: Colors.red,
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: focusNode.hasFocus
+                          ? _primaryColor
+                          : Colors.grey.shade300,
+                      width: focusNode.hasFocus ? 2 : 1,
                     ),
+                  ),
+                  child: TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    validator: (value) =>
+                        value == null || value.isEmpty ? 'Wajib diisi' : null,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
+                      border: InputBorder.none,
+                      filled: true,
+                      fillColor: Colors.white,
+                      isDense: true,
+                      errorStyle: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.red,
+                      ),
+                      // Menambahkan indikator edit saat focus
+                      suffixIcon: focusNode.hasFocus
+                          ? Icon(
+                              Icons.edit_rounded,
+                              size: 18,
+                              color: _primaryColor,
+                            )
+                          : null,
+                    ),
+                    // Update UI saat focus berubah
+                    onTap: () {
+                      setState(() {});
+                    },
                   ),
                 ),
               ],
@@ -823,7 +862,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
                 color: _primaryColor,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+              child: const Icon(Icons.person_rounded,
+                  color: Colors.white, size: 20),
             ),
             const SizedBox(width: 16),
             Container(
@@ -837,7 +877,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Kaprog',
+                    'Pokja',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey,
@@ -846,11 +886,15 @@ class _EditMajorPageState extends State<EditMajorPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _kaprogController.text.isEmpty ? 'Pilih Kaprog' : _kaprogController.text,
+                    _kaprogController.text.isEmpty
+                        ? 'Pilih Pokja'
+                        : _kaprogController.text,
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: _kaprogController.text.isNotEmpty ? Colors.black87 : Colors.grey[600],
+                      color: _kaprogController.text.isNotEmpty
+                          ? Colors.black87
+                          : Colors.grey[600],
                     ),
                   ),
                 ],
@@ -895,7 +939,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                     ),
                     const SizedBox(width: 8),
                     const Text(
-                      'Edit Jurusan',
+                      'Ubah Data Program Keahlian',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -906,7 +950,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                   ],
                 ),
               ),
-              
+
               // SATU CONTAINER PUTIH UTUH DENGAN BORDER RADIUS
               Expanded(
                 child: Container(
@@ -922,7 +966,7 @@ class _EditMajorPageState extends State<EditMajorPage> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha:0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, -5),
                       ),
@@ -936,7 +980,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
                         )
                       : SingleChildScrollView(
                           physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 30),
                           child: Form(
                             key: _formKey,
                             child: Column(
@@ -953,7 +998,8 @@ class _EditMajorPageState extends State<EditMajorPage> {
                                       color: Colors.white,
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withValues(alpha:0.1),
+                                          color: Colors.black
+                                              .withValues(alpha: 0.1),
                                           blurRadius: 8,
                                           offset: const Offset(0, 3),
                                         ),
@@ -979,10 +1025,10 @@ class _EditMajorPageState extends State<EditMajorPage> {
                                     ),
                                   ),
                                 ),
-                                
+
                                 // JUDUL FORM DI TENGAH
                                 const Text(
-                                  'Edit Data Jurusan',
+                                  'Ubah Data Program Keahlian',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -990,24 +1036,24 @@ class _EditMajorPageState extends State<EditMajorPage> {
                                   ),
                                 ),
                                 const SizedBox(height: 30),
-                                
+
                                 // FORM FIELDS
                                 _buildFormField(
                                   Icons.code_rounded,
-                                  'Kode Jurusan',
+                                  'Kode Program Keahlian',
                                   _kodeController,
                                   _kodeFocusNode,
                                 ),
                                 _buildFormField(
                                   Icons.school_rounded,
-                                  'Nama Jurusan',
+                                  'Nama Program Keahlian',
                                   _namaController,
                                   _namaFocusNode,
                                 ),
                                 _buildKaprogField(),
-                                
+
                                 const SizedBox(height: 40),
-                                
+
                                 // TOMBOL SIMPAN
                                 Container(
                                   margin: const EdgeInsets.only(bottom: 30),
@@ -1016,34 +1062,44 @@ class _EditMajorPageState extends State<EditMajorPage> {
                                       Expanded(
                                         child: Container(
                                           decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: _primaryColor.withValues(alpha:0.2),
+                                                color: _primaryColor.withValues(
+                                                    alpha: 0.2),
                                                 blurRadius: 4,
                                                 offset: const Offset(0, 2),
                                               ),
                                             ],
                                           ),
                                           child: ElevatedButton(
-                                            onPressed: _isSubmitting ? null : _updateMajor,
+                                            onPressed: _isSubmitting
+                                                ? null
+                                                : _updateMajor,
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: _primaryColor,
                                               foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(vertical: 16),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 16),
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
                                               elevation: 0,
                                             ),
                                             child: _isSubmitting
                                                 ? const Row(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
                                                     children: [
                                                       SizedBox(
                                                         width: 20,
                                                         height: 20,
-                                                        child: CircularProgressIndicator(
+                                                        child:
+                                                            CircularProgressIndicator(
                                                           strokeWidth: 2.5,
                                                           color: Colors.white,
                                                         ),
@@ -1053,21 +1109,26 @@ class _EditMajorPageState extends State<EditMajorPage> {
                                                         'Menyimpan...',
                                                         style: TextStyle(
                                                           fontSize: 16,
-                                                          fontWeight: FontWeight.w600,
+                                                          fontWeight:
+                                                              FontWeight.w600,
                                                         ),
                                                       ),
                                                     ],
                                                   )
                                                 : const Row(
-                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
                                                     children: [
-                                                      Icon(Icons.save_rounded, size: 20),
+                                                      Icon(Icons.save_rounded,
+                                                          size: 20),
                                                       SizedBox(width: 10),
                                                       Text(
                                                         'Simpan Perubahan',
                                                         style: TextStyle(
                                                           fontSize: 16,
-                                                          fontWeight: FontWeight.w600,
+                                                          fontWeight:
+                                                              FontWeight.w600,
                                                         ),
                                                       ),
                                                     ],

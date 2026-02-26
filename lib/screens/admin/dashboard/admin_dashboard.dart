@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dashboard_service.dart';
 import 'stat_grid.dart';
 import '../crud/add_person_page.dart';
-import 'tahun_ajaran_page.dart'; // IMPORT TAHUN AJARAN
+import 'tahun_ajaran_page.dart';
 import 'api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -27,11 +29,12 @@ class _AdminDashboardState extends State<AdminDashboard>
   bool _isLoading = true;
   bool _isAppPaused = false;
   bool _isLoadingSekolah = false;
+  File? _selectedLogoFile;
 
-  // WARNA BARU SESUAI AdminData
+  // WARNA UTAMA
   final Color _primaryColor = const Color(0xFF3B060A);
 
-  // Gradasi untuk tombol dan aksen (SAMA PERSIS DENGAN AdminData)
+  // Gradasi untuk tombol dan aksen
   static const LinearGradient _primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
@@ -41,24 +44,24 @@ class _AdminDashboardState extends State<AdminDashboard>
     ],
   );
 
-  // Warna untuk setiap jenis data (konsisten dengan AdminData)
+  // Warna untuk setiap jenis data
   final Map<String, Color> _typeColors = {
     'Murid': const Color(0xFF3B060A),
     'Guru': const Color(0xFF5B1A1A),
-    'Jurusan': const Color(0xFF8B2A2D),
+    'Program Keahlian': const Color(0xFF8B2A2D),
     'Industri': const Color(0xFFCD5C5C),
     'Kelas': const Color(0xFFF08080),
-    'Tahun Ajaran': const Color(0xFF9C27B0), // Warna baru untuk Tahun Ajaran
+    'Tahun Ajaran': const Color(0xFF9C27B0),
   };
 
-  // Icon untuk setiap jenis data (SAMA DENGAN AdminData)
+  // Icon untuk setiap jenis data
   final Map<String, IconData> _typeIcons = {
     'Murid': Icons.person,
     'Guru': Icons.school,
-    'Jurusan': Icons.category,
+    'Program Keahlian': Icons.category,
     'Industri': Icons.business,
     'Kelas': Icons.class_,
-    'Tahun Ajaran': Icons.calendar_today, // Icon untuk Tahun Ajaran
+    'Tahun Ajaran': Icons.calendar_today,
   };
 
   @override
@@ -151,18 +154,26 @@ class _AdminDashboardState extends State<AdminDashboard>
         });
       }
 
+      print('📥 LOADING DATA SEKOLAH...'); // PRINT
+
       final response = await ApiService.get('/sekolah');
+
+      print('📥 RESPONSE STATUS: ${response.statusCode}'); // PRINT
+      print('📥 RESPONSE BODY: ${response.body}'); // PRINT
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        print('✅ DATA SEKOLAH: $data'); // PRINT
+
         if (mounted) {
           setState(() {
             _sekolahData = data['data'];
             _isLoadingSekolah = false;
           });
+          print('✅ STATE DATA SEKOLAH DIPERBARUI'); // PRINT
         }
       } else {
-        debugPrint('Failed to load sekolah data: ${response.statusCode}');
+        print('❌ GAGAL LOAD DATA SEKOLAH: ${response.statusCode}'); // PRINT
         if (mounted) {
           setState(() {
             _isLoadingSekolah = false;
@@ -170,7 +181,8 @@ class _AdminDashboardState extends State<AdminDashboard>
         }
       }
     } catch (e) {
-      debugPrint('Error loading sekolah data: $e');
+      print('❌ ERROR LOADING SEKOLAH DATA: $e'); // PRINT
+      print('❌ STACK TRACE: ${StackTrace.current}'); // PRINT
       if (mounted) {
         setState(() {
           _isLoadingSekolah = false;
@@ -179,57 +191,194 @@ class _AdminDashboardState extends State<AdminDashboard>
     }
   }
 
-  Future<void> _updateSekolahData() async {
+  Future<void> _updateSekolahData(Map<String, dynamic> updatedData) async {
     if (_sekolahData == null) return;
 
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
-      
+
+      print('📝 TOKEN: $token');
+      print('📝 DATA YANG AKAN DIKIRIM: $updatedData');
+
       if (token == null) {
+        print('❌ TOKEN TIDAK DITEMUKAN');
         if (!mounted) return;
         _showErrorSnackbar('Token tidak ditemukan. Silakan login kembali.');
         return;
       }
 
       final sekolahId = _sekolahData!['id'];
-      
+      print('📝 SEKOLAH ID: $sekolahId');
+
+      // Hapus field yang tidak perlu dikirim
+      final Map<String, dynamic> dataToSend = Map.from(updatedData);
+      dataToSend.remove('id');
+      dataToSend.remove('created_at');
+      dataToSend.remove('updated_at');
+
+      // Pastikan logo adalah string (URL)
+      if (dataToSend['logo'] != null && dataToSend['logo'] is! String) {
+        dataToSend['logo'] = dataToSend['logo'].toString();
+      }
+
+      print('📝 DATA AFTER CLEANUP: $dataToSend');
+
+      print('📝 MENGIRIM REQUEST KE: /sekolah/$sekolahId');
+
       final response = await ApiService.put(
         '/sekolah/$sekolahId',
-        _sekolahData!,
+        dataToSend,
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _sekolahData = data['data'];
-          });
+      print('📝 RESPONSE STATUS CODE: ${response.statusCode}');
+      print('📝 RESPONSE BODY: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ UPDATE SUKSES!');
+
+        try {
+          final responseData = jsonDecode(response.body);
+          print('✅ RESPONSE JSON: $responseData');
+
+          if (mounted) {
+            setState(() {
+              _sekolahData = responseData['data'] ?? responseData;
+              _selectedLogoFile = null;
+            });
+            print('✅ STATE DIPERBARUI');
+          }
+
+          if (mounted) {
+            _showSuccessDialog(
+                responseData['message'] ?? 'Data sekolah berhasil diperbarui');
+          }
+        } catch (e) {
+          print('⚠️ RESPONSE BUKAN JSON TAPI STATUS SUKSES');
+          print('⚠️ ERROR PARSING JSON: $e');
+
+          if (mounted) {
+            _showSuccessDialog('Data sekolah berhasil diperbarui');
+            _loadSekolahData();
+          }
         }
-        
-        if (mounted) {
-          await _showSuccessDialog(data['message'] ?? 'Data sekolah berhasil diperbarui');
-        }
-        
-      } else if (response.statusCode == 401) {
-        if (!mounted) return;
-        _showErrorSnackbar('Sesi telah berakhir. Silakan login kembali.');
       } else {
-        final errorData = jsonDecode(response.body);
-        final errorMessage = errorData['message'] ?? 'Gagal memperbarui data sekolah';
+        print('❌ GAGAL UPDATE! STATUS CODE: ${response.statusCode}');
+        print('❌ RESPONSE BODY: ${response.body}');
+
+        String errorMessage = 'Gagal memperbarui data sekolah';
+
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['message'] ?? errorMessage;
+        } catch (e) {
+          errorMessage =
+              'Gagal memperbarui data sekolah (Kode: ${response.statusCode})';
+        }
+
         if (!mounted) return;
-        _showErrorSnackbar('$errorMessage (Kode: ${response.statusCode})');
+        _showErrorSnackbar(errorMessage);
       }
     } catch (e) {
-      debugPrint('Error updating sekolah data: $e');
+      print('❌ EXCEPTION: $e');
       if (!mounted) return;
       _showErrorSnackbar('Terjadi kesalahan: ${e.toString()}');
     }
   }
+
+  Future<void> _pickLogo() async {
+    print('📸 MEMILIH LOGO...');
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        print('✅ GAMBAR DIPILIH: ${image.path}');
+
+        setState(() {
+          _selectedLogoFile = File(image.path);
+        });
+
+        print('✅ STATE DIPERBARUI DENGAN LOGO BARU');
+
+        // Tampilkan dialog untuk memasukkan URL logo
+        _showLogoUrlDialog();
+      } else {
+        print('⚠️ TIDAK ADA GAMBAR DIPILIH');
+      }
+    } catch (e) {
+      print('❌ ERROR PICKING IMAGE: $e');
+      if (!mounted) return;
+      _showErrorSnackbar('Gagal memilih gambar: ${e.toString()}');
+    }
+  }
+
+// Dialog untuk memasukkan URL logo
+  void _showLogoUrlDialog() {
+    final TextEditingController urlController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('URL Logo'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                  'Masukkan URL logo (dari hosting atau penyimpanan cloud)'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  hintText: 'https://example.com/logo.png',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (urlController.text.isNotEmpty) {
+                  // Update editedData dengan URL logo
+                  // Anda perlu mengkomunikasikan ini ke dialog edit
+                  // Misalnya dengan callback atau mengupdate state
+
+                  print('✅ URL LOGO: ${urlController.text}');
+
+                  // Tutup dialog
+                  Navigator.pop(context);
+
+                  // Tampilkan pesan sukses
+                  _showSuccessDialog('URL logo berhasil ditambahkan');
+                }
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// Method untuk upload logo ke server dan mendapatkan URL
+
+// Method untuk upload logo ke server dan mendapatkan URL
 
   Future<void> _showSuccessDialog(String message) async {
     return showDialog(
@@ -252,7 +401,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.white,
-                  const Color(0xFF3B060A).withOpacity(0.03),
+                  const Color(0xFF3B060A).withValues(alpha: 0.03),
                 ],
               ),
             ),
@@ -274,7 +423,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF34A853).withOpacity(0.3),
+                        color: const Color(0xFF34A853).withValues(alpha: 0.3),
                         blurRadius: 15,
                         spreadRadius: 2,
                         offset: const Offset(0, 4),
@@ -287,9 +436,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     size: 40,
                   ),
                 ),
-                
                 const SizedBox(height: 24),
-                
                 Text(
                   'Berhasil!',
                   style: TextStyle(
@@ -299,9 +446,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     letterSpacing: 0.5,
                   ),
                 ),
-                
                 const SizedBox(height: 12),
-                
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
@@ -314,9 +459,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 28),
-                
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -331,7 +474,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 2,
-                      shadowColor: _primaryColor.withOpacity(0.3),
+                      shadowColor: _primaryColor.withValues(alpha: 0.3),
                     ),
                     child: const Text(
                       'OK',
@@ -343,9 +486,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 8),
-                
                 Text(
                   'Diperbarui: ${DateFormat('HH:mm:ss').format(DateTime.now())}',
                   style: TextStyle(
@@ -436,232 +577,220 @@ class _AdminDashboardState extends State<AdminDashboard>
   void _handleStatBoxTap(String type) {
     widget.onNavigateToData?.call(type);
   }
-void _showAddOptions() {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.white,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(20),
-        topRight: Radius.circular(20),
-      ),
-    ),
-    builder: (BuildContext context) {
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: const Text(
-                'Tambah Data Baru',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3B060A), // Gunakan warna primer dashboard
-                ),
-              ),
-            ),
-            
-            // TAMBAHKAN TAHUN AJARAN
-            _buildAddTile(
-              Icons.calendar_today,
-              'Tambah Tahun Ajaran',
-              'TahunAjaran',
-              const Color(0xFF3B060A), // Warna primer
-            ),
-            
-            _buildAddTile(
-              Icons.school,
-              'Tambah Murid',
-              'Siswa',
-              const Color(0xFF3B060A),
-            ),
-            _buildAddTile(
-              Icons.person,
-              'Tambah Guru',
-              'Guru',
-              const Color(0xFF3B060A),
-            ),
-            _buildAddTile(
-              Icons.category,
-              'Tambah Jurusan',
-              'Jurusan',
-              const Color(0xFF3B060A),
-            ),
-            _buildAddTile(
-              Icons.business,
-              'Tambah Industri',
-              'Industri',
-              const Color(0xFF3B060A),
-            ),
-            _buildAddTile(
-              Icons.class_,
-              'Tambah Kelas',
-              'Kelas',
-              const Color(0xFF3B060A),
-            ),
-            
-            // Jika ingin menambahkan opsi import Excel seperti di AdminMain
-            const Divider(height: 20),
-            
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B060A).withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.person_add, color: Color(0xFF3B060A)),
-              ),
-              title: const Text(
-                'Tambah Siswa via Excel',
-                style: TextStyle(fontWeight: FontWeight.w500),
-              ),
-              subtitle: const Text('Import data dari file Excel'),
-              trailing:
-                  const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-              onTap: () {
-                Navigator.pop(context);
-                _showExcelImportOption();
-              },
-            ),
-            
-            const SizedBox(height: 20),
-          ],
+
+  void _showAddOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
-      );
-    },
-  );
-}
-
-// Fungsi untuk menampilkan opsi import Excel (jika dibutuhkan)
-void _showExcelImportOption() {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(20),
-        topRight: Radius.circular(20),
       ),
-    ),
-    builder: (BuildContext context) {
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              child: const Text(
-                'Tambah Siswa',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF3B060A),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: const Text(
+                  'Tambah Data Baru',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3B060A),
+                  ),
                 ),
               ),
-            ),
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B060A).withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
+              _buildAddTile(
+                Icons.calendar_today,
+                'Tambah Tahun Ajaran',
+                'TahunAjaran',
+                const Color(0xFF3B060A),
+              ),
+              _buildAddTile(
+                Icons.school,
+                'Tambah Murid',
+                'Siswa',
+                const Color(0xFF3B060A),
+              ),
+              _buildAddTile(
+                Icons.person,
+                'Tambah Guru',
+                'Guru',
+                const Color(0xFF3B060A),
+              ),
+              _buildAddTile(
+                Icons.category,
+                'Tambah Program Keahlian',
+                'Program Keahlian',
+                const Color(0xFF3B060A),
+              ),
+              _buildAddTile(
+                Icons.business,
+                'Tambah Industri',
+                'Industri',
+                const Color(0xFF3B060A),
+              ),
+              _buildAddTile(
+                Icons.class_,
+                'Tambah Kelas',
+                'Kelas',
+                const Color(0xFF3B060A),
+              ),
+              const Divider(height: 20),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B060A).withAlpha(25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.person_add, color: Color(0xFF3B060A)),
                 ),
-                child: const Icon(Icons.person_add, color: Color(0xFF3B060A)),
-              ),
-              title: const Text(
-                'Tambah Manual',
-                style: TextStyle(fontWeight: FontWeight.w500),
-              ),
-              subtitle: const Text('Tambah data siswa satu per satu'),
-              onTap: () {
-                Navigator.pop(context);
-                _navigateToAddPersonPage('Siswa');
-              },
-            ),
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B060A).withAlpha(25),
-                  borderRadius: BorderRadius.circular(8),
+                title: const Text(
+                  'Tambah Siswa via Excel',
+                  style: TextStyle(fontWeight: FontWeight.w500),
                 ),
-                child: const Icon(Icons.upload_file, color: Color(0xFF3B060A)),
+                subtitle: const Text('Import data dari file Excel'),
+                trailing: const Icon(Icons.arrow_forward_ios,
+                    size: 16, color: Colors.grey),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showExcelImportOption();
+                },
               ),
-              title: const Text(
-                'Import Excel',
-                style: TextStyle(fontWeight: FontWeight.w500),
-              ),
-              subtitle: const Text('Upload file Excel untuk import data'),
-              onTap: () {
-                Navigator.pop(context);
-                // Panggil fungsi untuk import Excel di sini
-                _showExcelImportDialog();
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showExcelImportOption() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
-      );
-    },
-  );
-}
-
-// Ganti fungsi _buildAddTile yang lama dengan ini:
-ListTile _buildAddTile(
-    IconData icon, String title, String type, Color color) {
-  return ListTile(
-    leading: Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withAlpha(25),
-        borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, color: color),
-    ),
-    title: Text(
-      title,
-      style: const TextStyle(
-        fontWeight: FontWeight.w500,
-        color: Colors.black87,
-      ),
-    ),
-    trailing:
-        const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-    onTap: () {
-      Navigator.pop(context);
-      _navigateToAddPersonPage(type);
-    },
-  );
-}
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: const Text(
+                  'Tambah Siswa',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF3B060A),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B060A).withAlpha(25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.person_add, color: Color(0xFF3B060A)),
+                ),
+                title: const Text(
+                  'Tambah Manual',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                subtitle: const Text('Tambah data siswa satu per satu'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigateToAddPersonPage('Siswa');
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B060A).withAlpha(25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child:
+                      const Icon(Icons.upload_file, color: Color(0xFF3B060A)),
+                ),
+                title: const Text(
+                  'Import Excel',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                subtitle: const Text('Upload file Excel untuk import data'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showExcelImportDialog();
+                },
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-// Tambahkan fungsi untuk Excel import dialog
-void _showExcelImportDialog() {
-  // Implementasi dialog import Excel di sini
-  // Sesuaikan dengan kode yang ada di AdminMain jika perlu
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Import Excel'),
-      content: const Text('Fitur import Excel akan segera tersedia.'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('OK'),
+  ListTile _buildAddTile(
+      IconData icon, String title, String type, Color color) {
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: color.withAlpha(25),
+          borderRadius: BorderRadius.circular(8),
         ),
-      ],
-    ),
-  );
-}
+        child: Icon(icon, color: color),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Colors.black87,
+        ),
+      ),
+      trailing:
+          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+      onTap: () {
+        Navigator.pop(context);
+        _navigateToAddPersonPage(type);
+      },
+    );
+  }
 
-  // PERBAIKAN: Menambahkan navigasi untuk Tahun Ajaran
+  void _showExcelImportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Import Excel'),
+        content: const Text('Fitur import Excel akan segera tersedia.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _navigateToAddPersonPage(String jenisData) {
     if (jenisData == 'TahunAjaran') {
       Navigator.push(
@@ -694,13 +823,13 @@ void _showExcelImportDialog() {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
           ],
           border: Border.all(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             width: 1,
           ),
         ),
@@ -715,8 +844,8 @@ void _showExcelImportDialog() {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    _primaryColor.withOpacity(0.1),
-                    _primaryColor.withOpacity(0.05),
+                    _primaryColor.withValues(alpha: 0.1),
+                    _primaryColor.withValues(alpha: 0.05),
                   ],
                 ),
                 shape: BoxShape.circle,
@@ -747,13 +876,13 @@ void _showExcelImportDialog() {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -792,36 +921,58 @@ void _showExcelImportDialog() {
           const SizedBox(height: 16),
 
           // Logo sekolah
-          if (_sekolahData!['logo_url'] != null &&
-              _sekolahData!['logo_url'].isNotEmpty)
-            Center(
-              child: Container(
-                width: 80,
-                height: 80,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    _sekolahData!['logo_url'],
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          gradient: _primaryGradient,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.school,
-                            color: Colors.white, size: 40),
-                      );
-                    },
+          Center(
+            child: Stack(
+              children: [
+                Container(
+                  width: 100,
+                  height: 100,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade300, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: _sekolahData!['logo_url'] != null &&
+                            _sekolahData!['logo_url'].isNotEmpty
+                        ? Image.network(
+                            _sekolahData!['logo_url'],
+                            fit: BoxFit.cover,
+                            width: 100,
+                            height: 100,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey[200],
+                                child: Icon(
+                                  Icons.school,
+                                  size: 40,
+                                  color: _primaryColor.withValues(alpha: 0.5),
+                                ),
+                              );
+                            },
+                          )
+                        : Container(
+                            color: Colors.grey[200],
+                            child: Icon(
+                              Icons.school,
+                              size: 40,
+                              color: _primaryColor.withValues(alpha: 0.5),
+                            ),
+                          ),
                   ),
                 ),
-              ),
+              ],
             ),
+          ),
+
+          const SizedBox(height: 8),
 
           // Info sekolah
           _buildInfoRow('NPSN', _sekolahData!['npsn'] ?? '-'),
@@ -947,13 +1098,13 @@ void _showExcelImportDialog() {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -994,8 +1145,8 @@ void _showExcelImportDialog() {
           const SizedBox(height: 20),
           Center(
             child: Container(
-              width: 80,
-              height: 80,
+              width: 100,
+              height: 100,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -1006,7 +1157,7 @@ void _showExcelImportDialog() {
                     Colors.grey[200]!,
                   ],
                 ),
-                borderRadius: BorderRadius.circular(12),
+                shape: BoxShape.circle,
               ),
             ),
           ),
@@ -1083,11 +1234,19 @@ void _showExcelImportDialog() {
 
     final formKey = GlobalKey<FormState>();
     final Map<String, dynamic> editedData = Map.from(_sekolahData!);
+    _selectedLogoFile = null;
 
     final List<Map<String, dynamic>> fieldGroups = [
       {
         'title': 'Informasi Umum',
         'fields': [
+          // Tambahkan di fieldGroups bagian Informasi Umum
+          {
+            'key': 'logo',
+            'label': 'URL Logo',
+            'icon': Icons.image,
+            'required': false,
+          },
           {
             'key': 'npsn',
             'label': 'NPSN',
@@ -1156,7 +1315,7 @@ void _showExcelImportDialog() {
         ]
       },
       {
-        'title': 'Kontak',
+        'title': 'Kontak & Kepala Sekolah',
         'fields': [
           {
             'key': 'nomor_telepon',
@@ -1204,12 +1363,14 @@ void _showExcelImportDialog() {
               ),
               child: Container(
                 constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(context).size.height * 0.8,
+                  maxHeight: MediaQuery.of(context).size.height * 0.9,
+                  maxWidth: MediaQuery.of(context).size.width * 0.9,
                 ),
                 color: Colors.white,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Header
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -1235,12 +1396,150 @@ void _showExcelImportDialog() {
                           ),
                           IconButton(
                             icon: const Icon(Icons.close, color: Colors.white),
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () {
+                              _selectedLogoFile = null;
+                              Navigator.pop(context);
+                            },
                           ),
                         ],
                       ),
                     ),
 
+                    // Logo Upload Section
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.grey[50],
+                      child: Column(
+                        children: [
+                          Stack(
+                            children: [
+                              Container(
+                                width: 120,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _primaryColor.withAlpha(50),
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.grey.withValues(alpha: 0.2),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: ClipOval(
+                                  child: _selectedLogoFile != null
+                                      ? Image.file(
+                                          _selectedLogoFile!,
+                                          fit: BoxFit.cover,
+                                          width: 120,
+                                          height: 120,
+                                        )
+                                      : (_sekolahData!['logo_url'] != null &&
+                                              _sekolahData!['logo_url']
+                                                  .isNotEmpty)
+                                          ? Image.network(
+                                              _sekolahData!['logo_url'],
+                                              fit: BoxFit.cover,
+                                              width: 120,
+                                              height: 120,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                return Container(
+                                                  color: Colors.grey[200],
+                                                  child: Icon(
+                                                    Icons.school,
+                                                    size: 50,
+                                                    color: _primaryColor
+                                                        .withAlpha(100),
+                                                  ),
+                                                );
+                                              },
+                                            )
+                                          : Container(
+                                              color: Colors.grey[200],
+                                              child: Icon(
+                                                Icons.school,
+                                                size: 50,
+                                                color: _primaryColor
+                                                    .withAlpha(100),
+                                              ),
+                                            ),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: _primaryColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 3),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.2),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: InkWell(
+                                    onTap: () async {
+                                      await _pickLogo();
+                                      setState(() {});
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      child: const Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                         
+                          if (_selectedLogoFile != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.green[200]!),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check_circle,
+                                        size: 14, color: Colors.green[700]),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Logo baru dipilih',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.green[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    // Form Fields
                     Expanded(
                       child: Container(
                         color: Colors.white,
@@ -1264,9 +1563,8 @@ void _showExcelImportDialog() {
                                       ),
                                     ),
                                   ),
-
                                   for (var field in group['fields']) ...[
-                                    _buildTextField(
+                                    _buildEditTextField(
                                       label: field['label'],
                                       initialValue: _sekolahData![field['key']]
                                               ?.toString() ??
@@ -1286,6 +1584,7 @@ void _showExcelImportDialog() {
                       ),
                     ),
 
+                    // Footer Buttons
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -1302,7 +1601,10 @@ void _showExcelImportDialog() {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () {
+                                _selectedLogoFile = null;
+                                Navigator.pop(context);
+                              },
                               style: OutlinedButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 12),
@@ -1323,10 +1625,21 @@ void _showExcelImportDialog() {
                               onPressed: () async {
                                 if (formKey.currentState!.validate()) {
                                   Navigator.pop(context);
-                                  setState(() {
-                                    _sekolahData = editedData;
-                                  });
-                                  await _updateSekolahData();
+
+                                  // Tampilkan loading
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (context) => const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+
+                                  await _updateSekolahData(editedData);
+
+                                  if (mounted) {
+                                    Navigator.pop(context); // Tutup loading
+                                  }
                                 }
                               },
                               style: ElevatedButton.styleFrom(
@@ -1337,7 +1650,7 @@ void _showExcelImportDialog() {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                elevation: 0,
+                                elevation: 2,
                               ),
                               child: const Text('Simpan'),
                             ),
@@ -1355,7 +1668,7 @@ void _showExcelImportDialog() {
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildEditTextField({
     required String label,
     required String initialValue,
     required IconData icon,
@@ -1370,17 +1683,17 @@ void _showExcelImportDialog() {
         Text(
           label,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: FontWeight.w500,
             color: Colors.black87,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         TextFormField(
           controller: controller,
           decoration: InputDecoration(
-            hintText: label,
-            prefixIcon: Icon(icon, size: 20, color: Colors.grey[600]),
+            hintText: 'Masukkan $label',
+            prefixIcon: Icon(icon, size: 18, color: Colors.grey[600]),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: Colors.grey[400]!),
@@ -1393,8 +1706,12 @@ void _showExcelImportDialog() {
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: _primaryColor, width: 1.5),
             ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.red, width: 1),
+            ),
             contentPadding:
-                const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
             filled: true,
             fillColor: Colors.white,
           ),
@@ -1407,238 +1724,6 @@ void _showExcelImportDialog() {
             return null;
           },
         ),
-      ],
-    );
-  }
-
-  Widget _buildLoading() {
-    return ListView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      children: [
-        const SizedBox(height: 24),
-
-        _buildSkeletonContainer(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildSkeletonLine(width: 150, height: 20),
-                      const SizedBox(height: 8),
-                      _buildSkeletonLine(width: 200, height: 14),
-                    ],
-                  ),
-                  _buildSkeletonLine(width: 120, height: 40, borderRadius: 20),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 1.2,
-                children: List.generate(6, (index) => _buildGridItemSkeleton()),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        _buildSekolahSkeleton(),
-
-        const SizedBox(height: 16),
-
-        _buildSkeletonContainer(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      gradient: _primaryGradient,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildSkeletonLine(width: 120, height: 20),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _buildSkeletonLine(
-                  width: double.infinity, height: 200, borderRadius: 8),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        _buildSkeletonContainer(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      gradient: _primaryGradient,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildSkeletonLine(width: 120, height: 20),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: _buildStatItemSkeleton()),
-                  const SizedBox(width: 16),
-                  Expanded(child: _buildStatItemSkeleton()),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _primaryColor.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _primaryColor.withOpacity(0.15),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children:
-                      List.generate(3, (index) => _buildMiniStatSkeleton()),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
-  Widget _buildSkeletonContainer({required Widget child}) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
-          width: 1,
-        ),
-      ),
-      child: child,
-    );
-  }
-
-  Widget _buildGridItemSkeleton() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: _primaryGradient,
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildSkeletonLine(width: 80, height: 16),
-          const SizedBox(height: 8),
-          _buildSkeletonLine(width: 60, height: 20),
-          const SizedBox(height: 4),
-          _buildSkeletonLine(width: 100, height: 12),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItemSkeleton() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _primaryColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _primaryColor.withOpacity(0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              gradient: _primaryGradient,
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildSkeletonLine(width: 60, height: 20),
-          const SizedBox(height: 4),
-          _buildSkeletonLine(width: 80, height: 14),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMiniStatSkeleton() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: const BoxDecoration(
-            gradient: _primaryGradient,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _buildSkeletonLine(width: 30, height: 16),
-        const SizedBox(height: 2),
-        _buildSkeletonLine(width: 40, height: 12),
       ],
     );
   }
@@ -1665,7 +1750,7 @@ void _showExcelImportDialog() {
     );
   }
 
-  // CHART SEDERHANA - Distribusi Data DENGAN WARNA BARU DAN ICON KONSISTEN
+  // CHART SEDERHANA - Distribusi Data
   Widget _buildSimpleDistributionChart() {
     if (_dashboardData == null) return const SizedBox();
 
@@ -1703,10 +1788,10 @@ void _showExcelImportDialog() {
         _typeColors['Kelas']!,
       ),
       ChartData(
-        'Jurusan',
+        'Program Keahlian',
         jurusanCount.toDouble(),
-        _typeIcons['Jurusan']!,
-        _typeColors['Jurusan']!,
+        _typeIcons['Program Keahlian']!,
+        _typeColors['Program Keahlian']!,
       ),
       ChartData(
         'Industri',
@@ -1724,13 +1809,13 @@ void _showExcelImportDialog() {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -1763,7 +1848,6 @@ void _showExcelImportDialog() {
             ],
           ),
           const SizedBox(height: 20),
-
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: Wrap(
@@ -1773,7 +1857,6 @@ void _showExcelImportDialog() {
                   chartData.map((data) => _buildChartLegend(data)).toList(),
             ),
           ),
-
           SizedBox(
             height: 200,
             child: BarChart(
@@ -1799,18 +1882,22 @@ void _showExcelImportDialog() {
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8.0),
-                          child: Text(
-                            chartData[value.toInt()].label,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
+                        if (value.toInt() >= 0 &&
+                            value.toInt() < chartData.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              chartData[value.toInt()].label,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
-                          ),
                           );
-                        },
+                        }
+                        return const Text('');
+                      },
                     ),
                   ),
                   leftTitles: AxisTitles(
@@ -1851,7 +1938,7 @@ void _showExcelImportDialog() {
                           end: Alignment.topCenter,
                           colors: [
                             data.color,
-                            data.color.withOpacity(0.7),
+                            data.color.withValues(alpha: 0.7),
                           ],
                         ),
                         width: 20,
@@ -1872,10 +1959,10 @@ void _showExcelImportDialog() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: data.color.withOpacity(0.1),
+        color: data.color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: data.color.withOpacity(0.2),
+          color: data.color.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -1889,7 +1976,7 @@ void _showExcelImportDialog() {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [data.color, data.color.withOpacity(0.8)],
+                colors: [data.color, data.color.withValues(alpha: 0.8)],
               ),
               shape: BoxShape.circle,
             ),
@@ -1909,7 +1996,7 @@ void _showExcelImportDialog() {
     );
   }
 
-  // STATISTIK RINGKAS DENGAN DESIGN BARU DAN ICON KONSISTEN
+  // STATISTIK RINGKAS
   Widget _buildQuickStats() {
     if (_dashboardData == null) return const SizedBox();
 
@@ -1925,13 +2012,13 @@ void _showExcelImportDialog() {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -1992,13 +2079,13 @@ void _showExcelImportDialog() {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _primaryColor.withOpacity(0.1),
-                  _primaryColor.withOpacity(0.05),
+                  _primaryColor.withValues(alpha: 0.1),
+                  _primaryColor.withValues(alpha: 0.05),
                 ],
               ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _primaryColor.withOpacity(0.15),
+                color: _primaryColor.withValues(alpha: 0.15),
                 width: 1,
               ),
             ),
@@ -2028,13 +2115,13 @@ void _showExcelImportDialog() {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            color.withOpacity(0.1),
-            color.withOpacity(0.05),
+            color.withValues(alpha: 0.1),
+            color.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           width: 1,
         ),
       ),
@@ -2049,7 +2136,7 @@ void _showExcelImportDialog() {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [color, color.withOpacity(0.8)],
+                colors: [color, color.withValues(alpha: 0.8)],
               ),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -2089,12 +2176,12 @@ void _showExcelImportDialog() {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [color, color.withOpacity(0.8)],
+              colors: [color, color.withValues(alpha: 0.8)],
             ),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.3),
+                color: color.withValues(alpha: 0.3),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -2115,7 +2202,7 @@ void _showExcelImportDialog() {
           title,
           style: TextStyle(
             fontSize: 11,
-            color: color.withOpacity(0.8),
+            color: color.withValues(alpha: 0.8),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -2143,6 +2230,229 @@ void _showExcelImportDialog() {
     return '1:$ratio';
   }
 
+  Widget _buildLoading() {
+    return ListView(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      children: [
+        const SizedBox(height: 24),
+        _buildSkeletonContainer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildSkeletonLine(width: 150, height: 20),
+                      const SizedBox(height: 8),
+                      _buildSkeletonLine(width: 200, height: 14),
+                    ],
+                  ),
+                  _buildSkeletonLine(width: 120, height: 40, borderRadius: 20),
+                ],
+              ),
+              const SizedBox(height: 20),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 1.2,
+                children: List.generate(6, (index) => _buildGridItemSkeleton()),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildSekolahSkeleton(),
+        const SizedBox(height: 16),
+        _buildSkeletonContainer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: _primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildSkeletonLine(width: 120, height: 20),
+                ],
+              ),
+              const SizedBox(height: 20),
+              _buildSkeletonLine(
+                  width: double.infinity, height: 200, borderRadius: 8),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildSkeletonContainer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: _primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildSkeletonLine(width: 120, height: 20),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(child: _buildStatItemSkeleton()),
+                  const SizedBox(width: 16),
+                  Expanded(child: _buildStatItemSkeleton()),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _primaryColor.withValues(alpha: 0.15),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children:
+                      List.generate(3, (index) => _buildMiniStatSkeleton()),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  Widget _buildSkeletonContainer({required Widget child}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildGridItemSkeleton() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: _primaryGradient,
+              borderRadius: BorderRadius.circular(20),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSkeletonLine(width: 80, height: 16),
+          const SizedBox(height: 8),
+          _buildSkeletonLine(width: 60, height: 20),
+          const SizedBox(height: 4),
+          _buildSkeletonLine(width: 100, height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItemSkeleton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _primaryColor.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _primaryColor.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: _primaryGradient,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _buildSkeletonLine(width: 60, height: 20),
+          const SizedBox(height: 4),
+          _buildSkeletonLine(width: 80, height: 14),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStatSkeleton() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: const BoxDecoration(
+            gradient: _primaryGradient,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(height: 8),
+        _buildSkeletonLine(width: 30, height: 16),
+        const SizedBox(height: 2),
+        _buildSkeletonLine(width: 40, height: 12),
+      ],
+    );
+  }
+
   Widget _buildError() {
     return Container(
       padding: const EdgeInsets.all(40),
@@ -2150,7 +2460,7 @@ void _showExcelImportDialog() {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
+          color: Colors.grey.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -2165,8 +2475,8 @@ void _showExcelImportDialog() {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  _primaryColor.withOpacity(0.1),
-                  _primaryColor.withOpacity(0.05),
+                  _primaryColor.withValues(alpha: 0.1),
+                  _primaryColor.withValues(alpha: 0.05),
                 ],
               ),
               shape: BoxShape.circle,
@@ -2235,7 +2545,7 @@ void _showExcelImportDialog() {
                   titlePadding: EdgeInsets.only(left: 16, bottom: 16),
                   expandedTitleScale: 1.0,
                   title: Text(
-                    'Dashboard',
+                    'Beranda',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -2251,8 +2561,8 @@ void _showExcelImportDialog() {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Colors.white.withOpacity(0.2),
-                          Colors.white.withOpacity(0.1),
+                          Colors.white.withValues(alpha: 0.2),
+                          Colors.white.withValues(alpha: 0.1),
                         ],
                       ),
                       shape: BoxShape.circle,
@@ -2265,7 +2575,6 @@ void _showExcelImportDialog() {
                   ),
                 ],
               ),
-
               SliverToBoxAdapter(
                 child: Container(
                   decoration: BoxDecoration(
@@ -2276,7 +2585,7 @@ void _showExcelImportDialog() {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 20,
                         offset: const Offset(0, -10),
                       ),
@@ -2302,14 +2611,11 @@ void _showExcelImportDialog() {
                                   onBoxTap: _handleStatBoxTap,
                                   typeColors: const {},
                                 ),
-
-                                _buildSekolahInfo(),
-
                                 const SizedBox(height: 16),
-
+                                _buildSekolahInfo(),
+                                const SizedBox(height: 16),
                                 _buildSimpleDistributionChart(),
                                 _buildQuickStats(),
-
                                 const SizedBox(height: 20),
                               ] else
                                 _buildError(),

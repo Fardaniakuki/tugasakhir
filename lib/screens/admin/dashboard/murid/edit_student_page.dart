@@ -765,91 +765,138 @@ class _EditStudentPageState extends State<EditStudentPage> {
       ),
     );
   }
-
-  // ========== FORM FIELDS ==========
-
-  Widget _buildFormField(
-      IconData icon, String label, TextEditingController controller,
-      {TextInputType keyboardType = TextInputType.text,
-      bool readOnly = false,
-      VoidCallback? onTap}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: InkWell(
-        onTap: onTap,
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: _primaryColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 16),
-            Container(
-              width: 1,
-              height: 40,
-              color: Colors.grey[300],
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  TextFormField(
-                    controller: controller,
-                    keyboardType: keyboardType,
-                    readOnly: readOnly,
-                    onTap: onTap,
-                    validator: (value) =>
-                        value == null || value.isEmpty ? 'Wajib diisi' : null,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                      isDense: true,
-                      errorStyle: TextStyle(
-                        fontSize: 12,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+// ========== FORM FIELDS ==========
+Widget _buildFormField(
+    IconData icon, String label, TextEditingController controller,
+    {TextInputType keyboardType = TextInputType.text,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    FocusNode? focusNode}) {
+    
+  // Create a local focus node if not provided
+  final localFocusNode = focusNode ?? FocusNode();
+  bool hasFocus = false;
+  
+  return StatefulBuilder(
+    builder: (context, setLocalState) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9F9F9),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.shade200,
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-      ),
-    );
-  }
-
+        child: InkWell(
+          onTap: onTap,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Container(
+                width: 1,
+                height: 40,
+                color: Colors.grey[300],
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: hasFocus ? _primaryColor : Colors.grey.shade300,
+                          width: hasFocus ? 2 : 1,
+                        ),
+                      ),
+                      child: TextFormField(
+                        controller: controller,
+                        keyboardType: keyboardType,
+                        readOnly: readOnly,
+                        focusNode: localFocusNode,
+                        onTap: () {
+                          if (onTap != null) {
+                            onTap();
+                          }
+                          setLocalState(() {
+                            hasFocus = true;
+                          });
+                        },
+                        onTapOutside: (_) {
+                          localFocusNode.unfocus();
+                          setLocalState(() {
+                            hasFocus = false;
+                          });
+                        },
+                        onChanged: (_) {
+                          setLocalState(() {});
+                        },
+                        validator: (value) =>
+                            value == null || value.isEmpty ? 'Wajib diisi' : null,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                          border: InputBorder.none,
+                          filled: true,
+                          fillColor: Colors.white,
+                          isDense: true,
+                          errorStyle: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.red,
+                          ),
+                          // Menambahkan indikator edit saat focus
+                          suffixIcon: hasFocus && !readOnly
+                              ? Icon(
+                                  Icons.edit_rounded,
+                                  size: 18,
+                                  color: _primaryColor,
+                                )
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
   Widget _buildKelasField() {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -948,7 +995,7 @@ class _EditStudentPageState extends State<EditStudentPage> {
                     ),
                     const SizedBox(width: 8),
                     const Text(
-                      'Edit Siswa',
+                      'Ubah Data Siswa',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -1035,7 +1082,7 @@ class _EditStudentPageState extends State<EditStudentPage> {
                                 
                                 // JUDUL FORM DI TENGAH
                                 const Text(
-                                  'Edit Data Siswa',
+                                  'Ubah Data Siswa',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,

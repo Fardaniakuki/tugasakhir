@@ -3,6 +3,7 @@ import 'dashboard/koordinator_dashboard.dart';
 import 'dashboard/koordinator_jadwal.dart';
 import 'dashboard/koordinator_data.dart';
 import 'dashboard/koordinator_pengaturan.dart';
+import 'dashboard/koordinator_perizinan_screen.dart'; // Halaman baru
 
 class KoordinatorMain extends StatefulWidget {
   const KoordinatorMain({super.key});
@@ -24,6 +25,7 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     ScrollController(),
     ScrollController(),
     ScrollController(),
+    ScrollController(), // Tambah controller untuk perizinan
   ];
 
   late final List<Widget> _pageBuilders;
@@ -41,7 +43,8 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
       _buildDashboardPage(),
       _buildJadwalPage(),
       _buildDataPage(),
-      _buildPengaturanPage(),
+      _buildPerizinanPage(), // Ganti pengaturan dengan perizinan
+      _buildPengaturanPage(), // Pengaturan dipindah ke index 4
     ];
   }
 
@@ -90,10 +93,23 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     );
   }
 
+  // Builder untuk halaman Perizinan dengan caching sederhana
+  Widget _buildPerizinanPage() {
+    return _buildCachedPage(
+      index: 3,
+      builder: () {
+        return KoordinatorPerizinanScreen(
+          key: const ValueKey('perizinan_page'),
+          scrollController: _scrollControllers[3],
+        );
+      },
+    );
+  }
+
   // Builder untuk halaman Pengaturan dengan caching sederhana
   Widget _buildPengaturanPage() {
     return _buildCachedPage(
-      index: 3,
+      index: 4,
       builder: () {
         return const KoordinatorPengaturan(
           key: ValueKey('pengaturan_page'),
@@ -252,9 +268,17 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
             label: 'Data',
           ),
 
-          // Menu 4: Pengaturan
+          // Menu 4: Perizinan
           _buildTabItem(
             index: 3,
+            icon: Icons.assignment_outlined,
+            activeIcon: Icons.assignment,
+            label: 'Perizinan',
+          ),
+
+          // Menu 5: Pengaturan
+          _buildTabItem(
+            index: 4,
             icon: Icons.settings_outlined,
             activeIcon: Icons.settings,
             label: 'Pengaturan',

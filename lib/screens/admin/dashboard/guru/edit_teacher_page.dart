@@ -398,55 +398,64 @@ class _EditTeacherPageState extends State<EditTeacherPage> {
   }
 
   // ========== FORM FIELDS ==========
-
-  Widget _buildFormField(
-      IconData icon, String label, TextEditingController controller, FocusNode focusNode,
-      {TextInputType keyboardType = TextInputType.text}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+// ========== FORM FIELDS ==========
+Widget _buildFormField(
+    IconData icon, String label, TextEditingController controller, FocusNode focusNode,
+    {TextInputType keyboardType = TextInputType.text}) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF9F9F9),
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.shade200,
+          blurRadius: 4,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: _primaryColor,
+            shape: BoxShape.circle,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: _primaryColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            width: 1,
-            height: 40,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w500,
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        const SizedBox(width: 16),
+        Container(
+          width: 1,
+          height: 40,
+          color: Colors.grey[300],
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.grey.shade300,
+                    width: 1,
                   ),
                 ),
-                const SizedBox(height: 4),
-                TextFormField(
+                child: TextFormField(
                   controller: controller,
                   focusNode: focusNode,
                   keyboardType: keyboardType,
@@ -457,24 +466,41 @@ class _EditTeacherPageState extends State<EditTeacherPage> {
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
+                    filled: true,
+                    fillColor: Colors.white,
                     isDense: true,
-                    errorStyle: TextStyle(
+                    errorStyle: const TextStyle(
                       fontSize: 12,
                       color: Colors.red,
                     ),
+                    // Menambahkan indikator edit
+                    suffixIcon: focusNode.hasFocus
+                        ? Icon(
+                            Icons.edit_rounded,
+                            size: 18,
+                            color: _primaryColor,
+                          )
+                        : null,
                   ),
+                  // Efek saat focus
+                  onTap: () {
+                    setState(() {});
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildRoleSwitch(String title, bool value, Function(bool) onChanged) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -575,7 +601,7 @@ class _EditTeacherPageState extends State<EditTeacherPage> {
                     ),
                     const SizedBox(width: 8),
                     const Text(
-                      'Edit Guru',
+                      'Ubah Data Guru',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -656,7 +682,7 @@ class _EditTeacherPageState extends State<EditTeacherPage> {
                           
                           // JUDUL FORM DI TENGAH
                           const Text(
-                            'Edit Data Guru',
+                            'Ubah Data Guru',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -709,10 +735,9 @@ class _EditTeacherPageState extends State<EditTeacherPage> {
                               (val) => setState(() => isPembimbing = val)),
                           _buildRoleSwitch('Wali Kelas', isWaliKelas,
                               (val) => setState(() => isWaliKelas = val)),
-                          _buildRoleSwitch('Kaprog', isKaprog,
+                          _buildRoleSwitch('Pokja', isKaprog,
                               (val) => setState(() => isKaprog = val)),
-                          _buildRoleSwitch('Aktif', isActive,
-                              (val) => setState(() => isActive = val)),
+                         
                           
                           const SizedBox(height: 40),
                           

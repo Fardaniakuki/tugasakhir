@@ -6,10 +6,16 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../login/login_screen.dart';
 import 'kelola_perizinan_screen.dart';
 import 'walikelaspengaturan.dart';
+import 'kelola_perizinan_screen.dart';
 
 class WaliKelasDashboard extends StatefulWidget {
-  const WaliKelasDashboard(
-      {super.key, required ScrollController scrollController});
+  final ScrollController scrollController;
+  
+  const WaliKelasDashboard({
+    super.key, 
+    required this.scrollController
+  });
+  
   @override
   State<WaliKelasDashboard> createState() => _WaliKelasDashboardState();
 }
@@ -22,6 +28,15 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   List<dynamic> _perizinanData = [];
   List<SiswaPKL> _siswaPKLList = [];
   final Map<int, String> _kelasCache = {};
+
+  // Data permasalahan dari API
+  List<Map<String, dynamic>> _permasalahanData = [];
+  bool _isLoadingPermasalahan = false;
+  
+  // Statistik permasalahan sesuai database
+  int _permasalahanMenunggu = 0;    // opened
+  int _permasalahanDiproses = 0;    // in_progress
+  int _permasalahanSelesai = 0;      // resolved
 
   int get _totalSIA => _perizinanData.length;
   int get _siaMenunggu => _perizinanData
@@ -38,58 +53,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   final int _laporanBelum = 5;
   final int _progresBaik = 10;
   final int _progresKurang = 7;
-  final List<Map<String, dynamic>> _permasalahanList = [
-    {
-      'id': 'M001',
-      'nama': 'Ahmad Rizki',
-      'kelas': 'XII TKJ 1',
-      'industri': 'PT. Teknologi Indonesia',
-      'jenis': 'Konflik dengan Supervisor',
-      'status': 'Terselesaikan',
-      'solusi': 'Dilakukan mediasi dengan HRD',
-      'tanggal': '10 Jan 2024',
-      'lokasi': 'Tempat PKL',
-      'statusColor': const Color(0xFF4CAF50)
-    },
-    {
-      'id': 'M002',
-      'nama': 'Siti Nurhaliza',
-      'kelas': 'XII RPL 2',
-      'industri': 'CV. Digital Solusi',
-      'jenis': 'Teknis Pekerjaan',
-      'status': 'Belum',
-      'solusi': 'Menunggu jadwal pendampingan',
-      'tanggal': '12 Jan 2024',
-      'lokasi': 'Tempat PKL',
-      'statusColor': const Color(0xFFFF9800)
-    },
-    {
-      'id': 'M003',
-      'nama': 'Budi Santoso',
-      'kelas': 'XII MM 1',
-      'industri': 'PT. Media Kreatif',
-      'jenis': 'Transportasi',
-      'status': 'Terselesaikan',
-      'solusi': 'Dicarikan carpool',
-      'tanggal': '8 Jan 2024',
-      'lokasi': 'Perjalanan ke PKL',
-      'statusColor': const Color(0xFF4CAF50)
-    },
-    {
-      'id': 'M004',
-      'nama': 'Dewi Lestari',
-      'kelas': 'XII TKJ 2',
-      'industri': 'PT. Network Indonesia',
-      'jenis': 'Komunikasi',
-      'status': 'Terselesaikan',
-      'solusi': 'Bimbingan komunikasi',
-      'tanggal': '15 Jan 2024',
-      'lokasi': 'Tempat PKL',
-      'statusColor': const Color(0xFF4CAF50)
-    },
-  ];
-
-  int get _permasalahanTotal => _permasalahanList.length;
+  
   static const Color _primaryRed = Color(0xFF6B1B1B);
   static const Color _bgSoft = Color(0xFF6B1B1B);
   static const Color _secondaryColor = Colors.white;
@@ -97,7 +61,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   static const Color _orange = Color(0xFFFF9800);
   static const Color _green = Color(0xFF4CAF50);
   static const Color _red = Color(0xFFF44336);
-  static const Color _darkRed = Color(0xFFB71C1C);
+  static const Color _blue = Color(0xFF2196F3);
+  static const Color _purple = Color(0xFF9C27B0);
 
   @override
   void initState() {
@@ -160,8 +125,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     } catch (e) {
       print('Error loading profile: $e');
     } finally {
-      await _fetchPerizinanData();
-      await _fetchDashboardData();
+      await Future.wait([
+        _fetchPerizinanData(),
+        _fetchDashboardData(),
+        _fetchStudentIssues(),
+      ]);
       setState(() {
         _isCheckingToken = false;
         _isLoading = false;
@@ -174,13 +142,180 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     return prefs.getString('access_token');
   }
 
+  String _getBaseUrl() {
+    return dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+  }
+
+  // GET /api/student-issues/wali-kelas - Fetch permasalahan siswa
+  Future<void> _fetchStudentIssues() async {
+    setState(() {
+      _isLoadingPermasalahan = true;
+    });
+
+    try {
+      final token = await _getToken();
+      if (token == null) return;
+
+      final baseUrl = _getBaseUrl();
+      final uri = Uri.parse('$baseUrl/api/student-issues/wali-kelas?limit=10');
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        
+        if (jsonResponse.containsKey('items') && jsonResponse['items'] is List) {
+          final List<dynamic> items = jsonResponse['items'];
+          
+          // Hitung statistik berdasarkan status sesuai database
+          int menunggu = 0;     // opened
+          int diproses = 0;     // in_progress
+          int selesai = 0;       // resolved
+          
+          for (var item in items) {
+            final status = item['status']?.toString().toLowerCase() ?? '';
+            if (status == 'opened') {
+              menunggu++;
+            } else if (status == 'in_progress') {
+              diproses++;
+            } else if (status == 'resolved') {
+              selesai++;
+            }
+          }
+          
+          setState(() {
+            _permasalahanMenunggu = menunggu;
+            _permasalahanDiproses = diproses;
+            _permasalahanSelesai = selesai;
+            
+            _permasalahanData = items.map((item) {
+              final siswa = item['siswa'] ?? {};
+              
+              // Format tanggal
+              String formattedDate = _formatDate(item['created_at']);
+              
+              // Mapping kategori
+              String kategoriDisplay = _mapKategori(item['kategori'] ?? 'lainnya');
+              
+              return {
+                'id': item['id'].toString(),
+                'judul': item['judul'] ?? 'Tidak ada judul',
+                'deskripsi': item['deskripsi'] ?? '',
+                'kategori': item['kategori'] ?? 'lainnya',
+                'kategori_display': kategoriDisplay,
+                'status': item['status'] ?? 'opened',
+                'tindak_lanjut': item['tindak_lanjut'],
+                'created_at': item['created_at'],
+                'resolved_at': item['resolved_at'],
+                'siswa_id': siswa['id'],
+                'siswa_nama': siswa['nama'] ?? 'Siswa Tidak Diketahui',
+                'siswa_nisn': siswa['nisn'] ?? '-',
+                // Format untuk tampilan card
+                'nama': siswa['nama'] ?? 'Siswa Tidak Diketahui',
+                'kelas': _kelasWali, // Gunakan kelas wali sebagai default
+                'industri': '-', // Industri tidak ada di response
+                'jenis': kategoriDisplay,
+                'tanggal': formattedDate,
+              };
+            }).toList();
+            
+            // Ambil hanya 3 data terbaru untuk ditampilkan
+            _permasalahanData = _permasalahanData.take(3).toList();
+          });
+          
+          print('✅ Loaded ${_permasalahanData.length} issues for dashboard');
+          print('📊 Statistik: Menunggu=$menunggu, Diproses=$diproses, Selesai=$selesai');
+        }
+      }
+    } catch (e) {
+      print('Error fetching student issues: $e');
+    } finally {
+      setState(() {
+        _isLoadingPermasalahan = false;
+      });
+    }
+  }
+
+  String _mapKategori(String kategori) {
+    switch (kategori.toLowerCase()) {
+      case 'kedisiplinan':
+        return 'Kedisiplinan';
+      case 'absensi':
+        return 'Absensi';
+      case 'performa':
+        return 'Performa';
+      case 'lainnya':
+        return 'Lainnya';
+      default:
+        return kategori;
+    }
+  }
+
+  String _formatDate(String? dateString) {
+    if (dateString == null) return '-';
+    try {
+      final date = DateTime.parse(dateString);
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  String _translateStatusIssue(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return 'Menunggu';
+      case 'in_progress':
+        return 'Diproses';
+      case 'resolved':
+        return 'Selesai';
+      default:
+        return status;
+    }
+  }
+
+  Color _getStatusColorIssue(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return _purple;
+      case 'in_progress':
+        return _blue;
+      case 'resolved':
+        return _green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIconIssue(String status) {
+    switch (status.toLowerCase()) {
+      case 'opened':
+        return Icons.access_time;
+      case 'in_progress':
+        return Icons.autorenew;
+      case 'resolved':
+        return Icons.check_circle;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
   Future<String?> _fetchKelas(int kelasId) async {
     try {
       if (_kelasCache.containsKey(kelasId)) return _kelasCache[kelasId];
       final token = await _getToken();
       if (token == null) return null;
-      final baseUrl =
-          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final baseUrl = _getBaseUrl();
       final response = await http.get(
         Uri.parse('$baseUrl/api/kelas/$kelasId'),
         headers: {
@@ -206,8 +341,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     try {
       final token = await _getToken();
       if (token == null) return null;
-      final baseUrl =
-          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final baseUrl = _getBaseUrl();
       final response = await http.get(
         Uri.parse('$baseUrl/api/siswa/$siswaId'),
         headers: {
@@ -240,8 +374,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     try {
       final token = await _getToken();
       if (token == null) return;
-      final baseUrl =
-          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final baseUrl = _getBaseUrl();
       final response = await http.get(
         Uri.parse('$baseUrl/api/izin/wali-kelas'),
         headers: {
@@ -280,8 +413,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     try {
       final token = await _getToken();
       if (token == null) return;
-      final baseUrl =
-          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final baseUrl = _getBaseUrl();
       final response = await http.get(
         Uri.parse('$baseUrl/api/guru/dashboard/wali-kelas?page=1&limit=10'),
         headers: {
@@ -439,6 +571,15 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
+  void _navigateToPermasalahan() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const KelolaPerizinanTabScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isCheckingToken) {
@@ -453,8 +594,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   Widget _content() {
     return RefreshIndicator(
       onRefresh: () async {
-        await _fetchPerizinanData();
-        await _fetchDashboardData();
+        await Future.wait([
+          _fetchPerizinanData(),
+          _fetchDashboardData(),
+          _fetchStudentIssues(),
+        ]);
       },
       backgroundColor: Colors.white,
       color: _primaryRed,
@@ -482,7 +626,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 16,
               offset: const Offset(0, 6))
         ],
@@ -500,10 +644,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       color: Color(0xFF6B1B1B))),
               Row(
                 children: [
-                  IconButton(
-                      onPressed: () {},
-                      icon: const Icon(Icons.notifications_none,
-                          color: Color(0xFF6B1B1B), size: 26)),
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: _navigateToSettings,
@@ -511,10 +651,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B1B1B).withOpacity(0.1),
+                        color: const Color(0xFF6B1B1B).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: const Color(0xFF6B1B1B).withOpacity(0.3),
+                            color:
+                                const Color(0xFF6B1B1B).withValues(alpha: 0.3),
                             width: 1.5),
                       ),
                       child: const Icon(Icons.person_outline,
@@ -527,11 +668,20 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Selamat Datang, $_namaWaliKelas', // Ini akan menampilkan nama dari variabel
+            'Selamat Datang, $_namaWaliKelas',
             style: const TextStyle(
               fontSize: 16,
               color: Colors.grey,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Kelas: $_kelasWali',
+            style: const TextStyle(
+              fontSize: 14,
+              color: _primaryRed,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -557,7 +707,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         ),
         child: Column(
           children: [
-            _siaCard(),
+            _permasalahanCard(), // Ganti _siaCard dengan _permasalahanCard
             const SizedBox(height: 14),
             Row(
               children: [
@@ -569,7 +719,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               ],
             ),
             const SizedBox(height: 14),
-            _siaChips(),
+            _permasalahanChips(), // Ganti _siaChips dengan _permasalahanChips
             const SizedBox(height: 14),
             _pklStatsCard(),
           ],
@@ -578,23 +728,16 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
-  Widget _siaCard() {
+  // Card untuk Permasalahan Siswa
+  Widget _permasalahanCard() {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (context) => KelolaPerizinanTabScreen(
-                  scrollController: ScrollController())),
-        );
-      },
+      onTap: _navigateToPermasalahan,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: _primaryRed,
           borderRadius: BorderRadius.circular(18),
-          border:
-              Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
+          border: Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
           boxShadow: [
             BoxShadow(
                 color: _primaryRed.withValues(alpha: 0.3),
@@ -609,11 +752,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.healing, color: Colors.white, size: 28),
+              child: const Icon(Icons.warning, color: Colors.white, size: 28),
             ),
             const SizedBox(width: 14),
             const Expanded(
-                child: Text('Sakit Dan Izin',
+                child: Text('Permasalahan Siswa',
                     style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
@@ -623,7 +766,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20)),
-              child: Text('$_totalSIA',
+              child: Text('${_permasalahanData.length}',
                   style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
@@ -635,21 +778,28 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
-  Widget _siaChips() {
+  // Chips untuk statistik permasalahan (Menunggu, Diproses, Selesai)
+  Widget _permasalahanChips() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
             child: _PengajuanChip(
-                count: '$_siaMenunggu', label: 'Menunggu', color: _orange)),
+                count: '$_permasalahanMenunggu', 
+                label: 'Menunggu', 
+                color: _purple)), // Ungu untuk Menunggu (opened)
         const SizedBox(width: 8),
         Expanded(
             child: _PengajuanChip(
-                count: '$_siaDisetujui', label: 'Disetujui', color: _green)),
+                count: '$_permasalahanDiproses', 
+                label: 'Diproses', 
+                color: _blue)), // Biru untuk Diproses (in_progress)
         const SizedBox(width: 8),
         Expanded(
             child: _PengajuanChip(
-                count: '$_siaDitolak', label: 'Ditolak', color: _red)),
+                count: '$_permasalahanSelesai', 
+                label: 'Selesai', 
+                color: _green)), // Hijau untuk Selesai (resolved)
       ],
     );
   }
@@ -806,9 +956,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             const SizedBox(height: 16),
             _siswaPklListHorizontal(),
             const SizedBox(height: 40),
-            _sectionTitleWithSeeAll('Permasalahan Siswa', _permasalahanTotal),
+            _sectionTitleWithSeeAll('Permasalahan Siswa', _permasalahanData.length),
             const SizedBox(height: 16),
             _permasalahanListHorizontal(),
+            const SizedBox(height: 60),
           ],
         ),
       ),
@@ -1043,7 +1194,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         height: 200,
         decoration: BoxDecoration(
           color: Colors.grey[50],
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey[200]!),
         ),
         child: Center(
@@ -1063,14 +1214,14 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     }
 
     return SizedBox(
-      height: 330,
+      height: 380,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: siswaSedangPKL.length,
         itemBuilder: (context, index) {
           final siswa = siswaSedangPKL[index];
           return Container(
-            width: 320,
+            width: 340,
             margin: EdgeInsets.only(
               right: index < siswaSedangPKL.length - 1 ? 16 : 0,
               left: index == 0 ? 4 : 0,
@@ -1087,7 +1238,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey[100]!, width: 1.5),
+        border: Border.all(color: Colors.grey[200]!, width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -1109,16 +1260,16 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2196F3).withValues(alpha: 0.1),
+                    color: _primaryRed.withAlpha(10),
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(
-                      color: const Color(0xFF2196F3).withValues(alpha: 0.3),
+                      color: _primaryRed.withAlpha(30),
                       width: 2,
                     ),
                   ),
                   child: const Icon(
                     Icons.person,
-                    color: Color(0xFF2196F3),
+                    color: _primaryRed,
                     size: 32,
                   ),
                 ),
@@ -1135,7 +1286,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                           height: 1.2,
                           color: Color(0xFF333333),
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
@@ -1158,7 +1309,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFF2196F3).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: const Color(0xFF2196F3).withValues(alpha: 0.3),
                   width: 1.5,
@@ -1186,7 +1337,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             ),
             const SizedBox(height: 20),
 
-            // Info PKL
+            // Info PKL - Industri
             if (siswa.industri != null && siswa.industri!.isNotEmpty)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1207,7 +1358,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                             fontWeight: FontWeight.w600,
                             color: Color(0xFF444444),
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -1217,10 +1368,12 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 ],
               ),
 
+            // Info PKL - Pembimbing (dengan format khusus untuk teks panjang)
             if (siswa.pembimbing != null && siswa.pembimbing!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       Icons.school,
@@ -1228,17 +1381,36 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                       color: Colors.grey[600],
                     ),
                     const SizedBox(width: 10),
-                    Text(
-                      'Pembimbing: ${siswa.pembimbing!}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Pembimbing:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            siswa.pembimbing!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
 
+            // Info PKL - Alamat Industri
             if (siswa.alamatIndustri != null &&
                 siswa.alamatIndustri!.isNotEmpty)
               Padding(
@@ -1269,23 +1441,23 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
 
             const Spacer(),
 
-            // Tombol detail
+            // TOMBOL DETAIL
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: OutlinedButton.icon(
                 onPressed: () => _showSiswaDetail(siswa),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryRed,
-                  foregroundColor: Colors.white,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _primaryRed,
+                  side: const BorderSide(color: _primaryRed),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  minimumSize: const Size(0, 40),
                 ),
-                icon: const Icon(Icons.remove_red_eye_outlined, size: 18),
+                icon: const Icon(Icons.visibility, size: 16),
                 label: const Text(
-                  'LIHAT DETAIL PKL',
+                  'LIHAT DETAIL',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -1299,18 +1471,54 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
+  // ==============================================
+  // PERMASALAHAN SISWA - HORIZONTAL LIST DARI API
+  // ==============================================
   Widget _permasalahanListHorizontal() {
+    if (_isLoadingPermasalahan) {
+      return Container(
+        height: 260,
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_permasalahanData.isEmpty) {
+      return Container(
+        height: 180,
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: const Center(
+          child: Text(
+            'Belum ada permasalahan siswa',
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
-      height: 255,
+      height: 280,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: _permasalahanList.length,
+        itemCount: _permasalahanData.length,
         itemBuilder: (context, index) {
-          final masalahData = _permasalahanList[index];
+          final masalahData = _permasalahanData[index];
           return Container(
-            width: 280,
+            width: 320,
             margin: EdgeInsets.only(
-                right: index < _permasalahanList.length - 1 ? 16 : 0),
+              right: index < _permasalahanData.length - 1 ? 16 : 0,
+              left: index == 0 ? 4 : 0,
+            ),
             child: _permasalahanCardHorizontal(masalahData),
           );
         },
@@ -1318,13 +1526,19 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
+  // ==============================================
+  // PERMASALAHAN SISWA - CARD HORIZONTAL DARI API
+  // DENGAN STATUS
+  // ==============================================
   Widget _permasalahanCardHorizontal(Map<String, dynamic> masalahData) {
     final siswaName = masalahData['nama'];
-    final jenis = masalahData['jenis'];
-    final status = masalahData['status'];
-    final statusColor = masalahData['statusColor'] as Color;
-    final kelas = masalahData['kelas'];
-    final industri = masalahData['industri'];
+    final jenis = masalahData['kategori_display'] ?? masalahData['jenis'];
+    final judul = masalahData['judul'];
+    final kelas = masalahData['kelas'] ?? _kelasWali;
+    final tanggal = masalahData['tanggal'];
+    final status = _translateStatusIssue(masalahData['status']);
+    final statusColor = _getStatusColorIssue(masalahData['status']);
+    final statusIcon = _getStatusIconIssue(masalahData['status']);
 
     return GestureDetector(
       onTap: () {
@@ -1347,6 +1561,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Header dengan icon dan nama siswa
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1354,12 +1569,13 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: _darkRed.withValues(alpha: 0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: _darkRed.withValues(alpha: 0.3), width: 1.5),
+                          color: statusColor.withValues(alpha: 0.3),
+                          width: 1.5),
                     ),
-                    child: const Icon(Icons.warning, color: _darkRed, size: 24),
+                    child: Icon(statusIcon, color: statusColor, size: 24),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1374,92 +1590,118 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 4),
-                        if (kelas.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                    color: Colors.grey[300]!, width: 1)),
-                            child: Text(kelas,
-                                style: const TextStyle(
-                                    color: Colors.grey, fontSize: 11)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                  color: statusColor.withValues(alpha: 0.3))),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(statusIcon, size: 10, color: statusColor),
+                              const SizedBox(width: 4),
+                              Text(
+                                status,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Row(children: [
-                Icon(Icons.apartment, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Expanded(
-                    child: Text(industri,
-                        style:
-                            const TextStyle(fontSize: 12, color: Colors.grey),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis))
-              ]),
-              const SizedBox(height: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                    color: _darkRed.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: _darkRed.withValues(alpha: 0.3), width: 1)),
-                child: Text(jenis,
-                    style: const TextStyle(
-                        color: _darkRed,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
-              ),
               const SizedBox(height: 12),
+              
+              // Judul
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: statusColor.withValues(alpha: 0.3), width: 1)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(
-                      status == 'Terselesaikan'
-                          ? Icons.check_circle
-                          : Icons.access_time,
-                      color: statusColor,
-                      size: 16),
+                  color: _primaryRed.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  judul,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 8),
+              
+              // Jenis permasalahan
+              Row(
+                children: [
+                  Icon(Icons.category, size: 14, color: Colors.grey[600]),
                   const SizedBox(width: 6),
-                  Text(status,
-                      style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12))
-                ]),
+                  Expanded(
+                    child: Text(
+                      jenis,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 4),
+              
+              // Kelas
+              Row(
+                children: [
+                  Icon(Icons.class_, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Text(
+                    kelas,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              
+              // Tanggal
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Text(
+                    tanggal,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+              
+              const Spacer(),
+              
+              // Tombol Lihat Detail
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () => _showPermasalahanDetail(masalahData),
                   style: OutlinedButton.styleFrom(
-                      foregroundColor: _darkRed,
-                      side: const BorderSide(color: _darkRed),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: const Size(0, 36)),
+                    foregroundColor: _primaryRed,
+                    side: BorderSide(color: _primaryRed),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    minimumSize: const Size(0, 36),
+                  ),
                   icon: const Icon(Icons.visibility, size: 14),
-                  label: const Text('LIHAT DETAIL',
-                      style:
-                          TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  label: const Text(
+                    'LIHAT DETAIL',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
@@ -1840,8 +2082,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     try {
       final token = await _getToken();
       if (token == null) return;
-      final baseUrl =
-          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final baseUrl = _getBaseUrl();
       final response = await http.post(
         Uri.parse('$baseUrl/api/izin/${data['id']}/approve'),
         headers: {
@@ -1962,8 +2203,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                             try {
                               final token = await _getToken();
                               if (token == null) return;
-                              final baseUrl = dotenv.env['API_BASE_URL'] ??
-                                  'https://api.gedanggoreng.com';
+                              final baseUrl = _getBaseUrl();
                               final response = await http.post(
                                 Uri.parse(
                                     '$baseUrl/api/izin/${data['id']}/reject'),
@@ -2035,8 +2275,11 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(24), topRight: Radius.circular(24))),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
       builder: (context) => _siswaDetailBottomSheet(siswa),
     );
   }
@@ -2044,15 +2287,17 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   Widget _siswaDetailBottomSheet(SiswaPKL siswa) {
     Color statusColor = Colors.grey;
     IconData statusIcon = Icons.help_outline;
+    final String statusText = siswa.statusPkl;
 
+    // Tentukan warna dan ikon berdasarkan status
     if (siswa.statusPkl == 'Sedang PKL') {
-      statusColor = const Color(0xFF2196F3);
+      statusColor = const Color(0xFF2196F3); // Biru
       statusIcon = Icons.play_circle_fill;
     } else if (siswa.statusPkl == 'Belum PKL') {
-      statusColor = const Color(0xFFFF9800);
+      statusColor = const Color(0xFFFF9800); // Orange
       statusIcon = Icons.access_time;
     } else if (siswa.statusPkl == 'Selesai PKL') {
-      statusColor = const Color(0xFF4CAF50);
+      statusColor = const Color(0xFF4CAF50); // Hijau
       statusIcon = Icons.check_circle;
     }
 
@@ -2064,18 +2309,24 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
-              child: Container(
-                  width: 60,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2)))),
+            child: Container(
+              width: 60,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
-          const Text('Detail Siswa PKL',
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF6B1B1B))),
+          const Text(
+            'Detail Siswa PKL',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6B1B1B),
+            ),
+          ),
           const SizedBox(height: 20),
           Expanded(
             child: SingleChildScrollView(
@@ -2086,98 +2337,161 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: statusColor.withValues(alpha: 0.1))),
+                      color: _primaryRed.withAlpha(10),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: _primaryRed.withAlpha(30)),
+                    ),
                     child: Row(
                       children: [
                         Container(
-                          width: 60,
-                          height: 60,
+                          width: 50,
+                          height: 50,
                           decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color: statusColor.withValues(alpha: 0.3))),
-                          child: Icon(statusIcon, color: statusColor, size: 32),
+                            color: _primaryRed.withAlpha(10),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _primaryRed.withAlpha(30),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.person,
+                            color: _primaryRed,
+                            size: 28,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(siswa.nama,
-                                  style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700)),
+                              Text(
+                                siswa.nama,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               const SizedBox(height: 4),
-                              Text('NISN: ${siswa.nisn}',
-                                  style: const TextStyle(
-                                      fontSize: 14, color: Colors.grey)),
+                              Text(
+                                'NISN: ${siswa.nisn}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: statusColor.withValues(alpha: 0.3))),
-                          child: Text(siswa.statusPkl,
-                              style: TextStyle(
+                            color: statusColor.withAlpha(20),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: statusColor.withAlpha(50),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                statusIcon,
+                                color: statusColor,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                statusText,
+                                style: TextStyle(
                                   color: statusColor,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 12)),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Informasi PKL',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black)),
+                  const Text(
+                    'Informasi PKL',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[200]!)),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
                     child: Column(
                       children: [
-                        if (siswa.industri != null)
-                          _detailInfoRow('Industri', siswa.industri!),
-                        if (siswa.industri != null) const SizedBox(height: 12),
-                        if (siswa.alamatIndustri != null)
-                          _detailInfoRow(
-                              'Alamat Industri', siswa.alamatIndustri!),
-                        if (siswa.alamatIndustri != null)
-                          const SizedBox(height: 12),
-                        if (siswa.pembimbing != null)
-                          _detailInfoRow(
-                              'Pembimbing Sekolah', siswa.pembimbing!),
-                        if (siswa.pembimbing != null)
-                          const SizedBox(height: 12),
-                        if (siswa.pembimbingIndustri != null)
-                          _detailInfoRow(
-                              'Pembimbing Industri', siswa.pembimbingIndustri!),
-                        if (siswa.pembimbingIndustri != null)
-                          const SizedBox(height: 12),
-                        if (siswa.noTelpIndustri != null)
-                          _detailInfoRow(
-                              'Telp Industri', siswa.noTelpIndustri!),
-                        if (siswa.noTelpIndustri != null)
-                          const SizedBox(height: 12),
-                        if (siswa.noTelpPembimbingSekolah != null)
-                          _detailInfoRow('Telp Pembimbing',
-                              siswa.noTelpPembimbingSekolah!),
-                        if (siswa.noTelpPembimbingSekolah != null)
-                          const SizedBox(height: 12),
+                        if (siswa.industri != null &&
+                            siswa.industri!.isNotEmpty)
+                          Column(
+                            children: [
+                              _detailInfoRow('Industri', siswa.industri!),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
+                        if (siswa.alamatIndustri != null &&
+                            siswa.alamatIndustri!.isNotEmpty)
+                          Column(
+                            children: [
+                              _detailInfoRow(
+                                  'Alamat Industri', siswa.alamatIndustri!),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
+                        if (siswa.pembimbing != null &&
+                            siswa.pembimbing!.isNotEmpty)
+                          Column(
+                            children: [
+                              _detailInfoRow(
+                                  'Pembimbing Sekolah', siswa.pembimbing!),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
+                        if (siswa.pembimbingIndustri != null &&
+                            siswa.pembimbingIndustri!.isNotEmpty)
+                          Column(
+                            children: [
+                              _detailInfoRow('Pembimbing Industri',
+                                  siswa.pembimbingIndustri!),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
+                        if (siswa.noTelpIndustri != null &&
+                            siswa.noTelpIndustri!.isNotEmpty)
+                          Column(
+                            children: [
+                              _detailInfoRow(
+                                  'Telp Industri', siswa.noTelpIndustri!),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
+                        if (siswa.noTelpPembimbingSekolah != null &&
+                            siswa.noTelpPembimbingSekolah!.isNotEmpty)
+                          Column(
+                            children: [
+                              _detailInfoRow('Telp Pembimbing',
+                                  siswa.noTelpPembimbingSekolah!),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
                         _detailInfoRow('Status PKL', siswa.statusPkl),
                       ],
                     ),
@@ -2192,13 +2506,21 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             child: ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
-                  backgroundColor: _primaryRed,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(vertical: 16)),
-              child: const Text('TUTUP',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                backgroundColor: _primaryRed,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
+              ),
+              child: const Text(
+                'TUTUP',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 20),
@@ -2207,6 +2529,10 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     );
   }
 
+  // ==============================================
+  // PERMASALAHAN SISWA - DETAIL BOTTOM SHEET DARI API
+  // DENGAN STATUS
+  // ==============================================
   void _showPermasalahanDetail(Map<String, dynamic> masalahData) {
     showModalBottomSheet(
       context: context,
@@ -2220,158 +2546,174 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
 
   Widget _permasalahanDetailBottomSheet(Map<String, dynamic> masalahData) {
     final siswaName = masalahData['nama'];
-    final jenis = masalahData['jenis'];
-    const deskripsi =
-        'Siswa mengalami kesulitan dalam hal ini. Klik tombol di bawah untuk melihat detail lengkap.';
-    final status = masalahData['status'];
-    final solusi = masalahData['solusi'] ?? 'Belum ada solusi';
-    final kelas = masalahData['kelas'] ?? '';
-    final industri = masalahData['industri'] ?? '';
+    final judul = masalahData['judul'];
+    final jenis = masalahData['kategori_display'] ?? masalahData['jenis'];
+    final deskripsi = masalahData['deskripsi'];
+    final kelas = masalahData['kelas'] ?? _kelasWali;
     final tanggal = masalahData['tanggal'] ?? '-';
-    final lokasi = masalahData['lokasi'] ?? 'Tempat PKL';
-    final statusColor = masalahData['statusColor'] as Color;
+    final status = _translateStatusIssue(masalahData['status']);
+    final statusColor = _getStatusColorIssue(masalahData['status']);
+    final statusIcon = _getStatusIconIssue(masalahData['status']);
+    final tindakLanjut = masalahData['tindak_lanjut'];
 
     return Container(
       padding: const EdgeInsets.all(24),
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.75,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Handle bar
           Center(
-              child: Container(
-                  width: 60,
-                  height: 4,
-                  decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2)))),
+            child: Container(
+              width: 60,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
-          const Text('Detail Permasalahan',
-              style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFB71C1C))),
+          
+          // Title
+          const Text(
+            'Detail Permasalahan',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF6B1B1B),
+            ),
+          ),
           const SizedBox(height: 20),
+          
           Expanded(
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Header Card dengan status
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                        color: _darkRed.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(16),
-                        border:
-                            Border.all(color: _darkRed.withValues(alpha: 0.1))),
+                      color: statusColor.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+                    ),
                     child: Row(
                       children: [
                         Container(
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                              color: _darkRed.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color: _darkRed.withValues(alpha: 0.3))),
-                          child: const Icon(Icons.warning,
-                              color: _darkRed, size: 24),
+                            color: statusColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: statusColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Icon(statusIcon, color: statusColor, size: 24),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(siswaName,
-                                  style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700)),
+                              Text(
+                                siswaName,
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               const SizedBox(height: 4),
-                              Text('$kelas • $industri',
-                                  style: const TextStyle(
-                                      fontSize: 14, color: Colors.grey)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: statusColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: statusColor.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(statusIcon, size: 12, color: statusColor),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      status,
+                                      style: TextStyle(
+                                        color: statusColor,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: statusColor.withValues(alpha: 0.3))),
-                          child: Text(status,
-                              style: TextStyle(
-                                  color: statusColor,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12)),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Informasi Permasalahan',
-                      style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black)),
+
+                  // Informasi Permasalahan
+                  const Text(
+                    'Informasi Permasalahan',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
                   const SizedBox(height: 12),
+
+                  // Detail Container
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey[200]!)),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
                     child: Column(
                       children: [
-                        _detailInfoRow('Jenis Permasalahan', jenis),
+                        _detailInfoRow('Judul', judul),
+                        const SizedBox(height: 12),
+                        _detailInfoRow('Permasalahan', jenis),
                         const SizedBox(height: 12),
                         _detailInfoRow('Tanggal Laporan', tanggal),
                         const SizedBox(height: 12),
-                        _detailInfoRow('Lokasi', lokasi),
-                        const SizedBox(height: 12),
-                        _detailInfoRow('Status', status),
-                        const SizedBox(height: 12),
-                        const Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                                width: 140,
-                                child: Text('Deskripsi:',
-                                    style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey))),
-                            SizedBox(width: 8),
-                            Expanded(
-                                child: Text(deskripsi,
-                                    style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500))),
-                          ],
-                        ),
+                        _detailInfoRow('Kelas', kelas),
+                        if (tindakLanjut != null) ...[
+                          const SizedBox(height: 12),
+                          _detailInfoRow('Tindak Lanjut', tindakLanjut),
+                        ],
                         const SizedBox(height: 12),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(
-                                width: 140,
-                                child: Text('Solusi/Tindakan:',
+                                width: 120,
+                                child: Text('Deskripsi:',
                                     style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
                                         color: Colors.grey))),
                             const SizedBox(width: 8),
                             Expanded(
-                                child: Text(solusi,
-                                    style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: status == 'Terselesaikan'
-                                            ? _green
-                                            : _orange))),
+                              child: Text(
+                                deskripsi,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -2381,6 +2723,32 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               ),
             ),
           ),
+
+          // Tombol Tutup
+          const SizedBox(height: 30),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryRed,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
+              ),
+              child: const Text(
+                'TUTUP',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );

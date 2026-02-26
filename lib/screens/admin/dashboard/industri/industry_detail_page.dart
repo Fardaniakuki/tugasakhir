@@ -800,7 +800,7 @@ class _IndustryDetailPageState extends State<IndustryDetailPage> {
                                                 
                                                 _buildProfileItem(
                                                   icon: Icons.school_rounded,
-                                                  title: 'Jurusan',
+                                                  title: 'Program Keahlian',
                                                   value: jurusanName ?? 'Loading...',
                                                 ),
                                                 const SizedBox(height: 16),
@@ -904,7 +904,7 @@ class _IndustryDetailPageState extends State<IndustryDetailPage> {
                                                           Icon(Icons.edit_rounded, size: 18),
                                                           SizedBox(width: 6),
                                                           Text(
-                                                            'Edit',
+                                                            'Ubah',
                                                             style: TextStyle(
                                                               fontSize: 14,
                                                               fontWeight: FontWeight.w600,

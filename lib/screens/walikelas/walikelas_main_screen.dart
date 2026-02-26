@@ -208,7 +208,7 @@ class __WalikelasBottomBarState extends State<_WalikelasBottomBar> {
             index: 1,
             icon: Icons.assignment_outlined,
             activeIcon: Icons.assignment,
-            label: 'Perizinan',
+            label: 'Permasalahan',
           ),
         ],
       ),

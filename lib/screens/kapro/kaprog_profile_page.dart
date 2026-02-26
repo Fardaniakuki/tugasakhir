@@ -293,7 +293,7 @@ class _KaprogProfilePageState extends State<KaprogProfilePage> {
                 children: [
                   IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back_ios, color: _primaryColor, size: 20)),
                   const SizedBox(width: 8),
-                  const Text('Profil Kaprog', style: TextStyle(color: _primaryColor, fontSize: 20, fontWeight: FontWeight.w700)),
+                  const Text('Profil Kepala Konsentrasi Keahlian', style: TextStyle(color: _primaryColor, fontSize: 15, fontWeight: FontWeight.w700)),
                   const Spacer(),
                   if (!_isLoading && !_isEditing) IconButton(onPressed: () => setState(() => _isEditing = true), icon: const Icon(Icons.edit, color: _primaryColor)),
                 ],

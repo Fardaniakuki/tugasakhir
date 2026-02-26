@@ -18,12 +18,22 @@ class IndustriDetailScreen extends StatefulWidget {
 
 class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
   static const Color _primaryRed = Color(0xFF6B1B1B);
+  static const Color _bgSoft = Color(0xFFF6EEEE);
   static const Color _green = Color(0xFF4CAF50);
 
   bool _isLoading = true;
   Map<String, dynamic>? _industriData;
-  List<dynamic> _siswaList = [];
-  final TextEditingController _kuotaController = TextEditingController();
+  List<dynamic> _allSiswaList = []; // Menyimpan semua data
+  
+  // Filter dan Pagination
+  String _selectedFilter = 'Semua';
+  final List<String> _filterOptions = ['Semua', 'Menunggu', 'Diterima', 'Ditolak'];
+  
+  // Pagination untuk filtered data
+  int _currentPage = 1;
+  final int _itemsPerPage = 10;
+  int _totalFilteredItems = 0;
+  int _totalFilteredPages = 1;
 
   @override
   void initState() {
@@ -107,21 +117,8 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
         _industriData = combinedData;
       });
 
-      // 4. Load data siswa di industri ini
-      final siswaResponse = await http.get(
-        Uri.parse(
-            '${dotenv.env['API_BASE_URL']}/api/pkl/applications?industri_id=${widget.industriId}'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (siswaResponse.statusCode == 200) {
-        final data = jsonDecode(siswaResponse.body);
-        if (data['data'] != null && data['data'] is List) {
-          setState(() {
-            _siswaList = data['data'];
-          });
-        }
-      }
+      // 4. Load semua data siswa di industri ini
+      await _loadAllSiswaData();
 
       setState(() {
         _isLoading = false;
@@ -134,22 +131,231 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
     }
   }
 
+  Future<void> _loadAllSiswaData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      if (token == null) return;
 
+      // Ambil semua data tanpa pagination dari API
+      final siswaResponse = await http.get(
+        Uri.parse(
+            '${dotenv.env['API_BASE_URL']}/api/pkl/applications?industri_id=${widget.industriId}'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
 
+      if (siswaResponse.statusCode == 200) {
+        final data = jsonDecode(siswaResponse.body);
+        if (data['data'] != null && data['data'] is List) {
+          setState(() {
+            _allSiswaList = data['data'] as List;
+            _updatePaginationInfo(); // Update info pagination setelah data dimuat
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading siswa data: $e');
+    }
+  }
 
-  // Helper untuk quick action buttons
+  // Helper untuk mendapatkan data yang sudah difilter
+  List<dynamic> get _filteredSiswaList {
+    List<dynamic> filteredList;
+    
+    if (_selectedFilter == 'Semua') {
+      filteredList = _allSiswaList;
+    } else {
+      filteredList = _allSiswaList.where((siswa) {
+        final status = siswa['application']?['status']?.toString().toLowerCase() ?? '';
+        switch (_selectedFilter) {
+          case 'Menunggu':
+            return status == 'pending' || status.contains('menunggu');
+          case 'Diterima':
+            return status == 'approved' || status == 'active' || status.contains('diterima');
+          case 'Ditolak':
+            return status == 'rejected' || status.contains('ditolak');
+          default:
+            return true;
+        }
+      }).toList();
+    }
+    
+    return filteredList;
+  }
+
+  // Mendapatkan data untuk halaman saat ini
+  List<dynamic> get _currentPageData {
+    final filteredList = _filteredSiswaList;
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = startIndex + _itemsPerPage;
+    
+    return filteredList.sublist(
+      startIndex.clamp(0, filteredList.length),
+      endIndex.clamp(0, filteredList.length),
+    );
+  }
+
+  void _updatePaginationInfo() {
+    final filteredList = _filteredSiswaList;
+    
+    setState(() {
+      _totalFilteredItems = filteredList.length;
+      _totalFilteredPages = (_totalFilteredItems / _itemsPerPage).ceil();
+      if (_totalFilteredPages == 0) _totalFilteredPages = 1;
+      
+      // Pastikan current page tidak melebihi total pages
+      if (_currentPage > _totalFilteredPages) {
+        _currentPage = _totalFilteredPages;
+      }
+    });
+  }
 
   int _getJumlahSiswaAktif() {
-    return _siswaList.where((siswa) {
+    return _allSiswaList.where((siswa) {
       final status = siswa['application']?['status'] ?? '';
       return status == 'Approved' || status == 'Active';
     }).length;
   }
 
-  @override
-  Widget build(BuildContext context) {
+  void _changePage(int page) {
+    if (page < 1 || page > _totalFilteredPages) return;
+    
+    setState(() {
+      _currentPage = page;
+    });
+  }
+
+  // =================== PAGINATION CONTROLS ===================
+  Widget _buildPaginationControls() {
+    // Hanya tampilkan pagination jika filtered data lebih dari items per page
+    if (_totalFilteredItems <= _itemsPerPage) return const SizedBox();
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      child: Column(
+        children: [
+          // Info halaman
+          Text(
+            'Halaman $_currentPage dari $_totalFilteredPages (Total: $_totalFilteredItems siswa)',
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 12),
+          
+          // Tombol pagination
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Tombol Previous
+              IconButton(
+                onPressed: _currentPage > 1
+                    ? () => _changePage(_currentPage - 1)
+                    : null,
+                icon: const Icon(Icons.chevron_left),
+                style: IconButton.styleFrom(
+                  backgroundColor: _primaryRed.withValues(alpha: 0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                disabledColor: Colors.grey,
+              ),
+              
+              const SizedBox(width: 8),
+              
+              // Number buttons - hanya tampilkan jika lebih dari 1 halaman
+              if (_totalFilteredPages > 1)
+                Wrap(
+                  spacing: 4,
+                  children: [
+                    // First page (tampilkan jika halaman aktif > 3)
+                    if (_currentPage > 3)
+                      _buildPageButton(1),
+                    
+                    // Dots (tampilkan jika halaman aktif > 4)
+                    if (_currentPage > 4)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('...', style: TextStyle(color: Colors.grey)),
+                      ),
+                    
+                    // Pages around current page
+                    for (int i = max(1, _currentPage - 2); i <= min(_totalFilteredPages, _currentPage + 2); i++)
+                      _buildPageButton(i),
+                    
+                    // Dots (tampilkan jika halaman aktif < totalPages - 3)
+                    if (_currentPage < _totalFilteredPages - 3)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('...', style: TextStyle(color: Colors.grey)),
+                      ),
+                    
+                    // Last page (tampilkan jika halaman aktif < totalPages - 2)
+                    if (_currentPage < _totalFilteredPages - 2)
+                      _buildPageButton(_totalFilteredPages),
+                  ],
+                ),
+              
+              const SizedBox(width: 8),
+              
+              // Tombol Next
+              IconButton(
+                onPressed: _currentPage < _totalFilteredPages
+                    ? () => _changePage(_currentPage + 1)
+                    : null,
+                icon: const Icon(Icons.chevron_right),
+                style: IconButton.styleFrom(
+                  backgroundColor: _primaryRed.withValues(alpha:0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                disabledColor: Colors.grey,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildPageButton(int page) {
+    final isCurrent = page == _currentPage;
+    return GestureDetector(
+      onTap: () => _changePage(page),
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isCurrent ? _primaryRed : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isCurrent ? _primaryRed : Colors.grey[300]!,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          '$page',
+          style: TextStyle(
+            color: isCurrent ? Colors.white : Colors.grey[700],
+            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+  
+  int max(int a, int b) => a > b ? a : b;
+  int min(int a, int b) => a < b ? a : b;
+
+  // =================== SKELETON LOADING WIDGETS ===================
+  Widget _buildSkeletonLoading() {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _bgSoft,
       appBar: AppBar(
         backgroundColor: _primaryRed,
         centerTitle: true,
@@ -162,208 +368,131 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
           ),
         ),
       ),
-      body: _isLoading
-          ? _buildSkeletonLoading()
-          : _industriData == null
-              ? _buildErrorState()
-              : _buildContent(),
-    );
-  }
-
-  Widget _buildSkeletonLoading() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Card Skeleton
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: const [
-                BoxShadow(
-                  blurRadius: 14,
-                  offset: Offset(0, 6),
-                  color: Colors.black12,
-                )
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Bagian atas: Icon, Nama, dan Tombol Edit
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Icon Industri Skeleton
-                    Container(
-                      height: 70,
-                      width: 70,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-
-                    // Nama dan Bidang Skeleton
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 24,
-                            width: 200,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            height: 18,
-                            width: 150,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Tombol Edit Skeleton
-                    Container(
-                      height: 40,
-                      width: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // Informasi Kuota Skeleton
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Skeleton Header Card
+            _skeletonCard(
+              height: 200,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Column(
-                        children: [
-                          Container(
-                            height: 24,
-                            width: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            height: 16,
-                            width: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: Colors.grey[300],
-                      ),
-                      Column(
-                        children: [
-                          Container(
-                            height: 24,
-                            width: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            height: 16,
-                            width: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                        ],
+                      _skeletonCircle(size: 70),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _skeletonText(width: 200, height: 24),
+                            const SizedBox(height: 8),
+                            _skeletonText(width: 150, height: 16),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _bgSoft,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _skeletonText(width: 60, height: 32),
+                        _skeletonText(width: 1, height: 40),
+                        _skeletonText(width: 60, height: 32),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Biodata Skeleton
-          _buildSectionSkeleton(),
-          _buildInfoRowSkeleton(),
-          _buildInfoRowSkeleton(),
-          _buildInfoRowSkeleton(),
-
-          const SizedBox(height: 20),
-
-          // Statistik Skeleton
-          _buildSectionSkeleton(),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildStatItemSkeleton(),
-              const SizedBox(width: 16),
-              _buildStatItemSkeleton(),
-              const SizedBox(width: 16),
-              _buildStatItemSkeleton(),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Siswa PKL Skeleton
-          _buildSectionSkeleton(),
-          const SizedBox(height: 16),
-          for (int i = 0; i < 3; i++) _buildSiswaItemSkeleton(),
-        ],
+            const SizedBox(height: 20),
+            
+            // Skeleton Biodata Section
+            _skeletonSectionTitle(),
+            _skeletonCard(
+              height: 280,
+              child: Column(
+                children: [
+                  _skeletonInfoRow(),
+                  const Divider(height: 20),
+                  _skeletonInfoRow(),
+                  const Divider(height: 20),
+                  _skeletonInfoRow(),
+                  const Divider(height: 20),
+                  _skeletonInfoRow(),
+                  const Divider(height: 20),
+                  _skeletonInfoRow(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Skeleton Statistik Section
+            _skeletonSectionTitle(),
+            _skeletonCard(
+              height: 180,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _skeletonText(width: 120, height: 20),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _skeletonStatItem(),
+                      const SizedBox(width: 16),
+                      _skeletonStatItem(),
+                      const SizedBox(width: 16),
+                      _skeletonStatItem(),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Skeleton Siswa Section
+            _skeletonSectionTitle(),
+            _skeletonCard(
+              height: 120,
+              child: Row(
+                children: [
+                  _skeletonCircle(size: 40),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _skeletonText(width: 150, height: 20),
+                        const SizedBox(height: 8),
+                        _skeletonText(width: 100, height: 16),
+                      ],
+                    ),
+                  ),
+                  _skeletonText(width: 80, height: 32),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSectionSkeleton() {
+  Widget _skeletonCard({required double height, required Widget child}) {
     return Container(
-      height: 24,
-      width: 150,
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(6),
-      ),
-    );
-  }
-
-  Widget _buildInfoRowSkeleton() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      height: height,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -375,190 +504,171 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
           )
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            height: 20,
-            width: 100,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Container(
-              height: 20,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(6),
-              ),
-            ),
-          ),
-        ],
+      child: child,
+    );
+  }
+
+  Widget _skeletonText({required double width, required double height}) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(4),
       ),
     );
   }
 
-  Widget _buildStatItemSkeleton() {
+  Widget _skeletonCircle({required double size}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  Widget _skeletonSectionTitle() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        width: 150,
+        height: 24,
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(4),
+        ),
+      ),
+    );
+  }
+
+  Widget _skeletonInfoRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _skeletonText(width: 100, height: 16),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _skeletonText(width: double.infinity, height: 16),
+        ),
+      ],
+    );
+  }
+
+  Widget _skeletonStatItem() {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.grey[100],
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[200]!),
         ),
         child: Column(
           children: [
-            Container(
-              height: 24,
-              width: 24,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                shape: BoxShape.circle,
-              ),
-            ),
+            _skeletonCircle(size: 24),
             const SizedBox(height: 8),
-            Container(
-              height: 24,
-              width: 40,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(6),
-              ),
-            ),
+            _skeletonText(width: 40, height: 24),
             const SizedBox(height: 4),
-            Container(
-              height: 14,
-              width: 60,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(6),
-              ),
-            ),
+            _skeletonText(width: 60, height: 11),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSiswaItemSkeleton() {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 10,
-            offset: Offset(0, 4),
-            color: Colors.black12,
-          )
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 18,
-                  width: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  height: 14,
-                  width: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            height: 30,
-            width: 80,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return _buildSkeletonLoading();
+    }
 
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 60, color: Colors.grey),
-          const SizedBox(height: 20),
-          const Text(
-            'Data industri tidak ditemukan',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _primaryRed,
+    if (_industriData == null) {
+      return Scaffold(
+        backgroundColor: _bgSoft,
+        appBar: AppBar(
+          backgroundColor: _primaryRed,
+          centerTitle: true,
+          iconTheme: const IconThemeData(color: Colors.white),
+          title: const Text(
+            'Detail Industri',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
             ),
-            child: const Text('Kembali'),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 60, color: Colors.grey),
+              const SizedBox(height: 20),
+              const Text(
+                'Data industri tidak ditemukan',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryRed,
+                ),
+                child: const Text('Kembali'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
-  Widget _buildContent() {
     final kuotaSiswa =
         _industriData?['kuota_siswa'] ?? _industriData?['kuota'] ?? 0;
     final remainingSlots =
         _industriData?['remaining_slots'] ?? _industriData?['sisa_kuota'] ?? 0;
     final jumlahSiswaAktif = _getJumlahSiswaAktif();
 
-    return RefreshIndicator(
-      onRefresh: _loadIndustriData,
-      color: _primaryRed,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _headerCard(),
-            const SizedBox(height: 20),
-            _sectionTitle('Biodata Industri'),
-            _biodata(),
-            const SizedBox(height: 20),
-            _sectionTitle('Statistik Kuota'),
-            _statistikCard(kuotaSiswa, remainingSlots, jumlahSiswaAktif),
-            const SizedBox(height: 20),
-            _sectionTitle('Siswa PKL'),
-            _siswaListWidget(),
-            const SizedBox(height: 20),
-          ],
+    return Scaffold(
+      backgroundColor: _bgSoft,
+      appBar: AppBar(
+        backgroundColor: _primaryRed,
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Detail Industri',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadIndustriData,
+        color: _primaryRed,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _headerCard(),
+              const SizedBox(height: 20),
+              _sectionTitle('Biodata Industri'),
+              _biodata(),
+              const SizedBox(height: 20),
+              _sectionTitle('Statistik Kuota'),
+              _statistikCard(kuotaSiswa, remainingSlots, jumlahSiswaAktif),
+              const SizedBox(height: 20),
+              _sectionTitle('Siswa Mengajukan PKL'),
+              _filterChips(),
+              const SizedBox(height: 12),
+              _siswaListWidget(),
+              _buildPaginationControls(),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -567,9 +677,6 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
   Widget _headerCard() {
     final nama = _industriData?['nama'] ?? 'Industri';
     final bidang = _industriData?['bidang'] ?? '-';
-    final kuota = _industriData?['kuota_siswa'] ?? _industriData?['kuota'] ?? 0;
-    final remaining =
-        _industriData?['remaining_slots'] ?? _industriData?['sisa_kuota'] ?? 0;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -587,16 +694,18 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Bagian atas: Icon, Nama, dan Bidang
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Icon Industri
               Container(
                 height: 70,
                 width: 70,
                 decoration: BoxDecoration(
-                  color: _primaryRed.withValues(alpha: 0.1),
+                  color: _primaryRed.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _primaryRed.withValues(alpha: 0.3), width: 2),
+                  border: Border.all(color: _primaryRed.withValues(alpha:0.3), width: 2),
                 ),
                 child: const Icon(
                   Icons.apartment,
@@ -605,6 +714,8 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
                 ),
               ),
               const SizedBox(width: 16),
+
+              // Nama dan Bidang
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,88 +740,49 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[300]!),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Column(
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.people_outline,
-                          size: 20,
-                          color: _primaryRed,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$kuota',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: _primaryRed,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Total Kuota',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  color: Colors.grey[300],
-                ),
-                Column(
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          '$remaining',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: remaining > 0 ? Colors.green : Colors.orange,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          remaining > 0
-                              ? Icons.event_available
-                              : Icons.event_busy,
-                          size: 20,
-                          color: remaining > 0 ? Colors.green : Colors.orange,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Slot Tersedia',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
+      ),
+    );
+  }
+
+  // =================== FILTER CHIPS ===================
+  Widget _filterChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _filterOptions.map((filter) {
+          final isSelected = _selectedFilter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedFilter = filter;
+                  _currentPage = 1; // Reset ke halaman 1 saat filter berubah
+                  _updatePaginationInfo();
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? _primaryRed : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected ? _primaryRed : Colors.grey[300]!,
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  filter,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.grey[700],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -815,9 +887,9 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
+                color: Colors.orange.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                border: Border.all(color: Colors.orange.withValues(alpha:0.3)),
               ),
               child: Row(
                 children: [
@@ -844,9 +916,9 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
+        color: color.withValues(alpha:0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(color: color.withValues(alpha:0.2)),
       ),
       child: Column(
         children: [
@@ -876,18 +948,29 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
   }
 
   Widget _siswaListWidget() {
-    if (_siswaList.isEmpty) {
+    final currentData = _currentPageData;
+    
+    if (currentData.isEmpty) {
       return _card(
         Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 40),
             child: Column(
               children: [
-                Icon(Icons.people_outline, size: 60, color: Colors.grey[400]),
+                Icon(
+                  _selectedFilter == 'Semua' 
+                    ? Icons.people_outline 
+                    : Icons.filter_alt_outlined,
+                  size: 60, 
+                  color: Colors.grey[400]
+                ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Belum ada siswa PKL di industri ini',
-                  style: TextStyle(color: Colors.grey),
+                Text(
+                  _selectedFilter == 'Semua' 
+                    ? 'Belum ada siswa yang mengajukan PKL di industri ini'
+                    : 'Tidak ada siswa dengan status "$_selectedFilter"',
+                  style: const TextStyle(color: Colors.grey),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -897,7 +980,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
     }
 
     return Column(
-      children: _siswaList.asMap().entries.map((entry) {
+      children: currentData.asMap().entries.map((entry) {
         final index = entry.key;
         final siswa = entry.value;
         final siswaName = siswa['siswa_username'] ?? 'Siswa';
@@ -912,7 +995,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
           case 'Approved':
           case 'Active':
             statusColor = Colors.green;
-            statusText = 'Aktif';
+            statusText = 'Diterima';
             statusIcon = Icons.check_circle;
             break;
           case 'Completed':
@@ -932,13 +1015,12 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
         }
 
         return Container(
-          margin:
-              EdgeInsets.only(bottom: index < _siswaList.length - 1 ? 12 : 0),
+          margin: EdgeInsets.only(bottom: index < currentData.length - 1 ? 12 : 0),
           child: _card(
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: statusColor.withValues(alpha: 0.1),
+                  backgroundColor: statusColor.withValues(alpha:0.1),
                   child: Icon(
                     Icons.person,
                     color: statusColor,
@@ -970,9 +1052,9 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
+                    color: statusColor.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                    border: Border.all(color: statusColor.withValues(alpha:0.3)),
                   ),
                   child: Row(
                     children: [
@@ -1027,11 +1109,5 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
       ),
       child: child,
     );
-  }
-
-  @override
-  void dispose() {
-    _kuotaController.dispose();
-    super.dispose();
   }
 }

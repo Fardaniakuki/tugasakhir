@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../login/login_screen.dart';
 
 // ========== THEME CONFIGURATION ==========
@@ -32,7 +32,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
   String _kelasSiswa = '-';
   String _jurusanSiswa = '-';
   String _role = 'Siswa';
-  
+
   bool _isLoading = true;
 
   @override
@@ -47,195 +47,223 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
 
   // Helper untuk mencari NISN yang valid dari berbagai key
   String _getSafeNisn(Map<String, dynamic> data) {
-    if (data['nisn'] != null && data['nisn'].toString().isNotEmpty && data['nisn'].toString() != 'null') {
+    if (data['nisn'] != null &&
+        data['nisn'].toString().isNotEmpty &&
+        data['nisn'].toString() != 'null') {
       return data['nisn'].toString();
     }
-    if (data['nis'] != null && data['nis'].toString().isNotEmpty && data['nis'].toString() != 'null') {
+    if (data['nis'] != null &&
+        data['nis'].toString().isNotEmpty &&
+        data['nis'].toString() != 'null') {
       return data['nis'].toString();
     }
-    if (data['nomor_induk'] != null && data['nomor_induk'].toString().isNotEmpty) {
+    if (data['nomor_induk'] != null &&
+        data['nomor_induk'].toString().isNotEmpty) {
       return data['nomor_induk'].toString();
     }
     // Fallback ke username jika username adalah NISN
-    if (data['username'] != null && RegExp(r'^[0-9]+$').hasMatch(data['username'].toString())) {
+    if (data['username'] != null &&
+        RegExp(r'^[0-9]+$').hasMatch(data['username'].toString())) {
       return data['username'].toString();
     }
     return '-';
   }
+// GANTI method _loadProfileData() dengan yang berikut:
 
-  Future<void> _loadProfileData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      final userName = prefs.getString('user_name');
+Future<void> _loadProfileData() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    final userName = prefs.getString('user_name');
 
-      // Set Role & Nama Awal dari Cache
-      setState(() {
-         _role = prefs.getString('user_role') ?? 'Siswa';
-         _namaSiswa = userName ?? 'Siswa';
-      });
+    // Set Role & Nama Awal dari Cache
+    setState(() {
+      _role = prefs.getString('user_role') ?? 'Siswa';
+      _namaSiswa = userName ?? 'Siswa';
+    });
 
-      if (token == null) {
-        await _loadFromSharedPrefs();
-        return;
-      }
+    if (token == null || userName == null) {
+      await _loadFromSharedPrefs();
+      return;
+    }
 
-      // 1. Ambil data semua siswa dari API
-      final siswaUrl = '${dotenv.env['API_BASE_URL']}/api/siswa';
-      print('DEBUG: Request ke $siswaUrl');
+    // 1. AMBIL DATA SISWA BERDASARKAN NAMA DENGAN SEARCH PARAMETER
+    await dotenv.load();
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+    
+    // Gunakan search parameter untuk mencari siswa berdasarkan nama
+    final siswaUrl = Uri.parse('$baseUrl/api/siswa').replace(
+      queryParameters: {
+        'search': userName, // Search by username from login
+        'limit': '10', // Limit results
+      },
+    );
 
-      final siswaResponse = await http.get(
-        Uri.parse(siswaUrl),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+    print('DEBUG: Request ke $siswaUrl');
 
-      if (siswaResponse.statusCode == 200) {
-        final dynamic responseData = jsonDecode(siswaResponse.body);
+    final siswaResponse = await http.get(
+      siswaUrl,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (siswaResponse.statusCode == 200) {
+      final dynamic responseData = jsonDecode(siswaResponse.body);
+      
+      if (responseData['success'] == true && responseData['data'] != null) {
+        final dynamic data = responseData['data'];
         
-        if (responseData['success'] == true && responseData['data'] != null) {
-          final dynamic data = responseData['data'];
+        if (data is Map && data['data'] is List) {
+          final List<dynamic> siswaList = data['data'];
           
-          if (data is Map && data['data'] is List) {
-            final List<dynamic> siswaList = data['data'];
-            dynamic foundSiswa;
-            final String searchName = userName ?? '';
+          // Debug: Tampilkan semua siswa yang ditemukan
+          print('DEBUG: Jumlah siswa ditemukan: ${siswaList.length}');
+          
+          if (siswaList.isNotEmpty) {
+            // Ambil siswa pertama (karena search sudah spesifik)
+            final siswaMap = _convertToStringMap(siswaList[0] as Map);
+            
+            // --- DEBUGGING: Cek Key Data di Console ---
+            print('=== DATA SISWA DITEMUKAN ===');
+            siswaMap.forEach((key, value) {
+              print('$key: $value');
+            });
+            // ------------------------------------------
 
-            // 2. Filter list siswa berdasarkan Nama User
-            if (searchName.isNotEmpty) {
-              for (var siswa in siswaList) {
-                if (siswa is Map) {
-                  final siswaMap = _convertToStringMap(siswa);
-                  final String namaSiswa = siswaMap['nama_lengkap']?.toString() ?? '';
-                  
-                  // Pencarian (Case Insensitive)
-                  if (namaSiswa.toLowerCase() == searchName.toLowerCase() ||
-                      namaSiswa.toLowerCase().contains(searchName.toLowerCase())) {
-                    foundSiswa = siswa;
-                    break;
-                  }
-                }
-              }
+            final String extractedNisn = _getSafeNisn(siswaMap);
+            final String nama = siswaMap['nama_lengkap']?.toString() ?? userName;
+
+            // Ambil kelas_id untuk mendapatkan data kelas dan jurusan
+            final int? kelasId = int.tryParse(siswaMap['kelas_id']?.toString() ?? '');
+
+            if (mounted) {
+              setState(() {
+                _namaSiswa = nama.toUpperCase();
+                _nisnSiswa = extractedNisn;
+              });
             }
 
-            if (foundSiswa != null) {
-              final siswaMap = _convertToStringMap(foundSiswa as Map);
-              
-              // --- DEBUGGING: Cek Key Data di Console ---
-              print('=== DATA SISWA DITEMUKAN ===');
-              print(siswaMap); 
-              // ------------------------------------------
+            // Simpan ke cache
+            await prefs.setString('siswa_nama_lengkap', nama);
+            await prefs.setString('siswa_nisn', extractedNisn);
+            if (kelasId != null) {
+              await prefs.setInt('siswa_kelas_id', kelasId);
+            }
 
-              final String extractedNisn = _getSafeNisn(siswaMap);
-              final String nama = siswaMap['nama_lengkap']?.toString() ?? 'SISWA';
-
+            // 2. AMBIL DETAIL KELAS & JURUSAN
+            if (kelasId != null) {
+              await _fetchKelasAndJurusan(token, kelasId, prefs);
+            } else {
+              // Jika tidak ada kelas_id, set default
               if (mounted) {
                 setState(() {
-                  _namaSiswa = nama.toUpperCase();
-                  _nisnSiswa = extractedNisn;
+                  _kelasSiswa = '-';
+                  _jurusanSiswa = '-';
                 });
               }
-
-              // Simpan ke cache
-              await prefs.setString('siswa_nama_lengkap', nama);
-              await prefs.setString('siswa_nisn', extractedNisn);
-
-              // 3. Ambil Detail Kelas & Jurusan
-              await _fetchKelasAndJurusan(token, siswaMap, prefs);
-            } else {
-              print('DEBUG: Siswa tidak ditemukan di list API');
-              await _loadFromSharedPrefs();
+              await prefs.setString('siswa_kelas_nama', '-');
+              await prefs.setString('siswa_jurusan_nama', '-');
             }
-          }
-        }
-      } else {
-        print('DEBUG: API Error ${siswaResponse.statusCode}');
-        await _loadFromSharedPrefs();
-      }
-    } catch (e) {
-      print('ERROR: $e');
-      await _loadFromSharedPrefs();
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _fetchKelasAndJurusan(
-    String token, 
-    Map<String, dynamic> siswaMap, 
-    SharedPreferences prefs
-  ) async {
-    try {
-      final int? kelasId = int.tryParse(siswaMap['kelas_id']?.toString() ?? '');
-      String kelasNama = '-';
-      String jurusanNama = '-';
-
-      // --- FETCH KELAS ---
-      if (kelasId != null) {
-        final kelasUrl = '${dotenv.env['API_BASE_URL']}/api/kelas';
-        final kelasResponse = await http.get(
-          Uri.parse(kelasUrl),
-          headers: {'Authorization': 'Bearer $token'},
-        );
-
-        if (kelasResponse.statusCode == 200) {
-          final dynamic kelasData = jsonDecode(kelasResponse.body);
-          if (kelasData['success'] == true && kelasData['data']['data'] is List) {
-            final List<dynamic> kelasList = kelasData['data']['data'];
             
-            // Cari Kelas berdasarkan ID
-            for (var kelas in kelasList) {
-              final kMap = _convertToStringMap(kelas as Map);
-              if (int.tryParse(kMap['id'].toString()) == kelasId) {
-                kelasNama = kMap['nama'] ?? '-';
-                
-                // --- FETCH JURUSAN (Nested inside Class search) ---
-                final int? jurusanId = int.tryParse(kMap['jurusan_id']?.toString() ?? '');
-                if (jurusanId != null) {
-                  final jurusanUrl = '${dotenv.env['API_BASE_URL']}/api/jurusan';
-                  final jurusanResponse = await http.get(
-                    Uri.parse(jurusanUrl),
-                    headers: {'Authorization': 'Bearer $token'},
-                  );
-
-                  if (jurusanResponse.statusCode == 200) {
-                    final jData = jsonDecode(jurusanResponse.body);
-                    if (jData['success'] == true && jData['data']['data'] is List) {
-                      final List<dynamic> jurusanList = jData['data']['data'];
-                      for (var jur in jurusanList) {
-                        final jMap = _convertToStringMap(jur as Map);
-                        if (int.tryParse(jMap['id'].toString()) == jurusanId) {
-                          jurusanNama = jMap['nama'] ?? '-';
-                          break;
-                        }
-                      }
-                    }
-                  }
-                }
-                break; // Stop loop kelas
-              }
-            }
+          } else {
+            print('DEBUG: Siswa tidak ditemukan dengan nama: $userName');
+            await _loadFromSharedPrefs();
           }
         }
       }
-
-      if (mounted) {
-        setState(() {
-          _kelasSiswa = kelasNama;
-          _jurusanSiswa = jurusanNama;
-        });
-      }
-
-      await prefs.setString('siswa_kelas_nama', kelasNama);
-      await prefs.setString('siswa_jurusan_nama', jurusanNama);
-
-    } catch (e) {
-      print('Error fetching detail: $e');
+    } else {
+      print('DEBUG: API Error ${siswaResponse.statusCode}');
+      await _loadFromSharedPrefs();
+    }
+  } catch (e) {
+    print('ERROR: $e');
+    await _loadFromSharedPrefs();
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
+}
+
+// GANTI method _fetchKelasAndJurusan dengan yang berikut:
+
+Future<void> _fetchKelasAndJurusan(
+  String token, 
+  int kelasId, 
+  SharedPreferences prefs
+) async {
+  try {
+    String kelasNama = '-';
+    String jurusanNama = '-';
+
+    // --- FETCH KELAS BERDASARKAN ID ---
+    await dotenv.load();
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+    final kelasUrl = '$baseUrl/api/kelas/$kelasId';
+    
+    print('DEBUG: Fetch kelas dari: $kelasUrl');
+    
+    final kelasResponse = await http.get(
+      Uri.parse(kelasUrl),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (kelasResponse.statusCode == 200) {
+      final dynamic kelasData = jsonDecode(kelasResponse.body);
+      if (kelasData['success'] == true && kelasData['data'] is Map) {
+        final kelasMap = _convertToStringMap(kelasData['data'] as Map);
+        kelasNama = kelasMap['nama'] ?? '-';
+        
+        print('DEBUG: Kelas ditemukan: $kelasNama');
+        
+        // --- FETCH JURUSAN BERDASARKAN jurusan_id ---
+        final int? jurusanId = int.tryParse(kelasMap['jurusan_id']?.toString() ?? '');
+        
+        if (jurusanId != null) {
+          final jurusanUrl = '$baseUrl/api/jurusan/$jurusanId';
+          print('DEBUG: Fetch jurusan dari: $jurusanUrl');
+          
+          final jurusanResponse = await http.get(
+            Uri.parse(jurusanUrl),
+            headers: {'Authorization': 'Bearer $token'},
+          );
+
+          if (jurusanResponse.statusCode == 200) {
+            final jData = jsonDecode(jurusanResponse.body);
+            if (jData['success'] == true && jData['data'] is Map) {
+              final jMap = _convertToStringMap(jData['data'] as Map);
+              jurusanNama = jMap['nama'] ?? '-';
+              print('DEBUG: Jurusan ditemukan: $jurusanNama');
+            }
+          } else {
+            print('DEBUG: Jurusan API Error ${jurusanResponse.statusCode}');
+          }
+        } else {
+          print('DEBUG: Jurusan ID tidak ditemukan di data kelas');
+        }
+      }
+    } else {
+      print('DEBUG: Kelas API Error ${kelasResponse.statusCode}');
+    }
+
+    if (mounted) {
+      setState(() {
+        _kelasSiswa = kelasNama;
+        _jurusanSiswa = jurusanNama;
+      });
+    }
+
+    await prefs.setString('siswa_kelas_nama', kelasNama);
+    await prefs.setString('siswa_jurusan_nama', jurusanNama);
+
+  } catch (e) {
+    print('Error fetching detail: $e');
+  }
+}
+
+// TAMBAHKAN method ini untuk mencoba endpoint alternatif jika ada:
+
 
   Future<void> _loadFromSharedPrefs() async {
     final prefs = await SharedPreferences.getInstance();
@@ -244,19 +272,21 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
     // Coba cari NISN di cache dengan berbagai key
     String? cachedNisn = prefs.getString('siswa_nisn');
     if (cachedNisn == null) {
-       for (var key in prefs.getKeys()) {
+      for (var key in prefs.getKeys()) {
         if (key.toLowerCase().contains('nis')) {
-           final val = prefs.getString(key);
-           if (val != null && val.isNotEmpty) {
-             cachedNisn = val;
-             break;
-           }
+          final val = prefs.getString(key);
+          if (val != null && val.isNotEmpty) {
+            cachedNisn = val;
+            break;
+          }
         }
-       }
+      }
     }
 
     setState(() {
-      _namaSiswa = prefs.getString('siswa_nama_lengkap') ?? prefs.getString('user_name') ?? 'Siswa';
+      _namaSiswa = prefs.getString('siswa_nama_lengkap') ??
+          prefs.getString('user_name') ??
+          'Siswa';
       _kelasSiswa = prefs.getString('siswa_kelas_nama') ?? '-';
       _jurusanSiswa = prefs.getString('siswa_jurusan_nama') ?? '-';
       _nisnSiswa = cachedNisn ?? '-';
@@ -281,10 +311,10 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
     // Hapus data login
     await prefs.remove('access_token');
     await prefs.remove('user_id');
-    await prefs.clear(); 
+    await prefs.clear();
 
     if (!mounted) return;
-    
+
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
       (Route<dynamic> route) => false,
@@ -301,7 +331,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Batal', style: TextStyle(color: PengaturanTheme.textGrey)),
+            child: const Text('Batal',
+                style: TextStyle(color: PengaturanTheme.textGrey)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -310,7 +341,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: PengaturanTheme.error,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text('Keluar', style: TextStyle(color: Colors.white)),
           ),
@@ -337,16 +369,15 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
             child: Column(
               children: [
                 _buildCustomAppBar(),
-                
-                _isLoading 
+                _isLoading
                     ? const Padding(
                         padding: EdgeInsets.all(20.0),
-                        child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                        child: Center(
+                            child:
+                                CircularProgressIndicator(color: Colors.white)),
                       )
                     : _buildProfileHeader(),
-                
                 const SizedBox(height: 24),
-
                 Expanded(
                   child: Container(
                     decoration: const BoxDecoration(
@@ -358,7 +389,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                     ),
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 24),
                       child: Column(
                         children: [
                           _buildSectionLabel('APLIKASI'),
@@ -381,17 +413,9 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                               onTap: () {},
                             ),
                           ]),
-
                           const SizedBox(height: 32),
-
                           _buildLogoutButton(),
-                          
                           const SizedBox(height: 20),
-                          const Text(
-                            'SIM PKL SMKN 2 Singosari\n© 2026',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: PengaturanTheme.textGrey, fontSize: 12),
-                          ),
                           const SizedBox(height: 40),
                         ],
                       ),
@@ -449,10 +473,11 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha:0.3), width: 4),
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.3), width: 4),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -486,14 +511,15 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                 ),
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha:0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    _jurusanSiswa != '-' && _jurusanSiswa != 'null' 
-                        ? '$_kelasSiswa • $_jurusanSiswa' 
+                    _jurusanSiswa != '-' && _jurusanSiswa != 'null'
+                        ? '$_kelasSiswa • $_jurusanSiswa'
                         : '$_role • $_kelasSiswa',
                     style: const TextStyle(
                       color: Colors.white,
@@ -509,7 +535,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                   'NISN: $_nisnSiswa',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white.withValues(alpha:0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -545,7 +571,7 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -581,7 +607,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                       color: PengaturanTheme.background,
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(icon, color: PengaturanTheme.primaryRed, size: 22),
+                    child:
+                        Icon(icon, color: PengaturanTheme.primaryRed, size: 22),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -609,7 +636,8 @@ class _SiswaPengaturanState extends State<SiswaPengaturan> {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: PengaturanTheme.textGrey),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: PengaturanTheme.textGrey),
                 ],
               ),
             ),

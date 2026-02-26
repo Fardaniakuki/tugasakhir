@@ -8,7 +8,8 @@ import '../login/login_screen.dart';
 import 'industri_detail_screen.dart';
 
 class KaprogDashboard extends StatefulWidget {
-  const KaprogDashboard({super.key, required ScrollController scrollController});
+  const KaprogDashboard(
+      {super.key, required ScrollController scrollController});
 
   @override
   State<KaprogDashboard> createState() => _KaprogDashboardState();
@@ -86,7 +87,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
       ]);
     } catch (e) {
       print('Error loading data: $e');
-      if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+      if (e.toString().contains('401') ||
+          e.toString().contains('Unauthorized')) {
         _redirectToLogin();
       }
     } finally {
@@ -878,7 +880,9 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                         _buildDetailItem(
                           icon: Icons.calendar_today,
                           label: 'Tanggal Pengajuan',
-                          value: appData['application']?['tanggal_permohonan'] ?? '-',
+                          value: appData['application']
+                                  ?['tanggal_permohonan'] ??
+                              '-',
                         ),
                       ],
                     ),
@@ -913,7 +917,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                             ),
                           ),
                           isExpanded: true,
-                          icon: const Icon(Icons.arrow_drop_down, color: _textPrimary),
+                          icon: const Icon(Icons.arrow_drop_down,
+                              color: _textPrimary),
                           items: _teachers.map((teacher) {
                             final nama = teacher['nama'] ?? 'Guru';
                             final nip = teacher['nip'] ?? '';
@@ -923,7 +928,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                                   teacher['guru_id']?.toString(),
                               child: Text(
                                 nip.isNotEmpty ? '$nama (NIP: $nip)' : nama,
-                                style: const TextStyle(fontSize: 14, color: _textPrimary),
+                                style: const TextStyle(
+                                    fontSize: 14, color: _textPrimary),
                               ),
                             );
                           }).toList(),
@@ -1101,7 +1107,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                             fontSize: 14,
                           ),
                         ),
-                        style: const TextStyle(fontSize: 14, color: _textPrimary),
+                        style:
+                            const TextStyle(fontSize: 14, color: _textPrimary),
                       ),
                     ),
 
@@ -1116,7 +1123,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                         decoration: BoxDecoration(
                           color: _red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: _red.withValues(alpha: 0.3)),
+                          border:
+                              Border.all(color: _red.withValues(alpha: 0.3)),
                         ),
                         child: const Row(
                           children: [
@@ -1324,7 +1332,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                     _buildDetailItem(
                       icon: Icons.calendar_today,
                       label: 'Tanggal Pengajuan',
-                      value: appData['application']?['tanggal_permohonan'] ?? '-',
+                      value:
+                          appData['application']?['tanggal_permohonan'] ?? '-',
                     ),
                   ],
                 ),
@@ -1544,7 +1553,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Detail Card
           _buildDetailCard(
             title: 'Informasi Pengajuan',
@@ -1762,16 +1771,6 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               ),
               Row(
                 children: [
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
-                      Icons.notifications_none,
-                      color: _textPrimary,
-                      size: 26,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: _navigateToPengaturan,
@@ -1782,7 +1781,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                         color: _primaryRed.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: _primaryRed.withValues(alpha: 0.3), width: 1.5),
+                            color: _primaryRed.withValues(alpha: 0.3),
+                            width: 1.5),
                       ),
                       child: Icon(
                         Icons.person_outline,
@@ -1857,7 +1857,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
         decoration: BoxDecoration(
           color: _primaryRed,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
+          border:
+              Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
           boxShadow: [
             BoxShadow(
               color: _primaryRed.withValues(alpha: 0.3),
@@ -1960,8 +1961,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               decoration: BoxDecoration(
                 color: _primaryRed.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border:
-                    Border.all(color: _primaryRed.withValues(alpha: 0.2), width: 1),
+                border: Border.all(
+                    color: _primaryRed.withValues(alpha: 0.2), width: 1),
               ),
               child: Icon(icon, color: _primaryRed, size: 20),
             ),
@@ -1970,10 +1971,13 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(fontSize: 11, color: _textSecondary)),
+                    style:
+                        const TextStyle(fontSize: 11, color: _textSecondary)),
                 Text(value,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 13, color: _textPrimary)),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: _textPrimary)),
               ],
             ),
           ],
@@ -2049,16 +2053,15 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionTitleWithSeeAll('Daftar Pengajuan PKL', _pendingApplications.length),
+            _sectionTitleWithSeeAll(
+                'Daftar Pengajuan PKL', _pendingApplications.length),
             const SizedBox(height: 16),
             _pengajuanList(),
             const SizedBox(height: 40),
-
             _sectionTitleWithSeeAll('Daftar Industri', _industries.length),
             const SizedBox(height: 16),
             _industriList(),
             const SizedBox(height: 40),
-
             _sectionTitleWithSeeAll('Daftar Pembimbing', _teachers.length),
             const SizedBox(height: 16),
             _pembimbingList(),
@@ -2089,8 +2092,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               decoration: BoxDecoration(
                 color: _primaryRed.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border:
-                    Border.all(color: _primaryRed.withValues(alpha: 0.2), width: 1),
+                border: Border.all(
+                    color: _primaryRed.withValues(alpha: 0.2), width: 1),
               ),
               child: Text(
                 '$count total',
@@ -2112,7 +2115,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     }
 
     return SizedBox(
-      height: 185,
+      height: 220,
       child: Column(
         children: [
           Expanded(
@@ -2244,13 +2247,12 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8F9FA),
                           borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: _borderColor, width: 1),
+                          border: Border.all(color: _borderColor, width: 1),
                         ),
                         child: Text(
                           kelasName,
-                          style:
-                              const TextStyle(color: _textSecondary, fontSize: 12),
+                          style: const TextStyle(
+                              color: _textSecondary, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2266,8 +2268,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               decoration: BoxDecoration(
                 color: statusColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border:
-                    Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
+                border: Border.all(
+                    color: statusColor.withValues(alpha: 0.3), width: 1),
               ),
               child: Row(
                 children: [
@@ -2468,13 +2470,12 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8F9FA),
                           borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: _borderColor, width: 1),
+                          border: Border.all(color: _borderColor, width: 1),
                         ),
                         child: Text(
                           bidangText,
-                          style:
-                              const TextStyle(color: _textSecondary, fontSize: 12),
+                          style: const TextStyle(
+                              color: _textSecondary, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2490,8 +2491,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               decoration: BoxDecoration(
                 color: _primaryRed.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
-                border:
-                    Border.all(color: _primaryRed.withValues(alpha: 0.1), width: 1),
+                border: Border.all(
+                    color: _primaryRed.withValues(alpha: 0.1), width: 1),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -2617,7 +2618,6 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
             nama: nama,
             teacherData: teacherData,
             mapel: teacherData['mapel'] ?? 'Mata Pelajaran',
-            kuota: '',
           ),
         );
       },
@@ -2679,13 +2679,12 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8F9FA),
                           borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: _borderColor, width: 1),
+                          border: Border.all(color: _borderColor, width: 1),
                         ),
                         child: Text(
                           kodeGuru,
-                          style:
-                              const TextStyle(color: _textSecondary, fontSize: 12),
+                          style: const TextStyle(
+                              color: _textSecondary, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -2701,8 +2700,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               decoration: BoxDecoration(
                 color: _primaryRed.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(12),
-                border:
-                    Border.all(color: _primaryRed.withValues(alpha: 0.1), width: 1),
+                border: Border.all(
+                    color: _primaryRed.withValues(alpha: 0.1), width: 1),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -2761,13 +2760,12 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
       ),
     );
   }
-  
+
   // ignore: non_constant_identifier_names
   void PengajuanMenungguScreen({required List pendingApplications}) {}
 }
-
-// ============= POPUP DETAIL PEMBIMBING =============
-class _PembimbingDetailDialog extends StatelessWidget {
+// ============= POPUP DETAIL PEMBIMBING DENGAN PAGINATION =============
+class _PembimbingDetailDialog extends StatefulWidget {
   final String nama;
   final String mapel;
   final dynamic teacherData;
@@ -2776,20 +2774,67 @@ class _PembimbingDetailDialog extends StatelessWidget {
     required this.nama,
     required this.mapel,
     required this.teacherData,
-    required String kuota,
   });
 
+  @override
+  State<_PembimbingDetailDialog> createState() =>
+      __PembimbingDetailDialogState();
+}
+
+class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
   static const Color _primaryRed = Color(0xFF6B1B1B);
   static const Color _bgColor = Colors.white;
   static const Color _borderColor = Color(0xFFE5E5E5);
   static const Color _textPrimary = Color(0xFF1A1A1A);
   static const Color _textSecondary = Color(0xFF666666);
   static const Color _green = Color(0xFF4CAF50);
+  
+  // Pagination variables
+  int _currentPage = 1;
+  final int _itemsPerPage = 5;
+  
+  List<dynamic> get _allStudents => widget.teacherData?['students'] ?? [];
+  
+  List<dynamic> get _currentPageStudents {
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = startIndex + _itemsPerPage;
+    return _allStudents.sublist(
+      startIndex.clamp(0, _allStudents.length),
+      endIndex.clamp(0, _allStudents.length),
+    );
+  }
+  
+  int get _totalPages => (_allStudents.length / _itemsPerPage).ceil();
+  
+  void _goToNextPage() {
+    if (_currentPage < _totalPages) {
+      setState(() {
+        _currentPage++;
+      });
+    }
+  }
+  
+  void _goToPrevPage() {
+    if (_currentPage > 1) {
+      setState(() {
+        _currentPage--;
+      });
+    }
+  }
+  
+  void _goToPage(int page) {
+    if (page >= 1 && page <= _totalPages) {
+      setState(() {
+        _currentPage = page;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final students = teacherData?['students'] ?? [];
-
+    final students = _currentPageStudents;
+    final hasStudents = _allStudents.isNotEmpty;
+    
     return Dialog(
       insetPadding: const EdgeInsets.all(20),
       shape: RoundedRectangleBorder(
@@ -2859,26 +2904,81 @@ class _PembimbingDetailDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
 
-                    _buildInfoItem('NIP', teacherData?['nip'] ?? '-'),
-                    _buildInfoItem('No. HP', teacherData?['no_telp'] ?? '-'),
-                    _buildInfoItem('Email', teacherData?['email'] ?? '-'),
-                    _buildInfoItem('Mata Pelajaran', teacherData?['mapel'] ?? '-'),
+                    _buildInfoItem('NIP', widget.teacherData?['nip'] ?? '-'),
+                    _buildInfoItem('No. HP', widget.teacherData?['no_telp'] ?? '-'),
 
                     const SizedBox(height: 20),
 
-                    // Daftar Siswa
-                    const Text(
-                      'Daftar Siswa',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: _textPrimary,
-                      ),
+                    // Daftar Siswa Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Daftar Siswa',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: _textPrimary,
+                          ),
+                        ),
+                        if (hasStudents)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _primaryRed.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border:
+                                  Border.all(color: _primaryRed.withValues(alpha: 0.3)),
+                            ),
+                            child: Text(
+                              'Total: ${_allStudents.length} siswa',
+                              style: const TextStyle(
+                                color: _primaryRed,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 12),
 
-                    if (students.isNotEmpty) ...[
+                    if (hasStudents) ...[
                       ..._buildStudentList(students),
+                      
+                      // Pagination Controls
+                      if (_totalPages > 1) _buildPaginationControls(),
+                      
+                      // Empty space indicator jika data sedang kosong di halaman ini
+                      if (students.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FA),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _borderColor),
+                          ),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.people_outline,
+                                  size: 48,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Tidak ada siswa di halaman ini',
+                                  style: TextStyle(
+                                    color: _textSecondary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ] else ...[
                       Container(
                         padding: const EdgeInsets.all(20),
@@ -2957,7 +3057,7 @@ class _PembimbingDetailDialog extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  nama,
+                  widget.nama,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -2966,16 +3066,16 @@ class _PembimbingDetailDialog extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  mapel,
+                  widget.mapel,
                   style: const TextStyle(
                     color: _textSecondary,
                     fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 4),
-                if (teacherData?['kode_guru'] != null)
+                if (widget.teacherData?['kode_guru'] != null)
                   Text(
-                    'Kode: ${teacherData?['kode_guru']}',
+                    'Kode: ${widget.teacherData?['kode_guru']}',
                     style: const TextStyle(
                       color: _primaryRed,
                       fontSize: 13,
@@ -3126,8 +3226,158 @@ class _PembimbingDetailDialog extends StatelessWidget {
       );
     }).toList();
   }
-}
 
+  Widget _buildPaginationControls() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _borderColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Previous Button
+          IconButton(
+            onPressed: _goToPrevPage,
+            icon: Icon(
+              Icons.chevron_left,
+              color: _currentPage > 1 ? _primaryRed : Colors.grey[400],
+            ),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(
+                  color: _currentPage > 1
+                      ? _primaryRed.withValues(alpha: 0.3)
+                      : Colors.grey[300]!,
+                ),
+              ),
+            ),
+          ),
+
+          // Page Numbers
+          Row(
+            children: _buildPageNumbers(),
+          ),
+
+          // Next Button
+          IconButton(
+            onPressed: _goToNextPage,
+            icon: Icon(
+              Icons.chevron_right,
+              color: _currentPage < _totalPages ? _primaryRed : Colors.grey[400],
+            ),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: BorderSide(
+                  color: _currentPage < _totalPages
+                      ? _primaryRed.withValues(alpha: 0.3)
+                      : Colors.grey[300]!,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildPageNumbers() {
+    final List<Widget> pageWidgets = [];
+    const int maxVisiblePages = 5;
+    
+    // Tentukan halaman awal dan akhir
+    int startPage = _currentPage - 2;
+    int endPage = _currentPage + 2;
+    
+    if (startPage < 1) {
+      endPage += (1 - startPage);
+      startPage = 1;
+    }
+    
+    if (endPage > _totalPages) {
+      startPage -= (endPage - _totalPages);
+      endPage = _totalPages;
+      if (startPage < 1) startPage = 1;
+    }
+    
+    // Batasi agar tidak melebihi maxVisiblePages
+    if (endPage - startPage + 1 > maxVisiblePages) {
+      if (_currentPage - startPage > endPage - _currentPage) {
+        startPage = endPage - maxVisiblePages + 1;
+      } else {
+        endPage = startPage + maxVisiblePages - 1;
+      }
+    }
+    
+    // Tombol untuk halaman pertama jika tidak terlihat
+    if (startPage > 1) {
+      pageWidgets.add(
+        _buildPageButton(1, isActive: false),
+      );
+      if (startPage > 2) {
+        pageWidgets.add(const Text('...'));
+      }
+    }
+    
+    // Tombol untuk halaman-halaman
+    for (int i = startPage; i <= endPage; i++) {
+      pageWidgets.add(
+        _buildPageButton(i, isActive: i == _currentPage),
+      );
+    }
+    
+    // Tombol untuk halaman terakhir jika tidak terlihat
+    if (endPage < _totalPages) {
+      if (endPage < _totalPages - 1) {
+        pageWidgets.add(const Text('...'));
+      }
+      pageWidgets.add(
+        _buildPageButton(_totalPages, isActive: false),
+      );
+    }
+    
+    return pageWidgets;
+  }
+
+  Widget _buildPageButton(int page, {required bool isActive}) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      child: Material(
+        color: isActive ? _primaryRed : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+          side: BorderSide(
+            color: isActive ? _primaryRed : _borderColor,
+          ),
+        ),
+        child: InkWell(
+          onTap: () => _goToPage(page),
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            child: Text(
+              '$page',
+              style: TextStyle(
+                color: isActive ? Colors.white : _textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 class _PengajuanChip extends StatelessWidget {
   final String count;
   final String label;

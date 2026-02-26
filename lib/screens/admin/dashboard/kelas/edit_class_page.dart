@@ -731,56 +731,63 @@ class _EditClassPageState extends State<EditClassPage> {
     _jurusanSearchController.clear();
     _jurusanSearchFocusNode.unfocus();
   }
-
-  // ========== FORM FIELDS ==========
-
-  Widget _buildFormField(
-      IconData icon, String label, TextEditingController controller, FocusNode focusNode) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9F9F9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade200,
-            blurRadius: 4,
-            offset: const Offset(0, 2),
+// ========== FORM FIELDS ==========
+Widget _buildFormField(
+    IconData icon, String label, TextEditingController controller, FocusNode focusNode) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF9F9F9),
+      borderRadius: BorderRadius.circular(12),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.grey.shade200,
+          blurRadius: 4,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: _primaryColor,
+            shape: BoxShape.circle,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: _primaryColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Container(
-            width: 1,
-            height: 40,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w500,
+          child: Icon(icon, color: Colors.white, size: 20),
+        ),
+        const SizedBox(width: 16),
+        Container(
+          width: 1,
+          height: 40,
+          color: Colors.grey[300],
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: focusNode.hasFocus ? _primaryColor : Colors.grey.shade300,
+                    width: focusNode.hasFocus ? 2 : 1,
                   ),
                 ),
-                const SizedBox(height: 4),
-                TextFormField(
+                child: TextFormField(
                   controller: controller,
                   focusNode: focusNode,
                   validator: (value) =>
@@ -790,24 +797,41 @@ class _EditClassPageState extends State<EditClassPage> {
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
                   ),
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
+                    filled: true,
+                    fillColor: Colors.white,
                     isDense: true,
-                    errorStyle: TextStyle(
+                    errorStyle: const TextStyle(
                       fontSize: 12,
                       color: Colors.red,
                     ),
+                    // Menambahkan indikator edit saat focus
+                    suffixIcon: focusNode.hasFocus
+                        ? Icon(
+                            Icons.edit_rounded,
+                            size: 18,
+                            color: _primaryColor,
+                          )
+                        : null,
                   ),
+                  // Update UI saat focus berubah
+                  onTap: () {
+                    setState(() {});
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-
+        ),
+      ],
+    ),
+  );
+}
   Widget _buildJurusanField() {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -848,7 +872,7 @@ class _EditClassPageState extends State<EditClassPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Jurusan',
+                    'Program Keahlian',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey,
@@ -906,7 +930,7 @@ class _EditClassPageState extends State<EditClassPage> {
                     ),
                     const SizedBox(width: 8),
                     const Text(
-                      'Edit Kelas',
+                      'Ubah Data Kelas',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -993,7 +1017,7 @@ class _EditClassPageState extends State<EditClassPage> {
                                 
                                 // JUDUL FORM DI TENGAH
                                 const Text(
-                                  'Edit Data Kelas',
+                                  'Ubah Data Kelas',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,

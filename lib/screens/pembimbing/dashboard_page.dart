@@ -137,10 +137,10 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
         for (var industriData in rawData) {
           final industri = industriData['industri'] ?? {};
           final List<dynamic> rawStudents = industriData['siswa'] ?? [];
-          
+
           for (var siswa in rawStudents) {
             final siswaKey = '${siswa['id']}_${industri['id']}';
-            
+
             // Cegah duplikasi siswa
             if (uniqueStudents.contains(siswaKey)) {
               continue;
@@ -212,16 +212,17 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
         for (var industriData in rawData) {
           final industri = industriData['industri'] ?? {};
           final industriId = industri['id'];
-          
+
           // Cegah duplikasi industri
           if (uniqueIndustri.contains(industriId)) {
             continue;
           }
           uniqueIndustri.add(industriId);
 
-          final jumlahSiswa = industriData['siswa_count'] ?? 
-                             (industriData['siswa'] != null ? 
-                              (industriData['siswa'] as List).length : 0);
+          final jumlahSiswa = industriData['siswa_count'] ??
+              (industriData['siswa'] != null
+                  ? (industriData['siswa'] as List).length
+                  : 0);
 
           processedIndustri.add({
             'industri_id': industriId,
@@ -453,13 +454,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                   fontWeight: FontWeight.w800,
                   color: _textPrimary)),
           Row(children: [
-            IconButton(
-                onPressed: () =>
-                    _showSnackBar('Fitur notifikasi belum tersedia'),
-                icon: const Icon(Icons.notifications_none,
-                    color: _textPrimary, size: 26),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints()),
             const SizedBox(width: 12),
             PopupMenuButton<String>(
               icon: Container(
@@ -469,7 +463,8 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                       color: _primaryRed.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: _primaryRed.withValues(alpha: 0.3), width: 1.5)),
+                          color: _primaryRed.withValues(alpha: 0.3),
+                          width: 1.5)),
                   child:
                       Icon(Icons.person_outline, color: _primaryRed, size: 22)),
               onSelected: (value) => value == 'logout'
@@ -567,7 +562,8 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
           decoration: BoxDecoration(
             color: _primaryRed,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
+            border:
+                Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
             boxShadow: [
               BoxShadow(
                   color: _primaryRed.withValues(alpha: 0.3),
@@ -648,8 +644,8 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
             decoration: BoxDecoration(
                 color: _primaryRed.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border:
-                    Border.all(color: _primaryRed.withValues(alpha: 0.2), width: 1)),
+                border: Border.all(
+                    color: _primaryRed.withValues(alpha: 0.2), width: 1)),
             child: Icon(icon, color: _primaryRed, size: 20)),
         const SizedBox(width: 8),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -707,7 +703,8 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 topLeft: Radius.circular(40), topRight: Radius.circular(40)),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: const Color.fromARGB(255, 255, 255, 255)
+                      .withValues(alpha: 0.1),
                   blurRadius: 20,
                   offset: const Offset(0, -10))
             ]),
@@ -729,6 +726,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 'Data Industri', _industriList.length, _navigateToIndustri),
             const SizedBox(height: 16),
             _industriListWidget(),
+            const SizedBox(height: 60),
           ]),
         ));
   }
@@ -754,7 +752,8 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                         color: _primaryRed.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                            color: _primaryRed.withValues(alpha: 0.2), width: 1)),
+                            color: _primaryRed.withValues(alpha: 0.2),
+                            width: 1)),
                     child: Text('Lihat Semua',
                         style: TextStyle(
                             fontWeight: FontWeight.w600,
@@ -820,7 +819,8 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                       color: _primaryRed.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                          color: _primaryRed.withValues(alpha: 0.3), width: 1.5)),
+                          color: _primaryRed.withValues(alpha: 0.3),
+                          width: 1.5)),
                   child: Icon(Icons.school, color: _primaryRed, size: 26)),
               const SizedBox(width: 16),
               Expanded(
@@ -864,8 +864,8 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                 decoration: BoxDecoration(
                     color: _green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
-                    border:
-                        Border.all(color: _green.withValues(alpha: 0.3), width: 1)),
+                    border: Border.all(
+                        color: _green.withValues(alpha: 0.3), width: 1)),
                 child: Row(children: [
                   const Icon(Icons.business, color: _green, size: 18),
                   const SizedBox(width: 8),
@@ -1201,7 +1201,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
     if (_industriList.isEmpty) {
       return _emptyList('Belum ada data industri', Icons.business);
     }
-    final displayIndustri = _industriList.take(2).toList();
+    final displayIndustri = _industriList.take(3).toList();
     return Column(
         children: displayIndustri
             .map((industri) => _industriCard(industri))
@@ -1373,11 +1373,12 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                                     width: 60,
                                     height: 60,
                                     decoration: BoxDecoration(
-                                        color: _primaryRed.withValues(alpha: 0.1),
+                                        color:
+                                            _primaryRed.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(14),
                                         border: Border.all(
-                                            color:
-                                                _primaryRed.withValues(alpha: 0.3))),
+                                            color: _primaryRed.withValues(
+                                                alpha: 0.3))),
                                     child: Icon(Icons.school,
                                         color: _primaryRed, size: 28)),
                                 const SizedBox(width: 16),
@@ -1722,306 +1723,804 @@ class _StatisticChip extends StatelessWidget {
   }
 }
 
-class SiswaDataScreen extends StatelessWidget {
+class SiswaDataScreen extends StatefulWidget {
   final List<Map<String, dynamic>> students;
   const SiswaDataScreen({super.key, required this.students});
+
+  @override
+  State<SiswaDataScreen> createState() => _SiswaDataScreenState();
+}
+
+class _SiswaDataScreenState extends State<SiswaDataScreen> {
+  int _currentPage = 1;
+  final int _itemsPerPage = 10;
+
+  List<Map<String, dynamic>> get _paginatedStudents {
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = startIndex + _itemsPerPage;
+    if (startIndex >= widget.students.length) {
+      return [];
+    }
+    return widget.students.sublist(
+      startIndex,
+      endIndex > widget.students.length ? widget.students.length : endIndex,
+    );
+  }
+
+  int get _totalPages => (widget.students.length / _itemsPerPage).ceil();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-          title: const Text('Data Siswa Bimbingan'),
-          backgroundColor: const Color(0xFF6B1B1B)),
-      body: students.isEmpty
-          ? Center(
-              child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                  Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  const Text('Belum ada siswa bimbingan',
-                      style: TextStyle(fontSize: 16, color: Colors.grey)),
-                ]))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(children: [
-                Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE5E5E5))),
-                    child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      backgroundColor: const Color(0xFF6B1B1B),
+      body: Column(
+        children: [
+          // Header dengan warna merah
+          Container(
+            padding:
+                const EdgeInsets.only(top: 50, left: 20, right: 20, bottom: 20),
+            decoration: const BoxDecoration(
+              color: Color(0xFF6B1B1B),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Data Siswa Bimbingan',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Body dengan background putih dan corner radius
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+              ),
+              child: widget.students.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Column(children: [
-                            Text('${students.length}',
-                                style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF6B1B1B))),
-                            const Text('Total Siswa',
-                                style: TextStyle(
-                                    fontSize: 12, color: Color(0xFF666666)))
-                          ]),
-                          Container(
-                              height: 40,
-                              width: 1,
-                              color: const Color(0xFFE5E5E5)),
-                          Column(children: [
-                            Text('${students.length}',
-                                style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.green)),
-                            const Text('Semua Siswa',
-                                style: TextStyle(
-                                    fontSize: 12, color: Color(0xFF666666)))
-                          ]),
-                        ])),
-                const SizedBox(height: 20),
-                Column(
-                    children: students.map((siswa) {
-                  String kelasJurusan = siswa['kelas'] ?? '-';
-                  if (siswa['jurusan'] != null && siswa['jurusan'] != '-') {
-                    kelasJurusan = '${siswa['kelas']} • ${siswa['jurusan']}';
-                  }
-                  return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE5E5E5)),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4))
-                          ]),
-                      child: Padding(
+                          Icon(Icons.people_outline,
+                              size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Belum ada siswa bimbingan',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        // Summary Card
+                        Container(
+                          margin: const EdgeInsets.all(16),
                           padding: const EdgeInsets.all(16),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(children: [
-                                  CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: const Color(0xFF6B1B1B)
-                                          .withValues(alpha: 0.1),
-                                      child: const Icon(Icons.school,
-                                          color: Color(0xFF6B1B1B), size: 24)),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                      child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                        Text(siswa['nama'],
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 16,
-                                                color: Color(0xFF1A1A1A))),
-                                        const SizedBox(height: 4),
-                                        Text('$kelasJurusan • ${siswa['nis']}',
-                                            style: const TextStyle(
-                                                color: Color(0xFF666666),
-                                                fontSize: 13)),
-                                      ])),
-                                ]),
-                                const SizedBox(height: 12),
-                                Row(children: [
-                                  const Icon(Icons.apartment,
-                                      size: 16, color: Color(0xFF666666)),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                      child: Text(siswa['industri'],
-                                          style: const TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF6B1B1B)),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis))
-                                ]),
-                                const SizedBox(height: 8),
-                                Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FA),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE5E5E5)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                children: [
+                                  Text(
+                                    '${widget.students.length}',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF6B1B1B),
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Total Siswa',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF666666),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                height: 40,
+                                width: 1,
+                                color: const Color(0xFFE5E5E5),
+                              ),
+                              Column(
+                                children: [
+                                  Text(
+                                    '${widget.students.length}',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Semua Aktif',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF666666),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // List Siswa
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _paginatedStudents.length,
+                            itemBuilder: (context, index) {
+                              final siswa = _paginatedStudents[index];
+                              String kelasJurusan = siswa['kelas'] ?? '-';
+                              if (siswa['jurusan'] != null &&
+                                  siswa['jurusan'] != '-') {
+                                kelasJurusan =
+                                    '${siswa['kelas']} • ${siswa['jurusan']}';
+                              }
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: const Color(0xFFE5E5E5)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Row(children: [
-                                        const Icon(Icons.business,
-                                            size: 16, color: Color(0xFF666666)),
-                                        const SizedBox(width: 6),
-                                        Text(siswa['jenis_industri'] ?? '-',
-                                            style: const TextStyle(
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 24,
+                                            backgroundColor:
+                                                const Color(0xFF6B1B1B)
+                                                    .withValues(alpha: 0.1),
+                                            child: const Icon(
+                                              Icons.school,
+                                              color: Color(0xFF6B1B1B),
+                                              size: 24,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  siswa['nama'],
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                    fontSize: 16,
+                                                    color: Color(0xFF1A1A1A),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  '$kelasJurusan • ${siswa['nis']}',
+                                                  style: const TextStyle(
+                                                    color: Color(0xFF666666),
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.apartment,
+                                            size: 16,
+                                            color: Color(0xFF666666),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              siswa['industri'],
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF6B1B1B),
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.business,
+                                                size: 16,
                                                 color: Color(0xFF666666),
-                                                fontSize: 13))
-                                      ]),
-                                      Text(siswa['industri_alamat'] ?? '-',
-                                          style: const TextStyle(
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                siswa['jenis_industri'] ?? '-',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF666666),
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Text(
+                                            siswa['industri_alamat'] ?? '-',
+                                            style: const TextStyle(
                                               color: Color(0xFF6B1B1B),
                                               fontSize: 12,
-                                              fontWeight: FontWeight.w600)),
-                                    ]),
-                              ])));
-                }).toList()),
-              ])),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        // Pagination Sederhana (jika data lebih dari 10)
+                        if (widget.students.length > _itemsPerPage)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 20),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Tombol Previous
+                                InkWell(
+                                  onTap: _currentPage > 1
+                                      ? () {
+                                          setState(() {
+                                            _currentPage--;
+                                          });
+                                        }
+                                      : null,
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: _currentPage > 1
+                                          ? const Color(0xFF6B1B1B)
+                                          : Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.chevron_left,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 10),
+
+                                // Nomor halaman
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 15, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8F9FA),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                        color: const Color(0xFFE5E5E5)),
+                                  ),
+                                  child: Text(
+                                    '$_currentPage',
+                                    style: const TextStyle(
+                                      color: Color(0xFF6B1B1B),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+
+                                // Tampilkan total halaman jika ada
+                                if (_totalPages > 1)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Text(
+                                      '/ $_totalPages',
+                                      style: const TextStyle(
+                                        color: Color(0xFF666666),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+
+                                const SizedBox(width: 10),
+
+                                // Tombol Next
+                                InkWell(
+                                  onTap: _currentPage < _totalPages
+                                      ? () {
+                                          setState(() {
+                                            _currentPage++;
+                                          });
+                                        }
+                                      : null,
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: _currentPage < _totalPages
+                                          ? const Color(0xFF6B1B1B)
+                                          : Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.chevron_right,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class IndustriDataScreen extends StatelessWidget {
+class IndustriDataScreen extends StatefulWidget {
   final List<Map<String, dynamic>> industriList;
   const IndustriDataScreen({super.key, required this.industriList});
+
+  @override
+  State<IndustriDataScreen> createState() => _IndustriDataScreenState();
+}
+
+class _IndustriDataScreenState extends State<IndustriDataScreen> {
+  int _currentPage = 1;
+  final int _itemsPerPage = 10;
+
+  List<Map<String, dynamic>> get _paginatedIndustri {
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    final endIndex = startIndex + _itemsPerPage;
+    if (startIndex >= widget.industriList.length) {
+      return [];
+    }
+    return widget.industriList.sublist(
+      startIndex,
+      endIndex > widget.industriList.length
+          ? widget.industriList.length
+          : endIndex,
+    );
+  }
+
+  int get _totalPages => (widget.industriList.length / _itemsPerPage).ceil();
+
+  Color? get _primaryRed => null;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-          title: const Text('Data Industri'),
-          backgroundColor: const Color(0xFF6B1B1B)),
-      body: industriList.isEmpty
-          ? Center(
-              child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                  Icon(Icons.business, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  Text('Belum ada data industri',
-                      style: TextStyle(fontSize: 18, color: Colors.grey[600])),
-                ]))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(children: [
-                Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE5E5E5))),
-                    child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+      backgroundColor: const Color(0xFF6B1B1B),
+      body: Column(
+        children: [
+          // Header dengan warna merah
+          Container(
+            padding:
+                const EdgeInsets.only(top: 50, left: 20, right: 20, bottom: 20),
+            decoration: const BoxDecoration(
+              color: Color(0xFF6B1B1B),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Data Industri',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Body dengan background putih dan corner radius
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+              ),
+              child: widget.industriList.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Column(children: [
-                            Text('${industriList.length}',
-                                style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF6B1B1B))),
-                            const Text('Total Industri',
-                                style: TextStyle(
-                                    fontSize: 12, color: Color(0xFF666666)))
-                          ]),
-                          Container(
-                              height: 40,
-                              width: 1,
-                              color: const Color(0xFFE5E5E5)),
-                          Column(children: [
-                            Text(
-                                '${industriList.fold(0, (sum, item) => sum + (item['jumlah_siswa'] as int))}',
-                                style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.green)),
-                            const Text('Total Siswa',
-                                style: TextStyle(
-                                    fontSize: 12, color: Color(0xFF666666)))
-                          ]),
-                        ])),
-                const SizedBox(height: 20),
-                Column(
-                    children: industriList.map((industri) {
-                  final int jumlahSiswa = industri['jumlah_siswa'] ?? 0;
-                  return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE5E5E5)),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4))
-                          ]),
-                      child: Padding(
+                          Icon(Icons.business,
+                              size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Belum ada data industri',
+                            style: TextStyle(
+                                fontSize: 18, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        // Summary Card
+                        Container(
+                          margin: const EdgeInsets.all(16),
                           padding: const EdgeInsets.all(16),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(children: [
-                                  CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: const Color(0xFF6B1B1B)
-                                          .withValues(alpha: 0.1),
-                                      child: const Icon(Icons.business,
-                                          color: Color(0xFF6B1B1B), size: 24)),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                      child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FA),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: const Color(0xFFE5E5E5)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              Column(
+                                children: [
+                                  Text(
+                                    '${widget.industriList.length}',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF6B1B1B),
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Total Industri',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF666666),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                height: 40,
+                                width: 1,
+                                color: const Color(0xFFE5E5E5),
+                              ),
+                              Column(
+                                children: [
+                                  Text(
+                                    '${widget.industriList.fold(0, (sum, item) => sum + (item['jumlah_siswa'] as int))}',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Total Siswa',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF666666),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // List Industri
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _paginatedIndustri.length,
+                            itemBuilder: (context, index) {
+                              final industri = _paginatedIndustri[index];
+                              final int jumlahSiswa =
+                                  industri['jumlah_siswa'] ?? 0;
+
+                              return GestureDetector(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => IndustriDetailScreen(
+                                      industriId: industri['industri_id'],
+                                      industriNama: industri['industri_nama'],
+                                    ),
+                                  ),
+                                ),
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                        color: const Color(0xFFE5E5E5)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                        Text(industri['industri_nama'],
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                fontSize: 16,
-                                                color: Color(0xFF1A1A1A))),
-                                        const SizedBox(height: 4),
-                                        Text('ID: ${industri['industri_id']}',
-                                            style: const TextStyle(
-                                                color: Color(0xFF666666),
-                                                fontSize: 13)),
-                                      ])),
-                                  Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                          color: const Color(0xFF6B1B1B)
-                                              .withValues(alpha: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(12)),
-                                      child: Row(children: [
-                                        const Icon(Icons.people,
-                                            size: 14, color: Color(0xFF6B1B1B)),
-                                        const SizedBox(width: 4),
-                                        Text('$jumlahSiswa',
-                                            style: const TextStyle(
+                                            CircleAvatar(
+                                              radius: 24,
+                                              backgroundColor:
+                                                  const Color(0xFF6B1B1B)
+                                                      .withValues(alpha: 0.1),
+                                              child: const Icon(
+                                                Icons.business,
                                                 color: Color(0xFF6B1B1B),
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600)),
-                                      ])),
-                                ]),
-                                const SizedBox(height: 12),
-                                const Divider(color: Color(0xFFE5E5E5)),
-                                const SizedBox(height: 12),
-                                Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Expanded(
-                                          child: Text(
-                                              'Klik untuk melihat detail industri',
-                                              style: TextStyle(
+                                                size: 24,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    industri['industri_nama'],
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 16,
+                                                      color: Color(0xFF1A1A1A),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'ID: ${industri['industri_id']}',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF666666),
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 5),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF6B1B1B)
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.people,
+                                                    size: 14,
+                                                    color: Color(0xFF6B1B1B),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '$jumlahSiswa',
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF6B1B1B),
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Divider(color: Color(0xFFE5E5E5)),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Expanded(
+                                              child: Text(
+                                                'Klik untuk melihat detail industri',
+                                                style: TextStyle(
                                                   color: Color(0xFF6B1B1B),
                                                   fontSize: 13,
-                                                  fontWeight: FontWeight.w600),
-                                              textAlign: TextAlign.center)),
-                                      IconButton(
-                                          onPressed: () => Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      IndustriDetailScreen(
-                                                          industriId: industri[
-                                                              'industri_id'],
-                                                          industriNama: industri[
-                                                              'industri_nama']))),
-                                          icon: const Icon(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                            Icon(
                                               Icons.arrow_forward_ios,
                                               size: 16,
-                                              color: Color(0xFF6B1B1B))),
-                                    ]),
-                              ])));
-                }).toList()),
-              ])),
+                                              color: _primaryRed,
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        // Pagination Sederhana (jika data lebih dari 10)
+                        if (widget.industriList.length > _itemsPerPage)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 16, horizontal: 20),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Tombol Previous
+                                InkWell(
+                                  onTap: _currentPage > 1
+                                      ? () {
+                                          setState(() {
+                                            _currentPage--;
+                                          });
+                                        }
+                                      : null,
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: _currentPage > 1
+                                          ? const Color(0xFF6B1B1B)
+                                          : Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.chevron_left,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(width: 10),
+
+                                // Nomor halaman
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 15, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8F9FA),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                        color: const Color(0xFFE5E5E5)),
+                                  ),
+                                  child: Text(
+                                    '$_currentPage',
+                                    style: const TextStyle(
+                                      color: Color(0xFF6B1B1B),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+
+                                // Tampilkan total halaman jika ada
+                                if (_totalPages > 1)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Text(
+                                      '/ $_totalPages',
+                                      style: const TextStyle(
+                                        color: Color(0xFF666666),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+
+                                const SizedBox(width: 10),
+
+                                // Tombol Next
+                                InkWell(
+                                  onTap: _currentPage < _totalPages
+                                      ? () {
+                                          setState(() {
+                                            _currentPage++;
+                                          });
+                                        }
+                                      : null,
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: _currentPage < _totalPages
+                                          ? const Color(0xFF6B1B1B)
+                                          : Colors.grey[300],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.chevron_right,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

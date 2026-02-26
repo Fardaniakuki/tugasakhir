@@ -764,7 +764,7 @@ class _TeacherDetailPageState extends State<TeacherDetailPage> {
                                                 const SizedBox(height: 10),
                                                 _buildStatusBadge('Wali Kelas', teacherData?['is_wali_kelas']),
                                                 const SizedBox(height: 10),
-                                                _buildStatusBadge('Kaprog', teacherData?['is_kaprog']),
+                                                _buildStatusBadge('Pokja', teacherData?['is_kaprog']),
                                                 const SizedBox(height: 40),
                                               ],
                                             ),
@@ -852,7 +852,7 @@ class _TeacherDetailPageState extends State<TeacherDetailPage> {
                                                           Icon(Icons.edit_rounded, size: 18),
                                                           SizedBox(width: 6),
                                                           Text(
-                                                            'Edit',
+                                                            'Ubah',
                                                             style: TextStyle(
                                                               fontSize: 14,
                                                               fontWeight: FontWeight.w600,

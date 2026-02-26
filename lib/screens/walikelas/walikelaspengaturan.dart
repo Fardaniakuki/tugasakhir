@@ -180,7 +180,7 @@ class _WaliKelasProfilePageState extends State<WaliKelasProfilePage> {
           print('   Kode: ${_guruData['kode_guru']}');
           print('   NIP: ${_guruData['nip']}');
           print('   Telp: ${_guruData['no_telp']}');
-          print('   Kelas Wali: ${_guruData['kelas_wali']}');
+          print('   Wali Kelas: ${_guruData['kelas_wali']}');
           print('   Jurusan: ${_guruData['jurusan']}');
           print('   ID: ${_guruData['id']}');
           print('   User ID: ${_guruData['user_id']}');

@@ -157,7 +157,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
     try {
       // Konversi status ke bahasa Inggris untuk API
       final String englishStatus = _translateStatusToEnglish(status);
-      
+
       final response = await http.get(
         Uri.parse(
             '${dotenv.env['API_BASE_URL']}/api/pkl/applications?status=$englishStatus'),
@@ -289,7 +289,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
 
           for (var app in applications) {
             final appData = app['application'] ?? {};
-            final pembimbingId = appData['pembimbing_guru_id'];
+            final pembimbingId = appData['guru_id'];
             final status = appData['status'] ?? '';
             final String indonesianStatus = _translateStatus(status);
 
@@ -301,7 +301,8 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
                 'status': indonesianStatus,
               });
 
-              if (indonesianStatus == 'Disetujui' || indonesianStatus == 'Aktif') {
+              if (indonesianStatus == 'Disetujui' ||
+                  indonesianStatus == 'Aktif') {
                 approvedStudentsCount++;
               }
             }
@@ -358,12 +359,12 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
 
           // Cari data pembimbing
           String pembimbingName = 'Belum ditentukan';
-          final pembimbingId = appData['pembimbing_guru_id'];
+          final pembimbingId = appData['pic'];
 
           if (pembimbingId != null) {
             for (var teacher in _teachers) {
               if (teacher['id'] == pembimbingId) {
-                pembimbingName = teacher['nama'] ?? 'Pembimbing';
+                pembimbingName = teacher['pic'] ?? 'Pembimbing';
                 break;
               }
             }
@@ -432,7 +433,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: _primaryRed.withValues(alpha:0.1),
+                        color: _primaryRed.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: Icon(
@@ -545,10 +546,10 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
-                              color: _primaryRed.withValues(alpha:0.1),
+                              color: _primaryRed.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                  color: _primaryRed.withValues(alpha:0.3)),
+                                  color: _primaryRed.withValues(alpha: 0.3)),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -642,225 +643,353 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
     );
   }
 
-// ============= DIALOG DETAIL PEMBIMBING =============
-void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
-  final students = teacherData['students'] ?? [];
+// ============= DIALOG DETAIL PEMBIMBING DENGAN PAGINATION =============
+  void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
+    final students = teacherData['students'] ?? [];
 
-  showDialog(
-    context: context,
-    builder: (context) => Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: _primaryRed.withValues(alpha:0.1),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.people,
-                      color: _primaryRed,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DETAIL PEMBIMBING',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF6B1B1B),
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Informasi lengkap pembimbing',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+    // Variables untuk pagination - 3 siswa per halaman
+    int currentPage = 1;
+    const int itemsPerPage = 3;
+    final int totalPages = (students.length / itemsPerPage).ceil();
+
+    // Fungsi untuk mendapatkan siswa berdasarkan halaman
+    List<dynamic> getCurrentPageStudents() {
+      final startIndex = (currentPage - 1) * itemsPerPage;
+      final endIndex = startIndex + itemsPerPage;
+      return students.sublist(
+        startIndex.clamp(0, students.length),
+        endIndex.clamp(0, students.length),
+      );
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final currentStudents = getCurrentPageStudents();
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
               ),
-
-              const SizedBox(height: 24),
-
-              // Info Pembimbing
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey[200]!),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.8,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Informasi Pembimbing',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF6B1B1B),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _simpleDetailItem('Nama', teacherData['nama'] ?? 'Guru'),
-                    _simpleDetailItem('NIP', teacherData['nip'] ?? '-'),
-                    _simpleDetailItem('No. HP', teacherData['no_telp'] ?? '-'),
-                    _simpleDetailItem('Kode Guru', teacherData['kode_guru'] ?? '-'),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // Daftar Siswa
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Daftar Siswa',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF6B1B1B),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _primaryRed.withValues(alpha:0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${students.length} siswa',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: _primaryRed,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                      const SizedBox(height: 12),
-
-                      if (students.isNotEmpty) ...[
-                        ..._buildSimpleStudentList(students),
-                        const SizedBox(height: 8),
-                        if (students.length > 3)
-                          Text(
-                            '${students.length - 3} siswa lainnya...',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                      ] else ...[
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[200]!),
-                          ),
-                          child: Center(
-                            child: Column(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Header
+                            Row(
                               children: [
-                                Icon(
-                                  Icons.people_outline,
-                                  size: 36,
-                                  color: Colors.grey[400],
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: _primaryRed.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(
+                                    Icons.people,
+                                    color: _primaryRed,
+                                    size: 24,
+                                  ),
                                 ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Belum ada siswa yang dibimbing',
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 12,
+                                const SizedBox(width: 14),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'DETAIL PEMBIMBING',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF6B1B1B),
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Informasi lengkap pembimbing',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          ),
+
+                            const SizedBox(height: 24),
+
+                            // Info Pembimbing
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.grey[200]!),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Informasi Pembimbing',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF6B1B1B),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  _buildSimpleDetailItem(
+                                      'Nama', teacherData['nama'] ?? 'Guru'),
+                                  _buildSimpleDetailItem(
+                                      'NIP', teacherData['nip'] ?? '-'),
+                                  _buildSimpleDetailItem(
+                                      'No. HP', teacherData['no_telp'] ?? '-'),
+                                  _buildSimpleDetailItem('Kode Guru',
+                                      teacherData['kode_guru'] ?? '-'),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 20),
+
+                            // Daftar Siswa
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.grey[200]!),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'Daftar Siswa',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF6B1B1B),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _primaryRed.withValues(
+                                              alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '${students.length} siswa',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: _primaryRed,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  if (students.isNotEmpty) ...[
+                                    ..._buildSimpleStudentList(currentStudents),
+
+                                    // Pagination Controls jika ada lebih dari 3 siswa
+                                    if (students.length > 3) ...[
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey[100],
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          border: Border.all(
+                                              color: Colors.grey[300]!),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            // Previous Button
+                                            IconButton(
+                                              onPressed: currentPage > 1
+                                                  ? () {
+                                                      setState(() {
+                                                        currentPage--;
+                                                      });
+                                                    }
+                                                  : null,
+                                              icon: Icon(
+                                                Icons.chevron_left,
+                                                color: currentPage > 1
+                                                    ? _primaryRed
+                                                    : Colors.grey[400],
+                                              ),
+                                              style: IconButton.styleFrom(
+                                                backgroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  side: BorderSide(
+                                                    color: currentPage > 1
+                                                        ? _primaryRed
+                                                            .withValues(
+                                                                alpha: 0.3)
+                                                        : Colors.grey[300]!,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+
+                                            // Page Info
+                                            Text(
+                                              'Halaman $currentPage dari $totalPages',
+                                              style: TextStyle(
+                                                color: Colors.grey[600],
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+
+                                            // Next Button
+                                            IconButton(
+                                              onPressed:
+                                                  currentPage < totalPages
+                                                      ? () {
+                                                          setState(() {
+                                                            currentPage++;
+                                                          });
+                                                        }
+                                                      : null,
+                                              icon: Icon(
+                                                Icons.chevron_right,
+                                                color: currentPage < totalPages
+                                                    ? _primaryRed
+                                                    : Colors.grey[400],
+                                              ),
+                                              style: IconButton.styleFrom(
+                                                backgroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  side: BorderSide(
+                                                    color:
+                                                        currentPage < totalPages
+                                                            ? _primaryRed
+                                                                .withValues(
+                                                                    alpha: 0.3)
+                                                            : Colors.grey[300]!,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ] else ...[
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color: Colors.grey[200]!),
+                                      ),
+                                      child: Center(
+                                        child: Column(
+                                          children: [
+                                            Icon(
+                                              Icons.people_outline,
+                                              size: 36,
+                                              color: Colors.grey[400],
+                                            ),
+                                            const SizedBox(height: 8),
+                                            const Text(
+                                              'Belum ada siswa yang dibimbing',
+                                              style: TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: 24),
+                          ],
                         ),
-                      ],
+                      ),
+
+                      // Action Button (di luar padding agar full width)
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _primaryRed,
+                                  side: const BorderSide(
+                                      color: Color(0xFF6B1B1B)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
+                                ),
+                                child: const Text(
+                                  'TUTUP',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 24),
-
-                // Action Button
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: _primaryRed,
-                          side: const BorderSide(color: Color(0xFF6B1B1B)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: const Text(
-                          'TUTUP',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _simpleDetailItem(String label, String value) {
+  Widget _buildSimpleDetailItem(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -893,10 +1022,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
   }
 
   List<Widget> _buildSimpleStudentList(List<dynamic> students) {
-    // Ambil hanya 3 siswa pertama untuk tampilan
-    final displayStudents = students.length > 3 ? students.sublist(0, 3) : students;
-    
-    return displayStudents.map<Widget>((student) {
+    return students.map<Widget>((student) {
       final namaSiswa = student['nama'] ?? 'Siswa';
       final kelas = student['kelas'] ?? '-';
       final industri = student['industri'] ?? 'Industri';
@@ -928,14 +1054,14 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Colors.white, // Background putih
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.grey[200]!),
         ),
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: _primaryRed.withValues(alpha:0.1),
+              backgroundColor: _primaryRed.withValues(alpha: 0.1),
               radius: 18,
               child: Text(
                 namaSiswa.substring(0, 1).toUpperCase(),
@@ -972,9 +1098,9 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: statusColor.withValues(alpha:0.1),
+                color: statusColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: statusColor.withValues(alpha:0.3)),
+                border: Border.all(color: statusColor.withValues(alpha: 0.3)),
               ),
               child: Text(
                 statusText,
@@ -1028,7 +1154,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -1096,7 +1222,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -1196,7 +1322,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
       margin: const EdgeInsets.only(top: 40),
       decoration: BoxDecoration(
         color: _secondaryColor,
-        border: Border.all(color: _blackColor.withValues(alpha:0.1), width: 1),
+        border: Border.all(color: _blackColor.withValues(alpha: 0.1), width: 1),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(40),
           topRight: Radius.circular(40),
@@ -1292,7 +1418,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[200]!),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -1305,7 +1431,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Dashboard Koordinator',
+                'Beranda Koordinator',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -1314,18 +1440,6 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
               ),
               Row(
                 children: [
-                  IconButton(
-                    onPressed: () {
-                      // Aksi notifikasi
-                    },
-                    icon: const Icon(
-                      Icons.notifications_none,
-                      color: Color(0xFF6B1B1B),
-                      size: 26,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: _navigateToPengaturan,
@@ -1333,10 +1447,11 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF6B1B1B).withValues(alpha:0.1),
+                        color: const Color(0xFF6B1B1B).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: const Color(0xFF6B1B1B).withValues(alpha:0.3),
+                            color:
+                                const Color(0xFF6B1B1B).withValues(alpha: 0.3),
                             width: 1.5),
                       ),
                       child: const Icon(
@@ -1375,7 +1490,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
           border: Border.all(color: Colors.grey[200]!),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.08),
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 18,
               offset: const Offset(0, 8),
             ),
@@ -1410,10 +1525,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
       decoration: BoxDecoration(
         color: _primaryRed,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _primaryRed.withValues(alpha:0.8), width: 1),
+        border: Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
         boxShadow: [
           BoxShadow(
-            color: _primaryRed.withValues(alpha:0.3),
+            color: _primaryRed.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -1424,7 +1539,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha:0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(Icons.supervisor_account,
@@ -1441,7 +1556,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha:0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -1496,10 +1611,11 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _borderOrange.withValues(alpha:0.5), width: 1.5),
+          border: Border.all(
+              color: _borderOrange.withValues(alpha: 0.5), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withValues(alpha:0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               blurRadius: 6,
               offset: const Offset(0, 3),
             ),
@@ -1510,10 +1626,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
             Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: _primaryRed.withValues(alpha:0.1),
+                color: _primaryRed.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border:
-                    Border.all(color: _primaryRed.withValues(alpha:0.2), width: 1),
+                border: Border.all(
+                    color: _primaryRed.withValues(alpha: 0.2), width: 1),
               ),
               child: Icon(icon, color: _primaryRed, size: 20),
             ),
@@ -1543,7 +1659,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[300]!, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withValues(alpha:0.1),
+            color: Colors.grey.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -1583,14 +1699,14 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
       margin: const EdgeInsets.only(top: 40),
       decoration: BoxDecoration(
         color: _secondaryColor,
-        border: Border.all(color: _blackColor.withValues(alpha:0.1), width: 1),
+        border: Border.all(color: _blackColor.withValues(alpha: 0.1), width: 1),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(40),
           topRight: Radius.circular(40),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, -10),
           ),
@@ -1642,10 +1758,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: _primaryRed.withValues(alpha:0.1),
+                color: _primaryRed.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border:
-                    Border.all(color: _primaryRed.withValues(alpha:0.2), width: 1),
+                border: Border.all(
+                    color: _primaryRed.withValues(alpha: 0.2), width: 1),
               ),
               child: Text(
                 '$count total',
@@ -1753,7 +1869,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[200]!, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -1770,10 +1886,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: _primaryRed.withValues(alpha:0.1),
+                  color: _primaryRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: _primaryRed.withValues(alpha:0.3), width: 1.5),
+                      color: _primaryRed.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Icon(
                   Icons.person,
@@ -1822,9 +1938,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: statusColor.withValues(alpha:0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: statusColor.withValues(alpha:0.3), width: 1),
+              border: Border.all(
+                  color: statusColor.withValues(alpha: 0.3), width: 1),
             ),
             child: Row(
               children: [
@@ -1883,7 +2000,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[200]!, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -1983,7 +2100,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[200]!, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -2000,10 +2117,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: _primaryRed.withValues(alpha:0.1),
+                  color: _primaryRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: _primaryRed.withValues(alpha:0.3), width: 1.5),
+                      color: _primaryRed.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Icon(
                   icon,
@@ -2052,9 +2169,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _primaryRed.withValues(alpha:0.05),
+              color: _primaryRed.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _primaryRed.withValues(alpha:0.1), width: 1),
+              border: Border.all(
+                  color: _primaryRed.withValues(alpha: 0.1), width: 1),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -2091,7 +2209,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[200]!, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -2119,7 +2237,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
     }
 
     return SizedBox(
-      height: 190,
+      height: 210,
       child: Column(
         children: [
           Expanded(
@@ -2180,7 +2298,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[200]!, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -2197,10 +2315,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: _primaryRed.withValues(alpha:0.1),
+                  color: _primaryRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: _primaryRed.withValues(alpha:0.3), width: 1.5),
+                      color: _primaryRed.withValues(alpha: 0.3), width: 1.5),
                 ),
                 child: Icon(
                   Icons.people,
@@ -2249,9 +2367,10 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _primaryRed.withValues(alpha:0.05),
+              color: _primaryRed.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _primaryRed.withValues(alpha:0.1), width: 1),
+              border: Border.all(
+                  color: _primaryRed.withValues(alpha: 0.1), width: 1),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -2288,7 +2407,7 @@ void _showTeacherDetailDialog(Map<String, dynamic> teacherData) {
         border: Border.all(color: Colors.grey[200]!, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -2332,7 +2451,7 @@ class _PengajuanChip extends StatelessWidget {
         border: Border.all(color: Colors.grey[200]!, width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

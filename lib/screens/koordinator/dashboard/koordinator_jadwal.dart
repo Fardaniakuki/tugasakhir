@@ -48,6 +48,58 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
     'Penjemputan'
   ];
 
+  // Fungsi untuk mengubah nama hari ke Bahasa Indonesia
+  String _getIndonesianDayName(String englishDay) {
+    switch (englishDay.toLowerCase()) {
+      case 'monday': return 'Senin';
+      case 'tuesday': return 'Selasa';
+      case 'wednesday': return 'Rabu';
+      case 'thursday': return 'Kamis';
+      case 'friday': return 'Jumat';
+      case 'saturday': return 'Sabtu';
+      case 'sunday': return 'Minggu';
+      default: return englishDay;
+    }
+  }
+
+  // Fungsi untuk mengubah nama bulan ke Bahasa Indonesia
+  String _getIndonesianMonthName(String englishMonth) {
+    switch (englishMonth.toLowerCase()) {
+      case 'january': return 'Januari';
+      case 'february': return 'Februari';
+      case 'march': return 'Maret';
+      case 'april': return 'April';
+      case 'may': return 'Mei';
+      case 'june': return 'Juni';
+      case 'july': return 'Juli';
+      case 'august': return 'Agustus';
+      case 'september': return 'September';
+      case 'october': return 'Oktober';
+      case 'november': return 'November';
+      case 'december': return 'Desember';
+      default: return englishMonth;
+    }
+  }
+
+  // Format tanggal ke Bahasa Indonesia
+  String _formatDateIndonesian(DateTime date) {
+    final dayName = _getIndonesianDayName(DateFormat('EEEE').format(date));
+    final monthName = _getIndonesianMonthName(DateFormat('MMMM').format(date));
+    return '$dayName, ${date.day} $monthName ${date.year}';
+  }
+
+  // Format bulan dan tahun ke Bahasa Indonesia
+  String _formatMonthYearIndonesian(DateTime date) {
+    final monthName = _getIndonesianMonthName(DateFormat('MMMM').format(date));
+    return '$monthName ${date.year}';
+  }
+
+  // Format tanggal singkat (dd MMM yyyy) ke Bahasa Indonesia
+  String _formatShortDateIndonesian(DateTime date) {
+    final monthName = _getIndonesianMonthName(DateFormat('MMM').format(date));
+    return '${date.day} $monthName ${date.year}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -76,7 +128,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
   }
 
   void _generateCalendar() {
-    _currentMonth = DateFormat('MMMM yyyy').format(_currentDate);
+    _currentMonth = _formatMonthYearIndonesian(_currentDate); // Pakai format Indonesia
     _calendarDays = [];
     final firstDayOfMonth = DateTime(_currentDate.year, _currentDate.month, 1);
     final lastDayOfMonth = DateTime(_currentDate.year, _currentDate.month + 1, 0);
@@ -160,6 +212,10 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
         _redirectToLogin();
         return;
       }
+
+      // Debug: Print data yang dikirim
+      print('🟡 Creating kegiatan with data: $data');
+
       final response = await http.post(
         Uri.parse('${dotenv.env['API_BASE_URL']}/api/kegiatan-pkl'),
         headers: {
@@ -168,6 +224,10 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
         },
         body: json.encode(data),
       );
+
+      print('🟡 Response status: ${response.statusCode}');
+      print('🟡 Response body: ${response.body}');
+
       if (response.statusCode == 201 || response.statusCode == 200) {
         await _fetchKegiatanPkl();
         if (!mounted) return;
@@ -176,9 +236,11 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
         _redirectToLogin();
       } else {
         final errorData = json.decode(response.body);
-        throw Exception('Failed to create kegiatan: ${errorData['message'] ?? response.statusCode}');
+        final errorMessage = errorData['message'] ?? errorData['error'] ?? 'Failed to create kegiatan: ${response.statusCode}';
+        throw Exception(errorMessage);
       }
     } catch (e) {
+      print('❌ Error creating kegiatan: $e');
       if (!mounted) return;
       _showErrorPopup('Gagal menambahkan kegiatan: $e');
     }
@@ -439,7 +501,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
                           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Text(DateFormat('EEEE, dd MMMM yyyy').format(tanggalMulai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
+                            Text(_formatDateIndonesian(tanggalMulai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
                             const Icon(Icons.calendar_month, color: _primaryColor, size: 24),
                           ]),
                         ),
@@ -464,7 +526,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
                           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Text(DateFormat('EEEE, dd MMMM yyyy').format(tanggalSelesai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
+                            Text(_formatDateIndonesian(tanggalSelesai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
                             const Icon(Icons.calendar_month, color: _primaryColor, size: 24),
                           ]),
                         ),
@@ -667,7 +729,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
                           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Text(DateFormat('EEEE, dd MMMM yyyy').format(tanggalMulai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
+                            Text(_formatDateIndonesian(tanggalMulai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
                             const Icon(Icons.calendar_month, color: _primaryColor, size: 24),
                           ]),
                         ),
@@ -692,7 +754,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
                           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Text(DateFormat('EEEE, dd MMMM yyyy').format(tanggalSelesai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
+                            Text(_formatDateIndonesian(tanggalSelesai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
                             const Icon(Icons.calendar_month, color: _primaryColor, size: 24),
                           ]),
                         ),
@@ -951,7 +1013,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
   }
 
   String _formatDateForDisplay(DateTime date) {
-    return DateFormat('EEEE, dd MMMM yyyy').format(date);
+    return _formatDateIndonesian(date); // Gunakan format Indonesia
   }
 
   List<KegiatanPkl> _getKegiatanForDay(DateTime day) {
@@ -1215,12 +1277,12 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                             Row(children: [
                               Icon(Icons.calendar_today, size: 16, color: isPastEvent ? Colors.grey[500] : _textSecondary),
                               const SizedBox(width: 6),
-                              Text(DateFormat('dd MMM yyyy').format(kegiatan.tanggalMulai), style: TextStyle(color: isPastEvent ? Colors.grey[600] : _textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+                              Text(_formatShortDateIndonesian(kegiatan.tanggalMulai), style: TextStyle(color: isPastEvent ? Colors.grey[600] : _textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
                               if (kegiatan.tanggalSelesai != kegiatan.tanggalMulai) ...[
                                 const SizedBox(width: 8),
                                 Text('-', style: TextStyle(color: isPastEvent ? Colors.grey[500] : _textSecondary)),
                                 const SizedBox(width: 8),
-                                Text(DateFormat('dd MMM yyyy').format(kegiatan.tanggalSelesai), style: TextStyle(color: isPastEvent ? Colors.grey[600] : _textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+                                Text(_formatShortDateIndonesian(kegiatan.tanggalSelesai), style: TextStyle(color: isPastEvent ? Colors.grey[600] : _textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
                               ],
                               if (isPastEvent)
                                 Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)), child: const Text('Lewat', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.w600))),
