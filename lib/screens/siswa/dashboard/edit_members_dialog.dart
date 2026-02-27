@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dashboard_helpers.dart';
 
 class EditMembersDialog extends StatefulWidget {
@@ -125,7 +124,7 @@ class _EditMembersDialogState extends State<EditMembersDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = const Color(0xFF9f0712);
+    const primaryColor = Color(0xFF9f0712);
     
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -347,7 +346,7 @@ class _EditMembersDialogState extends State<EditMembersDialog> {
                             color: primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(Icons.person_add, size: 16, color: primaryColor),
+                          child: const Icon(Icons.person_add, size: 16, color: primaryColor),
                         ),
                         const SizedBox(width: 8),
                         const Text(
@@ -429,12 +428,12 @@ class _EditMembersDialogState extends State<EditMembersDialog> {
                             ),
                             label: Text(
                               member.nama,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 12,
                                 color: primaryColor,
                               ),
                             ),
-                            deleteIcon: Icon(Icons.close, size: 16, color: primaryColor),
+                            deleteIcon: const Icon(Icons.close, size: 16, color: primaryColor),
                             onDeleted: () => _removeMember(member),
                             backgroundColor: Colors.transparent,
                             padding: EdgeInsets.zero,
@@ -537,7 +536,7 @@ class _EditMembersDialogState extends State<EditMembersDialog> {
                               ),
                             ),
                             value: null,
-                            icon: Icon(Icons.arrow_drop_down, color: primaryColor),
+                            icon: const Icon(Icons.arrow_drop_down, color: primaryColor),
                             iconSize: 24,
                             elevation: 8,
                             dropdownColor: Colors.white,

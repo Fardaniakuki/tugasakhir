@@ -3,8 +3,8 @@ import 'dart:async';
 import 'dashboard/siswa_dashboard.dart';
 import 'dashboard/siswa_kalender.dart';
 import 'dashboard/siswa_permohonan.dart';
-import 'dashboard/siswa_pindah_pkl.dart'; // Dipindah ke index 3
-import 'dashboard/siswa_pengaturan.dart'; // Dipindah ke index 4
+import 'dashboard/siswa_pindah_pkl.dart';
+import 'dashboard/siswa_pengaturan.dart';
 import 'dashboard/ajukan_pkl_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -31,7 +31,7 @@ class _SiswaMainState extends State<SiswaMain> {
   final TextEditingController _alasanPindahController = TextEditingController();
   final TextEditingController _searchIndustriController =
       TextEditingController();
-  String? _jenisIzin = 'izin';
+  String? _jenisIzin = 'Izin';
   final List<File> _selectedFiles = [];
   final List<File> _selectedPindahFiles = [];
   final ImagePicker _picker = ImagePicker();
@@ -43,6 +43,9 @@ class _SiswaMainState extends State<SiswaMain> {
   List<Map<String, dynamic>> _industriList = [];
   int? _selectedIndustriId;
   bool _isLoadingIndustri = false;
+
+  // Variabel untuk menyimpan tanggal asli (format API)
+  DateTime? _selectedDate;
 
   @override
   void initState() {
@@ -56,7 +59,7 @@ class _SiswaMainState extends State<SiswaMain> {
       _buildPengaturanPage(), // index 4: Pengaturan
     ];
     _loadExistingIzin();
-    _loadIndustriList(); // Load daftar industri saat init
+    _loadIndustriList();
   }
 
   @override
@@ -66,6 +69,45 @@ class _SiswaMainState extends State<SiswaMain> {
     _alasanPindahController.dispose();
     _searchIndustriController.dispose();
     super.dispose();
+  }
+
+  // ==================== METHOD FORMAT TANGGAL INDONESIA UNTUK TAMPILAN ====================
+
+  String _formatTanggalIndonesia(DateTime date) {
+    final List<String> bulan = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember'
+    ];
+
+    final List<String> hari = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu'
+    ];
+
+    int hariIndex = date.weekday - 1;
+    if (hariIndex < 0) hariIndex = 6;
+
+    return '${hari[hariIndex]}, ${date.day} ${bulan[date.month - 1]} ${date.year}';
+  }
+
+  // Format untuk API (YYYY-MM-DD)
+  String _formatTanggalAPI(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
   Widget _buildDashboardPage() {
@@ -96,7 +138,6 @@ class _SiswaMainState extends State<SiswaMain> {
     );
   }
 
-  // TAB KE-3: Pindah PKL
   Widget _buildPindahPklPage() {
     return _buildCachedPage(
       index: 3,
@@ -108,7 +149,6 @@ class _SiswaMainState extends State<SiswaMain> {
     );
   }
 
-  // TAB KE-4: Pengaturan
   Widget _buildPengaturanPage() {
     return _buildCachedPage(
       index: 4,
@@ -188,7 +228,6 @@ class _SiswaMainState extends State<SiswaMain> {
             };
           }).toList();
 
-          // Reset selected if not in list
           if (_selectedIndustriId != null &&
               !_industriList.any((ind) => ind['id'] == _selectedIndustriId)) {
             _selectedIndustriId = null;
@@ -429,10 +468,9 @@ class _SiswaMainState extends State<SiswaMain> {
   Future<void> _showAjukanPindahPKLForm() async {
     _alasanPindahController.clear();
     _selectedPindahFiles.clear();
-    _selectedIndustriId = null; // Reset selection
-    _searchIndustriController.clear(); // Reset search
+    _selectedIndustriId = null;
+    _searchIndustriController.clear();
 
-    // Load industri list
     await _loadIndustriList();
 
     await showModalBottomSheet(
@@ -512,7 +550,6 @@ class _SiswaMainState extends State<SiswaMain> {
                         : null,
                   ),
                   onChanged: (value) async {
-                    // Debounce search
                     await Future.delayed(const Duration(milliseconds: 500));
                     if (value != _searchIndustriController.text) return;
                     await _loadIndustriList(search: value);
@@ -549,8 +586,7 @@ class _SiswaMainState extends State<SiswaMain> {
                   controller: _alasanPindahController,
                   maxLines: 4,
                   decoration: InputDecoration(
-                    hintText:
-                        'Alasan Pindah PKL',
+                    hintText: 'Alasan Pindah PKL',
                     filled: true,
                     fillColor: Colors.grey[50],
                     border: OutlineInputBorder(
@@ -615,7 +651,7 @@ class _SiswaMainState extends State<SiswaMain> {
         Text('Bukti Pendukung', style: _labelStyle),
         const SizedBox(height: 8),
         Text(
-          'Upload 1-5 file bukti (JPEG/PNG/PDF, maks 5MB per file)',
+          'Unggah 1-5 berkas bukti (JPEG/PNG/PDF, maks 5MB per berkas)',
           style: TextStyle(color: Colors.grey[600], fontSize: 13),
         ),
         const SizedBox(height: 12),
@@ -661,8 +697,8 @@ class _SiswaMainState extends State<SiswaMain> {
               _selectedPindahFiles.isEmpty ? Icons.attach_file : Icons.add,
               size: 20),
           label: Text(_selectedPindahFiles.isEmpty
-              ? 'Pilih File'
-              : 'Tambah File (${_selectedPindahFiles.length}/5)'),
+              ? 'Pilih Berkas'
+              : 'Tambah Berkas (${_selectedPindahFiles.length}/5)'),
         ),
       ],
     );
@@ -773,7 +809,6 @@ class _SiswaMainState extends State<SiswaMain> {
       BuildContext context, StateSetter setState) async {
     if (_isSubmittingPindah) return;
 
-    // Validasi
     if (_selectedIndustriId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -783,7 +818,6 @@ class _SiswaMainState extends State<SiswaMain> {
       return;
     }
 
-    // Cek apakah industri sudah penuh
     final selectedIndustri = _industriList.firstWhere(
       (ind) => ind['id'] == _selectedIndustriId,
       orElse: () => {},
@@ -828,7 +862,6 @@ class _SiswaMainState extends State<SiswaMain> {
 
     setState(() => _isSubmittingPindah = true);
 
-    // Loading
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -863,7 +896,6 @@ class _SiswaMainState extends State<SiswaMain> {
         try {
           final fileSize = await file.length();
           if (fileSize > 5 * 1024 * 1024) {
-            // 5MB
             throw Exception('File ${file.path} melebihi 5MB');
           }
 
@@ -878,11 +910,11 @@ class _SiswaMainState extends State<SiswaMain> {
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
-      Navigator.pop(context); // Tutup loading
+      Navigator.pop(context);
 
       if (response.statusCode == 201) {
         if (context.mounted) {
-          Navigator.pop(context); // Tutup form
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               backgroundColor: Colors.green,
@@ -893,7 +925,7 @@ class _SiswaMainState extends State<SiswaMain> {
               ]),
             ),
           );
-          refreshPage(3); // Refresh halaman pindah PKL
+          refreshPage(3);
         }
       } else {
         final Map<String, dynamic> errorData = jsonDecode(responseBody);
@@ -951,486 +983,577 @@ class _SiswaMainState extends State<SiswaMain> {
     if (_existingIzin.isEmpty) return false;
     return _existingIzin.any((izin) => izin['tanggal'] == tanggal);
   }
-Future<void> _showAjukanIzinForm() async {
-  _tanggalController.clear();
-  _alasanController.clear();
-  _selectedFiles.clear();
-  _jenisIzin = 'Izin'; // Default ke Izin (dengan huruf kapital)
-  await _loadExistingIzin();
 
-  await showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(24),
-        topRight: Radius.circular(24),
-      ),
-    ),
-    builder: (context) => StatefulBuilder(
-      builder: (BuildContext context, StateSetter setState) {
-        return SingleChildScrollView(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 20,
-            right: 20,
-            top: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Ajukan Izin',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: _primaryColor,
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Colors.grey),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Isi formulir di bawah untuk mengajukan izin/sakit/dispen',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 24),
+  // ==================== METHOD PICK DATE DENGAN BAHASA INDONESIA ====================
 
-              // PILIHAN JENIS PENGAJUAN (3 OPSI)
-              Text('Jenis Pengajuan', style: _labelStyle),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(child: _buildIzinTypeOption(context, setState, 'Izin', 'Izin', Icons.event_available)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildIzinTypeOption(context, setState, 'Sakit', 'Sakit', Icons.medical_services)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildIzinTypeOption(context, setState, 'Dispen', 'Dispen', Icons.school)),
-                ],
+  Future<void> _pickDate(BuildContext context, StateSetter setState) async {
+    try {
+      // Pilih tanggal dengan DatePicker yang sudah di-set ke bahasa Indonesia
+      final DateTime? picked = await showDatePicker(
+        context: context,
+        initialDate: DateTime.now(),
+        firstDate: DateTime.now().subtract(const Duration(days: 1)),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+        locale: const Locale('id'), // Set locale ke Indonesia
+        builder: (BuildContext context, Widget? child) {
+          return Theme(
+            data: ThemeData.light().copyWith(
+              colorScheme: ColorScheme.light(
+                primary: _primaryColor,
+                onPrimary: Colors.white,
               ),
-              const SizedBox(height: 24),
-
-              // Tanggal Izin
-              Text('Tanggal Izin', style: _labelStyle),
-              const SizedBox(height: 8),
-              
-              // Peringatan jika tanggal sudah ada izin
-              if (_tanggalController.text.isNotEmpty && 
-                  _isDateAlreadyHasIzin(_tanggalController.text))
-                Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.warning, color: Colors.orange),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Anda sudah memiliki izin di tanggal ini',
-                              style: TextStyle(
-                                color: Colors.orange[800],
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ),
-              
-              // Field Pilih Tanggal
-              GestureDetector(
-                onTap: () => _pickDate(context, setState),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _tanggalController.text.isNotEmpty && 
-                             _isDateAlreadyHasIzin(_tanggalController.text)
-                          ? Colors.orange
-                          : Colors.grey.shade300,
-                      width: _tanggalController.text.isNotEmpty && 
-                             _isDateAlreadyHasIzin(_tanggalController.text)
-                          ? 2
-                          : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today, 
-                        color: _tanggalController.text.isNotEmpty && 
-                               _isDateAlreadyHasIzin(_tanggalController.text)
-                            ? Colors.orange
-                            : _primaryColor, 
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _tanggalController.text.isNotEmpty
-                              ? _tanggalController.text
-                              : 'Pilih tanggal',
-                          style: TextStyle(
-                            color: _tanggalController.text.isNotEmpty
-                                ? _tanggalController.text.isNotEmpty && 
-                                   _isDateAlreadyHasIzin(_tanggalController.text)
-                                    ? Colors.orange[800]
-                                    : Colors.black
-                                : Colors.grey[500],
-                            fontWeight: _tanggalController.text.isNotEmpty && 
-                                       _isDateAlreadyHasIzin(_tanggalController.text)
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                      if (_tanggalController.text.isNotEmpty && 
-                          _isDateAlreadyHasIzin(_tanggalController.text))
-                        const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
-                    ],
-                  ),
+              textButtonTheme: TextButtonThemeData(
+                style: TextButton.styleFrom(
+                  foregroundColor: _primaryColor,
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // Alasan
-              Text('Alasan', style: _labelStyle),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _alasanController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'Jelaskan alasan izin/sakit/dispen...',
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.all(16),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Upload File
-              _buildFileUploadSection(setState),
-              const SizedBox(height: 32),
-
-              // Tombol Submit
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: (_isSubmitting || 
-                             (_tanggalController.text.isNotEmpty && 
-                              _isDateAlreadyHasIzin(_tanggalController.text)))
-                      ? null
-                      : () => _submitIzinForm(context, setState),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: (_tanggalController.text.isNotEmpty && 
-                                     _isDateAlreadyHasIzin(_tanggalController.text))
-                        ? Colors.grey
-                        : _primaryColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          (_tanggalController.text.isNotEmpty && 
-                           _isDateAlreadyHasIzin(_tanggalController.text))
-                              ? 'SUDAH ADA IZIN'
-                              : 'AJUKAN IZIN',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    ),
-  );
-}
-
-// Perbaiki method _buildIzinTypeOption
-Widget _buildIzinTypeOption(BuildContext context, StateSetter setState, 
-    String value, String label, IconData icon) {
-  final bool isSelected = _jenisIzin == value;
-  return GestureDetector(
-    onTap: () => setState(() => _jenisIzin = value),
-    child: AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 8),
-      decoration: BoxDecoration(
-        color: isSelected ? _primaryColor.withValues(alpha:0.1) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isSelected ? _primaryColor : Colors.transparent,
-          width: 2,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: isSelected ? _primaryColor : Colors.grey, size: 24),
-          const SizedBox(height: 8),
-          Text(label,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: isSelected ? _primaryColor : Colors.grey[700],
-              fontSize: 12,
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+            child: child!,
+          );
+        },
+        // Kustomisasi teks button
+        confirmText: 'PILIH',
+        cancelText: 'BATAL',
+        helpText: 'PILIH TANGGAL',
+        // Format input field
+        fieldLabelText: 'Pilih tanggal',
+        fieldHintText: 'YYYY/MM/DD',
+        errorFormatText: 'Format tanggal tidak valid',
+        errorInvalidText: 'Tanggal tidak valid',
+      );
 
-// Perbaiki method _submitIzinForm
-Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
-  if (_isSubmitting) return;
-  
-  // Validasi
-  if (_tanggalController.text.isEmpty) {
-    _showErrorDialog(context, 'Harap pilih tanggal izin');
-    return;
-  }
+      if (picked != null && mounted) {
+        // Simpan tanggal asli untuk keperluan API
+        _selectedDate = picked;
 
-  if (_isDateAlreadyHasIzin(_tanggalController.text)) {
-    _showErrorDialog(context, 'Anda sudah memiliki izin di tanggal ini');
-    return;
-  }
+        // Format tanggal untuk API (YYYY-MM-DD)
+        final String tanggalAPI = _formatTanggalAPI(picked);
 
-  // Validasi jenis izin (harus sesuai API)
-  if (_jenisIzin == null || _jenisIzin!.isEmpty) {
-    _showErrorDialog(context, 'Harap pilih jenis izin');
-    return;
-  }
+        // Format tanggal untuk tampilan pengguna (Indonesia)
+        final String formattedDate = _formatTanggalIndonesia(picked);
 
-  final validJenis = ['Izin', 'Sakit', 'Dispen'];
-  if (!validJenis.contains(_jenisIzin)) {
-    _showErrorDialog(context, 'Jenis izin tidak valid. Pilih dari: Izin, Sakit, atau Dispen');
-    return;
-  }
-
-  if (_alasanController.text.isEmpty || _alasanController.text.length < 10) {
-    _showErrorDialog(context, 'Harap isi alasan minimal 10 karakter');
-    return;
-  }
-
-  if (_selectedFiles.isEmpty) {
-    _showErrorDialog(context, 'Harap upload minimal 1 bukti foto');
-    return;
-  }
-
-  setState(() => _isSubmitting = true);
-
-  // Loading dialog
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => const AlertDialog(
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 20),
-          Text('Mengajukan izin...'),
-        ],
-      ),
-    ),
-  );
-
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if (token == null) throw Exception('Token tidak ditemukan');
-
-    await dotenv.load();
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-    final url = Uri.parse('$baseUrl/api/izin');
-
-    final request = http.MultipartRequest('POST', url);
-    request.headers['Authorization'] = 'Bearer $token';
-    request.fields['tanggal'] = _tanggalController.text;
-    request.fields['jenis'] = _jenisIzin!; // Nilai sudah "Izin", "Sakit", atau "Dispen"
-    request.fields['keterangan'] = _alasanController.text;
-
-    for (var file in _selectedFiles) {
-      try {
-        request.files.add(await http.MultipartFile.fromPath('files', file.path));
-      } catch (e) {
-        print('Error adding file: $e');
-      }
-    }
-
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    
-    // Tutup loading dialog
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
-
-    if (response.statusCode == 201) {
-      await _loadExistingIzin();
-      
-      if (context.mounted) {
-        // Tutup bottom sheet form
-        Navigator.pop(context);
-        
-        // Tampilkan snackbar sukses
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Izin ${_jenisIzin!.toLowerCase()} berhasil diajukan!',
-                    style: const TextStyle(color: Colors.white),
-                  ),
+        // Cek apakah sudah ada izin (gunakan format API)
+        if (_isDateAlreadyHasIzin(tanggalAPI)) {
+          final bool? confirm = await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Sudah Ada Izin'),
+              content: Text(
+                'Anda sudah memiliki izin pada tanggal $formattedDate.\n\nApakah Anda ingin tetap mengajukan izin baru?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('BATAL'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('LANJUTKAN'),
                 ),
               ],
             ),
-          ),
-        );
-        
-        refreshPage(2);
-      }
-    } else {
-      // Parse error response
-      String errorMessage = 'Gagal mengajukan izin';
-      try {
-        final Map<String, dynamic> errorData = jsonDecode(responseBody);
-        
-        if (errorData.containsKey('error')) {
-          if (errorData['error'] is Map) {
-            errorMessage = errorData['error']['message'] ?? errorMessage;
-          } else if (errorData['error'] is String) {
-            errorMessage = errorData['error'];
-          }
-        } else if (errorData.containsKey('message')) {
-          errorMessage = errorData['message'];
-        } else if (errorData.containsKey('detail')) {
-          errorMessage = errorData['detail'];
-        } else if (errorData.containsKey('errors')) {
-          final errors = errorData['errors'];
-          if (errors is Map) {
-            final firstError = errors.values.first;
-            if (firstError is List && firstError.isNotEmpty) {
-              errorMessage = firstError.first;
-            }
-          }
+          );
+          if (confirm != true) return;
         }
-      } catch (e) {
-        errorMessage = responseBody.isNotEmpty 
-            ? responseBody 
-            : 'Gagal mengajukan izin (${response.statusCode})';
+
+        // Tampilkan format Indonesia ke pengguna
+        setState(() {
+          _tanggalController.text = formattedDate;
+        });
       }
-      
-      if (context.mounted) {
-        _showErrorDialog(context, errorMessage);
+    } catch (e) {
+      print('Error picking date: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Gagal memilih tanggal'),
+              backgroundColor: Colors.red),
+        );
       }
-    }
-  } catch (e) {
-    // Tutup loading dialog
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
-    
-    if (context.mounted) {
-      _showErrorDialog(context, 'Error: ${e.toString()}');
-    }
-  } finally {
-    if (mounted) {
-      setState(() => _isSubmitting = false);
     }
   }
-}
 
-  Future<void> _pickDate(BuildContext context, StateSetter setState) async {
-    final DateTime? picked = await showDatePicker(
+  // ==================== METHOD FORM IZIN ====================
+
+  Future<void> _showAjukanIzinForm() async {
+    _tanggalController.clear();
+    _alasanController.clear();
+    _selectedFiles.clear();
+    _jenisIzin = 'Izin';
+    _selectedDate = null;
+    await _loadExistingIzin();
+
+    await showModalBottomSheet(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      builder: (context, child) => Theme(
-        data: ThemeData.light().copyWith(
-          colorScheme: ColorScheme.light(primary: _primaryColor),
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
         ),
-        child: child!,
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setState) {
+          return SingleChildScrollView(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Ajukan Izin',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: _primaryColor,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Isi formulir di bawah untuk mengajukan izin/sakit/dispen',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 24),
+
+                // PILIHAN JENIS PENGAJUAN (3 OPSI)
+                Text('Jenis Pengajuan', style: _labelStyle),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                        child: _buildIzinTypeOption(context, setState, 'Izin',
+                            'Izin', Icons.event_available)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: _buildIzinTypeOption(context, setState, 'Sakit',
+                            'Sakit', Icons.medical_services)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: _buildIzinTypeOption(context, setState, 'Dispen',
+                            'Dispen', Icons.school)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // FIELD PILIH TANGGAL
+                Text('Pilih Tanggal', style: _labelStyle),
+                const SizedBox(height: 8),
+
+                // Peringatan jika tanggal sudah ada izin
+                if (_tanggalController.text.isNotEmpty && _selectedDate != null)
+                  FutureBuilder<bool>(
+                    future: Future(() => _isDateAlreadyHasIzin(
+                        _formatTanggalAPI(_selectedDate!))),
+                    builder: (context, snapshot) {
+                      if (snapshot.data == true) {
+                        return Column(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.orange[50],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.orange),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.warning,
+                                      color: Colors.orange),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Anda sudah memiliki izin di tanggal ini',
+                                      style: TextStyle(
+                                        color: Colors.orange[800],
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        );
+                      }
+                      return const SizedBox();
+                    },
+                  ),
+
+                // Field Pilih Tanggal (tampilan Indonesia)
+                GestureDetector(
+                  onTap: () => _pickDate(context, setState),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _tanggalController.text.isNotEmpty
+                            ? (_selectedDate != null &&
+                                    _isDateAlreadyHasIzin(
+                                        _formatTanggalAPI(_selectedDate!)))
+                                ? Colors.orange
+                                : _primaryColor
+                            : Colors.grey.shade300,
+                        width: _tanggalController.text.isNotEmpty ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          color: _tanggalController.text.isNotEmpty
+                              ? (_selectedDate != null &&
+                                      _isDateAlreadyHasIzin(
+                                          _formatTanggalAPI(_selectedDate!)))
+                                  ? Colors.orange
+                                  : _primaryColor
+                              : Colors.grey,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _tanggalController.text.isEmpty
+                                ? 'Pilih tanggal izin'
+                                : _tanggalController
+                                    .text, // Sudah dalam format Indonesia
+                            style: TextStyle(
+                              color: _tanggalController.text.isNotEmpty
+                                  ? (_selectedDate != null &&
+                                          _isDateAlreadyHasIzin(
+                                              _formatTanggalAPI(
+                                                  _selectedDate!)))
+                                      ? Colors.orange[800]
+                                      : Colors.black
+                                  : Colors.grey[500],
+                              fontWeight: _tanggalController.text.isNotEmpty &&
+                                      (_selectedDate != null &&
+                                          _isDateAlreadyHasIzin(
+                                              _formatTanggalAPI(
+                                                  _selectedDate!)))
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        if (_tanggalController.text.isNotEmpty &&
+                            (_selectedDate != null &&
+                                _isDateAlreadyHasIzin(
+                                    _formatTanggalAPI(_selectedDate!))))
+                          const Icon(Icons.warning_amber,
+                              color: Colors.orange, size: 20)
+                        else
+                          const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Alasan
+                Text('Alasan', style: _labelStyle),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _alasanController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    hintText: 'Jelaskan alasan izin/sakit/dispen...',
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Upload File
+                _buildFileUploadSection(setState),
+                const SizedBox(height: 32),
+
+                // Tombol Submit
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: (_isSubmitting ||
+                            _selectedDate == null ||
+                            (_selectedDate != null &&
+                                _isDateAlreadyHasIzin(
+                                    _formatTanggalAPI(_selectedDate!))))
+                        ? null
+                        : () => _submitIzinForm(context, setState),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: (_selectedDate != null &&
+                              _isDateAlreadyHasIzin(
+                                  _formatTanggalAPI(_selectedDate!)))
+                          ? Colors.grey
+                          : _primaryColor,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            (_selectedDate != null &&
+                                    _isDateAlreadyHasIzin(
+                                        _formatTanggalAPI(_selectedDate!)))
+                                ? 'SUDAH ADA IZIN'
+                                : 'AJUKAN IZIN',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildIzinTypeOption(BuildContext context, StateSetter setState,
+      String value, String label, IconData icon) {
+    final bool isSelected = _jenisIzin == value;
+    return GestureDetector(
+      onTap: () => setState(() => _jenisIzin = value),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? _primaryColor.withValues(alpha: 0.1)
+              : Colors.grey[100],
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? _primaryColor : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon,
+                color: isSelected ? _primaryColor : Colors.grey, size: 24),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isSelected ? _primaryColor : Colors.grey[700],
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitIzinForm(
+      BuildContext context, StateSetter setState) async {
+    if (_isSubmitting) return;
+
+    // Validasi
+    if (_selectedDate == null) {
+      _showErrorDialog(context, 'Harap pilih tanggal izin');
+      return;
+    }
+
+    final String tanggalAPI = _formatTanggalAPI(_selectedDate!);
+
+    if (_isDateAlreadyHasIzin(tanggalAPI)) {
+      _showErrorDialog(context, 'Anda sudah memiliki izin di tanggal ini');
+      return;
+    }
+
+    if (_jenisIzin == null || _jenisIzin!.isEmpty) {
+      _showErrorDialog(context, 'Harap pilih jenis izin');
+      return;
+    }
+
+    final validJenis = ['Izin', 'Sakit', 'Dispen'];
+    if (!validJenis.contains(_jenisIzin)) {
+      _showErrorDialog(context,
+          'Jenis izin tidak valid. Pilih dari: Izin, Sakit, atau Dispen');
+      return;
+    }
+
+    if (_alasanController.text.isEmpty || _alasanController.text.length < 10) {
+      _showErrorDialog(context, 'Harap isi alasan minimal 10 karakter');
+      return;
+    }
+
+    if (_selectedFiles.isEmpty) {
+      _showErrorDialog(context, 'Harap upload minimal 1 bukti foto');
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    // Loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 20),
+            Text('Mengajukan izin...'),
+          ],
+        ),
       ),
     );
 
-    if (picked != null) {
-      final selectedDate =
-          '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+      if (token == null) throw Exception('Token tidak ditemukan');
 
-      if (_isDateAlreadyHasIzin(selectedDate)) {
-        final bool? confirm = await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Sudah Ada Izin'),
-            content: Text(
-                'Anda sudah memiliki izin pada tanggal $selectedDate.\n\nApakah Anda ingin tetap mengajukan izin baru?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('BATAL'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('LANJUTKAN'),
-              ),
-            ],
-          ),
-        );
-        if (confirm != true) return;
+      await dotenv.load();
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final url = Uri.parse('$baseUrl/api/izin');
+
+      final request = http.MultipartRequest('POST', url);
+      request.headers['Authorization'] = 'Bearer $token';
+      request.fields['tanggal'] = tanggalAPI;
+      request.fields['jenis'] = _jenisIzin!;
+      request.fields['keterangan'] = _alasanController.text;
+
+      for (var file in _selectedFiles) {
+        try {
+          request.files
+              .add(await http.MultipartFile.fromPath('files', file.path));
+        } catch (e) {
+          print('Error adding file: $e');
+        }
       }
 
-      setState(() => _tanggalController.text = selectedDate);
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      // Tutup loading dialog
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (response.statusCode == 201) {
+        await _loadExistingIzin();
+
+        if (context.mounted) {
+          // Tutup bottom sheet form
+          Navigator.pop(context);
+
+          // Tampilkan snackbar sukses
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Izin ${_jenisIzin!.toLowerCase()} berhasil diajukan!',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+
+          refreshPage(2);
+        }
+      } else {
+        // Parse error response
+        String errorMessage = 'Gagal mengajukan izin';
+        try {
+          final Map<String, dynamic> errorData = jsonDecode(responseBody);
+
+          if (errorData.containsKey('error')) {
+            if (errorData['error'] is Map) {
+              errorMessage = errorData['error']['message'] ?? errorMessage;
+            } else if (errorData['error'] is String) {
+              errorMessage = errorData['error'];
+            }
+          } else if (errorData.containsKey('message')) {
+            errorMessage = errorData['message'];
+          } else if (errorData.containsKey('detail')) {
+            errorMessage = errorData['detail'];
+          } else if (errorData.containsKey('errors')) {
+            final errors = errorData['errors'];
+            if (errors is Map) {
+              final firstError = errors.values.first;
+              if (firstError is List && firstError.isNotEmpty) {
+                errorMessage = firstError.first;
+              }
+            }
+          }
+        } catch (e) {
+          errorMessage = responseBody.isNotEmpty
+              ? responseBody
+              : 'Gagal mengajukan izin (${response.statusCode})';
+        }
+
+        if (context.mounted) {
+          _showErrorDialog(context, errorMessage);
+        }
+      }
+    } catch (e) {
+      // Tutup loading dialog
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      if (context.mounted) {
+        _showErrorDialog(context, 'Error: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -1441,7 +1564,7 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
         Text('Bukti Pendukung', style: _labelStyle),
         const SizedBox(height: 8),
         Text(
-          'Upload 1-3 foto (JPEG/PNG, maks 5MB per file)',
+          'Unggah 1-3 foto (JPEG/PNG, maks 5MB per berkas)',
           style: TextStyle(color: Colors.grey[600], fontSize: 13),
         ),
         const SizedBox(height: 12),
@@ -1484,8 +1607,8 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
           icon: Icon(_selectedFiles.isEmpty ? Icons.attach_file : Icons.add,
               size: 20),
           label: Text(_selectedFiles.isEmpty
-              ? 'Pilih File'
-              : 'Tambah File (${_selectedFiles.length}/3)'),
+              ? 'Pilih Berkas'
+              : 'Tambah Berkas (${_selectedFiles.length}/3)'),
         ),
       ],
     );
@@ -1557,8 +1680,6 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
     }
   }
 
-
-  /// Method untuk menampilkan dialog error yang lebih informatif
   void _showErrorDialog(BuildContext context, String message) {
     showDialog(
       context: context,
@@ -1586,7 +1707,7 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Terjadi kesalahan saat mengajukan izin:',
+                'Terjadi kesalahan:',
                 style: TextStyle(fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 12),
@@ -1605,33 +1726,6 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
                   ),
                 ),
               ),
-              if (message.contains('duplicate') ||
-                  message.contains('already exists') ||
-                  message.contains('sudah')) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.orange.shade700),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Anda mungkin sudah memiliki izin di tanggal yang sama',
-                          style: TextStyle(
-                              color: Colors.orange,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -1750,6 +1844,20 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
     }
   }
 
+  void refreshPage(int pageIndex) {
+    if (_pageLoaded.containsKey(pageIndex)) {
+      _pageCache.remove(pageIndex);
+      _pageLoaded[pageIndex] = false;
+      if (_currentIndex == pageIndex) setState(() {});
+    }
+  }
+
+  TextStyle get _labelStyle => const TextStyle(
+        fontWeight: FontWeight.w600,
+        color: Colors.black87,
+        fontSize: 15,
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1759,7 +1867,6 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
           Positioned.fill(
             child: IndexedStack(index: _currentIndex, children: _pageBuilders),
           ),
-          // FAB untuk Beranda (Ajukan PKL), Permohonan (Ajukan Izin), dan Pindah PKL (Ajukan Pindah PKL)
           if (_currentIndex == 0 || _currentIndex == 2 || _currentIndex == 3)
             Positioned(
               right: 20,
@@ -1767,7 +1874,6 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Tombol utama berdasarkan tab
                   FloatingActionButton(
                     onPressed: () async {
                       if (_currentIndex == 0) {
@@ -1801,20 +1907,6 @@ Future<void> _submitIzinForm(BuildContext context, StateSetter setState) async {
       ),
     );
   }
-
-  void refreshPage(int pageIndex) {
-    if (_pageLoaded.containsKey(pageIndex)) {
-      _pageCache.remove(pageIndex);
-      _pageLoaded[pageIndex] = false;
-      if (_currentIndex == pageIndex) setState(() {});
-    }
-  }
-
-  TextStyle get _labelStyle => const TextStyle(
-        fontWeight: FontWeight.w600,
-        color: Colors.black87,
-        fontSize: 15,
-      );
 }
 
 class _SiswaBottomBar extends StatefulWidget {
@@ -1857,18 +1949,13 @@ class __SiswaBottomBarState extends State<_SiswaBottomBar> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // index 0: Beranda
           _buildTabItem(0, Icons.home_outlined, Icons.home, 'Beranda'),
-          // index 1: Kalender
           _buildTabItem(1, Icons.calendar_today_outlined, Icons.calendar_today,
               'Kalender'),
-          // index 2: Permohonan
           _buildTabItem(
               2, Icons.assignment_outlined, Icons.assignment, 'Perizinan'),
-          // index 3: Pindah PKL
           _buildTabItem(
               3, Icons.swap_horiz_outlined, Icons.swap_horiz, 'Pindah PKL'),
-          // index 4: Pengaturan
           _buildTabItem(
               4, Icons.settings_outlined, Icons.settings, 'Pengaturan'),
         ],

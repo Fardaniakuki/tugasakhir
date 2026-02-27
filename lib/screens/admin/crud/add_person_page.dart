@@ -6,7 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 
 class AddPersonPage extends StatefulWidget {
-  final String jenisData; // 'Siswa', 'Guru', 'Jurusan', 'Kelas', 'Industri'
+  final String jenisData; // 'Siswa', 'Guru', 'Program Keahlian', 'Kelas', 'Industri'
   const AddPersonPage({super.key, required this.jenisData});
 
   @override
@@ -17,6 +17,9 @@ class _AddPersonPageState extends State<AddPersonPage> {
   final Color primaryColor = const Color(0xFF3B060A); // Warna baru
   final Color accentColor = const Color(0xFF641E20); // Warna sekunder
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  // Mapping jenis data untuk internal use
+  late String _internalJenisData;
 
   // Controllers
   final TextEditingController namaController = TextEditingController();
@@ -79,18 +82,24 @@ class _AddPersonPageState extends State<AddPersonPage> {
   @override
   void initState() {
     super.initState();
+    
+    // Mapping jenis data: 'Program Keahlian' -> 'Jurusan' untuk internal
+    _internalJenisData = widget.jenisData == 'Program Keahlian' 
+        ? 'Jurusan' 
+        : widget.jenisData;
+    
     _fetchKelas();
     _fetchJurusan();
     _setupFocusListeners();
     _setupTextControllers();
 
     // Load data kaprog jika jenis data adalah Jurusan
-    if (widget.jenisData == 'Jurusan') {
+    if (_internalJenisData == 'Jurusan') {
       _loadKaprogData();
     }
     
     // Load data wali kelas jika jenis data adalah Kelas
-    if (widget.jenisData == 'Kelas') {
+    if (_internalJenisData == 'Kelas') {
       _loadWaliKelasData();
     }
   }
@@ -209,7 +218,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Kaprog',
+            'Kepala Program Keahlian',
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 6),
@@ -229,7 +238,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                   SizedBox(width: 12),
-                  Text('Memuat data kaprog...'),
+                  Text('Memuat data kepala program...'),
                 ],
               ),
             )
@@ -239,7 +248,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                 showSearchBox: true,
                 searchFieldProps: TextFieldProps(
                   decoration: InputDecoration(
-                    hintText: 'Cari kaprog...',
+                    hintText: 'Cari kepala program...',
                     prefixIcon: Icon(Icons.search, color: primaryColor),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -271,13 +280,13 @@ class _AddPersonPageState extends State<AddPersonPage> {
               ),
               items: [
                 // Opsi "Tidak ada kaprog"
-                const {'id': null, 'nama': 'Tidak ada pokja'},
+                const {'id': null, 'nama': 'Tidak ada kepala program'},
                 ..._kaprogList,
               ],
               itemAsString: (item) => item['nama'] ?? '-',
               dropdownDecoratorProps: DropDownDecoratorProps(
                 dropdownSearchDecoration: InputDecoration(
-                  hintText: 'Pilih Kaprog',
+                  hintText: 'Pilih Kepala Program',
                   prefixIcon: Icon(Icons.person, color: primaryColor),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -304,15 +313,15 @@ class _AddPersonPageState extends State<AddPersonPage> {
               selectedItem: _selectedKaprogId != null
                   ? _kaprogList.firstWhere(
                       (kaprog) => kaprog['id'] == _selectedKaprogId,
-                      orElse: () => {'id': null, 'nama': 'Tidak ada pokja'},
+                      orElse: () => {'id': null, 'nama': 'Tidak ada kepala program'},
                     )
-                  : {'id': null, 'nama': 'Tidak ada pokja'},
+                  : {'id': null, 'nama': 'Tidak ada kepala program'},
             ),
           if (!_isLoadingKaprog && _kaprogList.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'Tidak ada guru yang terdaftar sebagai pokja',
+                'Tidak ada guru yang terdaftar sebagai kepala program',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[600],
@@ -704,7 +713,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
 
   // Validasi form sebelum submit
   bool _validateForm() {
-    switch (widget.jenisData) {
+    switch (_internalJenisData) {
       case 'Siswa':
         if (namaController.text.trim().length < 3) {
           _showErrorPopup(
@@ -762,12 +771,12 @@ class _AddPersonPageState extends State<AddPersonPage> {
       case 'Jurusan':
         if (kodeJurusanController.text.trim().length < 2) {
           _showErrorPopup(
-              'Validasi Gagal', 'Kode jurusan harus minimal 2 karakter');
+              'Validasi Gagal', 'Kode program keahlian harus minimal 2 karakter');
           return false;
         }
         if (namaController.text.trim().length < 3) {
           _showErrorPopup(
-              'Validasi Gagal', 'Nama jurusan harus minimal 3 karakter');
+              'Validasi Gagal', 'Nama program keahlian harus minimal 3 karakter');
           return false;
         }
         break;
@@ -836,7 +845,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
     String endpoint = '';
     Map<String, dynamic> payload = {};
 
-    switch (widget.jenisData) {
+    switch (_internalJenisData) {
       case 'Siswa':
         endpoint = '/api/siswa';
         payload = {
@@ -1222,7 +1231,8 @@ class _AddPersonPageState extends State<AddPersonPage> {
 
   @override
   Widget build(BuildContext context) {
-    final jenis = widget.jenisData;
+    final String displayJenis = widget.jenisData; // Untuk tampilan
+    final String internalJenis = _internalJenisData; // Untuk logika
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1259,7 +1269,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Tambah $jenis',
+                          'Tambah $displayJenis',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 22,
@@ -1287,7 +1297,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                         ],
                       ),
                       child: Icon(
-                        _getIconForJenisData(jenis),
+                        _getIconForJenisData(displayJenis),
                         size: 40,
                         color: primaryColor,
                       ),
@@ -1304,8 +1314,8 @@ class _AddPersonPageState extends State<AddPersonPage> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    // Input fields berdasarkan jenis data
-                    if (jenis == 'Siswa') ...[
+                    // Input fields berdasarkan jenis data (gunakan internalJenis untuk logika)
+                    if (internalJenis == 'Siswa') ...[
                       buildInputField(
                           Icons.person, 'Nama Lengkap', namaController,
                           minLength: 3,
@@ -1393,14 +1403,14 @@ class _AddPersonPageState extends State<AddPersonPage> {
                           ],
                         ),
                       ),
-                    ] else if (jenis == 'Guru') ...[
+                    ] else if (internalJenis == 'Guru') ...[
                       buildInputField(Icons.person, 'Nama Guru', namaController,
                           minLength: 3,
                           focusNode: _namaFocus,
                           fieldName: 'nama'),
                       buildInputField(Icons.badge, 'NIP', nipController,
                           minLength: 8,
-                          additionalHint: 'Minimal 18 digit',
+                          additionalHint: 'Minimal 8 digit',
                           focusNode: _nipFocus,
                           fieldName: 'nip'),
                       buildInputField(
@@ -1440,7 +1450,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                                   fontWeight: FontWeight.w600, fontSize: 16),
                             ),
                             const SizedBox(height: 12),
-                            _buildCheckbox('Kepala Konsentrasi', isKaprog, (value) {
+                            _buildCheckbox('Kepala Program Keahlian', isKaprog, (value) {
                               setState(() {
                                 isKaprog = value ?? false;
                               });
@@ -1464,20 +1474,20 @@ class _AddPersonPageState extends State<AddPersonPage> {
                           ],
                         ),
                       ),
-                    ] else if (jenis == 'Jurusan') ...[
+                    ] else if (internalJenis == 'Jurusan') ...[
                       buildInputField(
-                          Icons.code, 'Kode Jurusan', kodeJurusanController,
+                          Icons.code, 'Kode Program Keahlian', kodeJurusanController,
                           minLength: 2,
                           focusNode: _kodeJurusanFocus,
                           fieldName: 'kodeJurusan'),
                       buildInputField(
-                          Icons.book, 'Nama Jurusan', namaController,
+                          Icons.book, 'Nama Program Keahlian', namaController,
                           minLength: 3,
                           focusNode: _namaFocus,
                           fieldName: 'nama'),
-                      // Dropdown Kaprog untuk Jurusan
+                      // Dropdown Kaprog untuk Program Keahlian
                       _buildKaprogDropdown(),
-                    ] else if (jenis == 'Kelas') ...[
+                    ] else if (internalJenis == 'Kelas') ...[
                       buildInputField(
                           Icons.class_, 'Nama Kelas', namaController,
                           minLength: 2,
@@ -1486,7 +1496,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                       const SizedBox(height: 16),
                       // Dropdown Jurusan untuk Kelas
                       _buildDropdownSearch(
-                        label: 'Jurusan',
+                        label: 'Program Keahlian',
                         items: jurusanList,
                         onChanged: (val) {
                           setState(() {
@@ -1500,7 +1510,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                       const SizedBox(height: 16),
                       // Dropdown Wali Kelas untuk Kelas
                       _buildWaliKelasDropdown(),
-                    ] else if (jenis == 'Industri') ...[
+                    ] else if (internalJenis == 'Industri') ...[
                       buildInputField(
                           Icons.business, 'Nama Industri', namaController,
                           minLength: 3,
@@ -1521,7 +1531,7 @@ class _AddPersonPageState extends State<AddPersonPage> {
                           fieldName: 'email'),
                       // Dropdown Jurusan untuk Industri
                       _buildDropdownSearch(
-                        label: 'Jurusan',
+                        label: 'Program Keahlian',
                         items: jurusanList,
                         onChanged: (val) {
                           setState(() {
@@ -1589,13 +1599,15 @@ class _AddPersonPageState extends State<AddPersonPage> {
     );
   }
 
-  // Helper function untuk mendapatkan icon berdasarkan jenis data
+  // Helper function untuk mendapatkan icon berdasarkan jenis data (untuk tampilan)
   IconData _getIconForJenisData(String jenis) {
     switch (jenis) {
       case 'Siswa':
         return Icons.person;
       case 'Guru':
         return Icons.school;
+      case 'Program Keahlian':
+        return Icons.category;
       case 'Jurusan':
         return Icons.category;
       case 'Kelas':

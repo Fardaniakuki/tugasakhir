@@ -656,7 +656,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                   'Tambah Siswa via Excel',
                   style: TextStyle(fontWeight: FontWeight.w500),
                 ),
-                subtitle: const Text('Import data dari file Excel'),
+                subtitle: const Text('Uanggah data dari file Excel'),
                 trailing: const Icon(Icons.arrow_forward_ios,
                     size: 16, color: Colors.grey),
                 onTap: () {
@@ -1386,7 +1386,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
-                              'Edit Profil Sekolah',
+                              'Ubah Profil Sekolah',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -2567,11 +2567,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                       ),
                       shape: BoxShape.circle,
                     ),
-                    child: IconButton(
-                      icon: const Icon(Icons.refresh_rounded,
-                          color: Colors.white),
-                      onPressed: _refreshData,
-                    ),
+                    
                   ),
                 ],
               ),

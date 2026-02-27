@@ -18,8 +18,10 @@ class ClassDetailPage extends StatefulWidget {
 class _ClassDetailPageState extends State<ClassDetailPage> {
   Map<String, dynamic>? classData;
   List<dynamic> students = [];
+  Map<String, dynamic>? waliKelasData;
   bool isLoading = true;
   bool isLoadingStudents = true;
+  bool isLoadingWaliKelas = false;
 
   final Color _primaryColor = const Color(0xFF3B060A);
   final Color _accentColor = const Color(0xFF5B1A1A);
@@ -53,6 +55,49 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
     }
   }
 
+  Future<void> fetchWaliKelasData(int waliKelasGuruId) async {
+    try {
+      setState(() => isLoadingWaliKelas = true);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token') ?? '';
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/guru'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+        
+        // Cari guru dengan id yang sesuai dari response
+        if (decoded['data'] != null && decoded['data']['data'] is List) {
+          final List<dynamic> guruList = decoded['data']['data'];
+          final waliKelas = guruList.firstWhere(
+            (guru) => guru['id'] == waliKelasGuruId,
+            orElse: () => null,
+          );
+          
+          setState(() {
+            waliKelasData = waliKelas;
+            isLoadingWaliKelas = false;
+          });
+        } else {
+          setState(() => isLoadingWaliKelas = false);
+        }
+      } else {
+        setState(() => isLoadingWaliKelas = false);
+      }
+    } catch (e) {
+      setState(() => isLoadingWaliKelas = false);
+      print('Error fetching wali kelas: $e');
+    }
+  }
+
   Future<void> fetchClassDetail() async {
     try {
       setState(() => isLoading = true);
@@ -82,6 +127,11 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
           classData = {...kelas, 'jurusan_nama': jurusanNama};
           isLoading = false;
         });
+
+        // Ambil data wali kelas jika ada
+        if (kelas['wali_kelas_guru_id'] != null) {
+          await fetchWaliKelasData(kelas['wali_kelas_guru_id']);
+        }
       } else {
         setState(() => isLoading = false);
         _showErrorDialog('Gagal mengambil data kelas');
@@ -606,308 +656,403 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
       ),
     );
   }
-Widget _buildStudentsSection() {
-  // State untuk pagination
-  int currentPage = 1;
-  const int itemsPerPage = 10;
 
-  return StatefulBuilder(
-    builder: (context, setState) {
-      // Hitung total halaman
-      int totalPages = (students.length / itemsPerPage).ceil();
-      if (totalPages == 0) totalPages = 1;
-      
-      // Pastikan currentPage valid
-      if (currentPage > totalPages) {
-        currentPage = totalPages;
-      }
-      
-      // Ambil data untuk halaman saat ini
-      final int startIndex = (currentPage - 1) * itemsPerPage;
-      int endIndex = startIndex + itemsPerPage;
-      if (endIndex > students.length) endIndex = students.length;
-      
-      final List<dynamic> currentPageStudents = students.isNotEmpty 
-          ? students.sublist(startIndex, endIndex)
-          : [];
-
-      return Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9F9F9),
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.shade200,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+  Widget _buildWaliKelasItem() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade200,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _primaryColor,
+              shape: BoxShape.circle,
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header dengan jumlah siswa
-            Row(
+            child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: _primaryColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.people_rounded,
-                      color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 16),
                 const Text(
-                  'Daftar Murid',
+                  'Wali Kelas',
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                    fontSize: 14,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _primaryColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${students.length} siswa',
+                const SizedBox(height: 4),
+                if (isLoadingWaliKelas)
+                  const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else if (waliKelasData != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        waliKelasData!['nama'] ?? '-',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      
+                    ],
+                  )
+                else
+                  const Text(
+                    'Belum ada wali kelas',
                     style: TextStyle(
-                      fontSize: 12,
-                      color: _primaryColor,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
-                ),
               ],
             ),
-            
-            const SizedBox(height: 12),
-
-            // Daftar siswa dengan pagination
-            if (isLoadingStudents)
-              const Center(child: CircularProgressIndicator())
-            else if (students.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(
-                  child: Text(
-                    'Tidak ada murid dalam kelas ini',
-                    style: TextStyle(color: Colors.grey),
-                  ),
+          ),
+          if (waliKelasData != null && waliKelasData!['is_wali_kelas'] == true)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Aktif',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: _primaryColor,
+                  fontWeight: FontWeight.w500,
                 ),
-              )
-            else
-              Column(
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentsSection() {
+    // State untuk pagination
+    int currentPage = 1;
+    const int itemsPerPage = 10;
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        // Hitung total halaman
+        int totalPages = (students.length / itemsPerPage).ceil();
+        if (totalPages == 0) totalPages = 1;
+        
+        // Pastikan currentPage valid
+        if (currentPage > totalPages) {
+          currentPage = totalPages;
+        }
+        
+        // Ambil data untuk halaman saat ini
+        final int startIndex = (currentPage - 1) * itemsPerPage;
+        int endIndex = startIndex + itemsPerPage;
+        if (endIndex > students.length) endIndex = students.length;
+        
+        final List<dynamic> currentPageStudents = students.isNotEmpty 
+            ? students.sublist(startIndex, endIndex)
+            : [];
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9F9F9),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade200,
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header dengan jumlah siswa
+              Row(
                 children: [
-                  // List siswa
-                  Column(
-                    children: currentPageStudents.map((student) {
-                      return InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => StudentDetailPage(
-                                studentId: student['id'].toString(),
-                              ),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: _primaryColor.withValues(alpha: 0.1),
-                                child: Icon(
-                                  Icons.person_rounded,
-                                  color: _primaryColor,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      student['nama_lengkap'] ??
-                                          student['nama'] ??
-                                          '-',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.chevron_right_rounded,
-                                  color: Colors.grey),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _primaryColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.people_rounded,
+                        color: Colors.white, size: 20),
                   ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Pagination controls (hanya tampil jika lebih dari 1 halaman)
-                  if (students.length > itemsPerPage)
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.grey.shade200),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withValues(alpha: 0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                  const SizedBox(width: 16),
+                  const Text(
+                    'Daftar Murid',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _primaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${students.length} siswa',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _primaryColor,
+                        fontWeight: FontWeight.w500,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Tombol Previous
-                          GestureDetector(
-                            onTap: currentPage > 1 
-                                ? () {
-                                    setState(() {
-                                      currentPage--;
-                                    });
-                                  } 
-                                : null,
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: currentPage > 1 
-                                    ? _primaryColor 
-                                    : Colors.grey[200],
-                                borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 12),
+
+              // Daftar siswa dengan pagination
+              if (isLoadingStudents)
+                const Center(child: CircularProgressIndicator())
+              else if (students.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      'Tidak ada murid dalam kelas ini',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: [
+                    // List siswa
+                    Column(
+                      children: currentPageStudents.map((student) {
+                        return InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => StudentDetailPage(
+                                  studentId: student['id'].toString(),
+                                ),
                               ),
-                              child: Icon(
-                                Icons.arrow_back_ios_rounded,
-                                size: 16,
-                                color: currentPage > 1 
-                                    ? Colors.white 
-                                    : Colors.grey[400],
-                              ),
-                            ),
-                          ),
-                          
-                          const SizedBox(width: 16),
-                          
-                          // Indikator halaman
-                          Container(
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
+                                vertical: 12, horizontal: 16),
                             decoration: BoxDecoration(
-                              color: _primaryColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
                             ),
                             child: Row(
                               children: [
-                                Text(
-                                  'Halaman ',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                                Text(
-                                  '$currentPage',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: _primaryColor.withValues(alpha: 0.1),
+                                  child: Icon(
+                                    Icons.person_rounded,
                                     color: _primaryColor,
+                                    size: 20,
                                   ),
                                 ),
-                                Text(
-                                  ' dari $totalPages',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        student['nama_lengkap'] ??
+                                            student['nama'] ??
+                                            '-',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
+                                const Icon(Icons.chevron_right_rounded,
+                                    color: Colors.grey),
                               ],
                             ),
                           ),
-                          
-                          const SizedBox(width: 16),
-                          
-                          // Tombol Next
-                          GestureDetector(
-                            onTap: currentPage < totalPages 
-                                ? () {
-                                    setState(() {
-                                      currentPage++;
-                                    });
-                                  } 
-                                : null,
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: currentPage < totalPages 
-                                    ? _primaryColor 
-                                    : Colors.grey[200],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 16,
-                                color: currentPage < totalPages 
-                                    ? Colors.white 
-                                    : Colors.grey[400],
+                        );
+                      }).toList(),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Pagination controls (hanya tampil jika lebih dari 1 halaman)
+                    if (students.length > itemsPerPage)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Tombol Previous
+                            GestureDetector(
+                              onTap: currentPage > 1 
+                                  ? () {
+                                      setState(() {
+                                        currentPage--;
+                                      });
+                                    } 
+                                  : null,
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: currentPage > 1 
+                                      ? _primaryColor 
+                                      : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.arrow_back_ios_rounded,
+                                  size: 16,
+                                  color: currentPage > 1 
+                                      ? Colors.white 
+                                      : Colors.grey[400],
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  
-                  // Info tambahan
-                  if (students.length > itemsPerPage)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        'Menampilkan ${startIndex + 1}-$endIndex dari ${students.length} siswa',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                            
+                            const SizedBox(width: 16),
+                            
+                            // Indikator halaman
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Halaman ',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  Text(
+                                    '$currentPage',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: _primaryColor,
+                                    ),
+                                  ),
+                                  Text(
+                                    ' dari $totalPages',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            
+                            const SizedBox(width: 16),
+                            
+                            // Tombol Next
+                            GestureDetector(
+                              onTap: currentPage < totalPages 
+                                  ? () {
+                                      setState(() {
+                                        currentPage++;
+                                      });
+                                    } 
+                                  : null,
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: currentPage < totalPages 
+                                      ? _primaryColor 
+                                      : Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  Icons.arrow_forward_ios_rounded,
+                                  size: 16,
+                                  color: currentPage < totalPages 
+                                      ? Colors.white 
+                                      : Colors.grey[400],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                ],
-              ),
-          ],
-        ),
-      );
-    },
-  );
-}
+                    
+                    // Info tambahan
+                    if (students.length > itemsPerPage)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Menampilkan ${startIndex + 1}-$endIndex dari ${students.length} siswa',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1075,7 +1220,11 @@ Widget _buildStudentsSection() {
                                                           'jurusan_nama'] ??
                                                       '-',
                                                 ),
-                                                const SizedBox(height: 24),
+                                                const SizedBox(height: 16),
+
+                                                // WALI KELAS
+                                                _buildWaliKelasItem(),
+                                                const SizedBox(height: 16),
 
                                                 // SECTION DAFTAR MURID
                                                 _buildStudentsSection(),

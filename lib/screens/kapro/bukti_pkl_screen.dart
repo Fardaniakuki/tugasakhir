@@ -247,7 +247,7 @@ class _BuktiPklScreenState extends State<BuktiPklScreen>
                   child: const Icon(Icons.open_in_browser, color: Colors.blue),
                 ),
                 title: const Text(
-                  'Preview di Browser',
+                  'Lihat di Browser',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
                 ),
                 subtitle: const Text(
@@ -545,7 +545,7 @@ class _BuktiPklScreenState extends State<BuktiPklScreen>
                             Icon(Icons.remove_red_eye, size: 18),
                             SizedBox(width: 8),
                             Text(
-                              'Preview',
+                              'Tinjau',
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
@@ -1097,7 +1097,7 @@ class _BuktiPklScreenState extends State<BuktiPklScreen>
                                         ),
                                       ),
                                       child: const Text(
-                                        'PREVIEW',
+                                        'TINJAU',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w700,
@@ -1142,7 +1142,7 @@ class _BuktiPklScreenState extends State<BuktiPklScreen>
                         ),
                         icon: const Icon(Icons.remove_red_eye, size: 20),
                         label: const Text(
-                          'PREVIEW FILE',
+                          'PRATINJAU',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
@@ -1650,7 +1650,6 @@ class _BuktiPklScreenState extends State<BuktiPklScreen>
                     _generateSuratPermohonan(data['application_id']);
                   }
                 },
-                onPreviewFile: (String url) => _previewFile(url),
               )),
         ],
       ),
@@ -1726,13 +1725,11 @@ class _DocumentCard extends StatelessWidget {
   final Map<String, dynamic> data;
   final VoidCallback onTap;
   final VoidCallback onGenerateSurat;
-  final Function(String) onPreviewFile;
 
   const _DocumentCard({
     required this.data,
     required this.onTap,
     required this.onGenerateSurat,
-    required this.onPreviewFile,
   });
 
   static const Color _primaryRed = Color(0xFF6B1B1B);
@@ -1740,9 +1737,6 @@ class _DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fileCount = (data['file_urls'] as List?)?.length ?? 0;
-    final firstFileUrl = (data['file_urls'] as List?)?.isNotEmpty == true
-        ? (data['file_urls'] as List).first
-        : null;
 
     // Get status color with fallback
     final statusColor = data['statusColor'] as Color? ?? Colors.orange;
@@ -1944,37 +1938,11 @@ class _DocumentCard extends StatelessWidget {
                   ),
                 ],
 
-                // Action Buttons
+                // Action Buttons - HAPUS TOMBOL PREVIEW, HANYA DETAIL DAN BUAT SURAT
                 const SizedBox(height: 16),
                 Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: firstFileUrl != null
-                            ? () => onPreviewFile(firstFileUrl)
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: _primaryRed,
-                          side: const BorderSide(color: _primaryRed),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                        ),
-                        icon: const Icon(Icons.remove_red_eye, size: 16),
-                        label: const Text(
-                          'PREVIEW',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
+                    // HAPUS TOMBOL PREVIEW - SEKARANG HANYA 2 TOMBOL
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: onTap,

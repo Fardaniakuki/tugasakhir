@@ -6,16 +6,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../login/login_screen.dart';
 import 'kelola_perizinan_screen.dart';
 import 'walikelaspengaturan.dart';
-import 'kelola_perizinan_screen.dart';
 
 class WaliKelasDashboard extends StatefulWidget {
   final ScrollController scrollController;
-  
-  const WaliKelasDashboard({
-    super.key, 
-    required this.scrollController
-  });
-  
+
+  const WaliKelasDashboard({super.key, required this.scrollController});
+
   @override
   State<WaliKelasDashboard> createState() => _WaliKelasDashboardState();
 }
@@ -32,32 +28,16 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   // Data permasalahan dari API
   List<Map<String, dynamic>> _permasalahanData = [];
   bool _isLoadingPermasalahan = false;
-  
+
   // Statistik permasalahan sesuai database
-  int _permasalahanMenunggu = 0;    // opened
-  int _permasalahanDiproses = 0;    // in_progress
-  int _permasalahanSelesai = 0;      // resolved
+  int _permasalahanMenunggu = 0; // opened
+  int _permasalahanDiproses = 0; // in_progress
+  int _permasalahanSelesai = 0; // resolved
 
-  int get _totalSIA => _perizinanData.length;
-  int get _siaMenunggu => _perizinanData
-      .where((item) => item['status']?.toString().toLowerCase() == 'pending')
-      .length;
-  int get _siaDisetujui => _perizinanData
-      .where((item) => item['status']?.toString().toLowerCase() == 'approved')
-      .length;
-  int get _siaDitolak => _perizinanData
-      .where((item) => item['status']?.toString().toLowerCase() == 'rejected')
-      .length;
 
-  final int _laporanSelesai = 12;
-  final int _laporanBelum = 5;
-  final int _progresBaik = 10;
-  final int _progresKurang = 7;
-  
   static const Color _primaryRed = Color(0xFF6B1B1B);
   static const Color _bgSoft = Color(0xFF6B1B1B);
   static const Color _secondaryColor = Colors.white;
-  static const Color _borderOrange = Color(0xFFFFB74D);
   static const Color _orange = Color(0xFFFF9800);
   static const Color _green = Color(0xFF4CAF50);
   static const Color _red = Color(0xFFF44336);
@@ -73,10 +53,16 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
   Future<void> _checkTokenAndLoadProfile() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
+
     if (token == null || token.isEmpty) {
       _redirectToLogin();
       return;
     }
+
+    // Coba load dari SharedPreferences dulu untuk fast display
+    await _loadProfileFromPrefs();
+
+    // Kemudian load dari API untuk update data terbaru
     await _loadProfileData();
   }
 
@@ -103,7 +89,17 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           final data = jsonDecode(response.body);
           if (data['success'] == true && data['data'] != null) {
             final guruData = data['data'];
-            setState(() {
+
+            // Simpan ke SharedPreferences
+            await prefs.setString(
+                'user_name', guruData['nama'] ?? 'Wali Kelas');
+            await prefs.setString(
+                'guru_nama', guruData['nama'] ?? 'Wali Kelas');
+            if (guruData['kode_guru'] != null) {
+              await prefs.setString('kode_guru', guruData['kode_guru']);
+            }
+
+            setState(() async {
               _namaWaliKelas = guruData['nama'] ?? 'Wali Kelas';
               if (guruData['kelas_diampu'] != null &&
                   guruData['kelas_diampu'].isNotEmpty) {
@@ -113,9 +109,13 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                     final kelasData = kelasList[0];
                     _kelasWali =
                         kelasData['nama'] ?? kelasData['kelas'] ?? 'Kelas';
+
+                    // Simpan kelas wali
+                    await prefs.setString('kelas_wali', _kelasWali);
                   }
                 } else if (guruData['kelas_diampu'] is String) {
                   _kelasWali = guruData['kelas_diampu'];
+                  await prefs.setString('kelas_wali', _kelasWali);
                 }
               }
             });
@@ -124,6 +124,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       }
     } catch (e) {
       print('Error loading profile: $e');
+      // Fallback ke SharedPreferences jika API gagal
+      await _loadProfileFromPrefs();
     } finally {
       await Future.wait([
         _fetchPerizinanData(),
@@ -169,15 +171,16 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        
-        if (jsonResponse.containsKey('items') && jsonResponse['items'] is List) {
+
+        if (jsonResponse.containsKey('items') &&
+            jsonResponse['items'] is List) {
           final List<dynamic> items = jsonResponse['items'];
-          
+
           // Hitung statistik berdasarkan status sesuai database
-          int menunggu = 0;     // opened
-          int diproses = 0;     // in_progress
-          int selesai = 0;       // resolved
-          
+          int menunggu = 0; // opened
+          int diproses = 0; // in_progress
+          int selesai = 0; // resolved
+
           for (var item in items) {
             final status = item['status']?.toString().toLowerCase() ?? '';
             if (status == 'opened') {
@@ -188,21 +191,22 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
               selesai++;
             }
           }
-          
+
           setState(() {
             _permasalahanMenunggu = menunggu;
             _permasalahanDiproses = diproses;
             _permasalahanSelesai = selesai;
-            
+
             _permasalahanData = items.map((item) {
               final siswa = item['siswa'] ?? {};
-              
+
               // Format tanggal
-              String formattedDate = _formatDate(item['created_at']);
-              
+              final String formattedDate = _formatDate(item['created_at']);
+
               // Mapping kategori
-              String kategoriDisplay = _mapKategori(item['kategori'] ?? 'lainnya');
-              
+              final String kategoriDisplay =
+                  _mapKategori(item['kategori'] ?? 'lainnya');
+
               return {
                 'id': item['id'].toString(),
                 'judul': item['judul'] ?? 'Tidak ada judul',
@@ -224,13 +228,14 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 'tanggal': formattedDate,
               };
             }).toList();
-            
+
             // Ambil hanya 3 data terbaru untuk ditampilkan
             _permasalahanData = _permasalahanData.take(3).toList();
           });
-          
+
           print('✅ Loaded ${_permasalahanData.length} issues for dashboard');
-          print('📊 Statistik: Menunggu=$menunggu, Diproses=$diproses, Selesai=$selesai');
+          print(
+              '📊 Statistik: Menunggu=$menunggu, Diproses=$diproses, Selesai=$selesai');
         }
       }
     } catch (e) {
@@ -239,6 +244,34 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       setState(() {
         _isLoadingPermasalahan = false;
       });
+    }
+  }
+
+  // Di dalam class _WaliKelasDashboardState
+  Future<void> _loadProfileFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Ambil data yang disimpan oleh halaman profil
+      final String? nama =
+          prefs.getString('user_name') ?? prefs.getString('guru_nama');
+      final String? kodeGuru = prefs.getString('kode_guru');
+      final String? kelasWali = prefs.getString('kelas_wali'); // jika disimpan
+
+      print('📥 Loading profile from SharedPreferences:');
+      print('   Nama: $nama');
+      print('   Kode Guru: $kodeGuru');
+
+      setState(() {
+        if (nama != null && nama.isNotEmpty) {
+          _namaWaliKelas = nama;
+        }
+        if (kelasWali != null && kelasWali.isNotEmpty) {
+          _kelasWali = kelasWali;
+        }
+      });
+    } catch (e) {
+      print('❌ Error loading profile from prefs: $e');
     }
   }
 
@@ -262,8 +295,18 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     try {
       final date = DateTime.parse(dateString);
       const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'Mei',
+        'Jun',
+        'Jul',
+        'Agu',
+        'Sep',
+        'Okt',
+        'Nov',
+        'Des'
       ];
       return '${date.day} ${months[date.month - 1]} ${date.year}';
     } catch (e) {
@@ -615,79 +658,128 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       ),
     );
   }
-
-  Widget _headerCard() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 40, 16, 0),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 16,
-              offset: const Offset(0, 6))
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Beranda',
-                  style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF6B1B1B))),
-              Row(
-                children: [
-                  const SizedBox(width: 12),
-                  GestureDetector(
-                    onTap: _navigateToSettings,
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF6B1B1B).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color:
-                                const Color(0xFF6B1B1B).withValues(alpha: 0.3),
-                            width: 1.5),
-                      ),
-                      child: const Icon(Icons.person_outline,
-                          color: Color(0xFF6B1B1B), size: 22),
-                    ),
-                  ),
-                ],
+Widget _headerCard() {
+  return Container(
+    margin: const EdgeInsets.fromLTRB(16, 40, 16, 0),
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: Colors.grey[200]!),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.08),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Baris atas dengan judul "Beranda" dan tombol profil
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Beranda Wali Kelas',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF6B1B1B),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Selamat Datang, $_namaWaliKelas',
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-              fontWeight: FontWeight.w600,
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Kelas: $_kelasWali',
+            GestureDetector(
+              onTap: _navigateToSettings,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6B1B1B).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: const Color(0xFF6B1B1B).withValues(alpha: 0.2),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.person_outline,
+                  color: Color(0xFF6B1B1B),
+                  size: 24,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        // Baris sapaan (tanpa nama)
+        Row(
+          children: [
+            Icon(
+              Icons.waving_hand,
+              size: 20,
+              color: const Color(0xFF6B1B1B).withValues(alpha: 0.7),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Selamat Datang,',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 4),
+
+        // Nama Wali Kelasa (di baris terpisah)
+        Padding(
+          padding: const EdgeInsets.only(left: 28), // Sejajar dengan teks sapaan
+          child: Text(
+            _namaWaliKelas,
             style: const TextStyle(
-              fontSize: 14,
-              color: _primaryRed,
+              fontSize: 20,
               fontWeight: FontWeight.w700,
+              color: Color(0xFF6B1B1B),
             ),
+            maxLines: 2, // Bisa 2 baris jika sangat panjang
+            overflow: TextOverflow.ellipsis,
           ),
-        ],
-      ),
-    );
-  }
+        ),
+
+        const SizedBox(height: 12),
+
+        // Baris kelas
+        Row(
+          children: [
+            Icon(
+              Icons.class_outlined,
+              size: 20,
+              color: const Color(0xFF6B1B1B).withValues(alpha: 0.7),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Kelas: $_kelasWali',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _topCard() {
     return Padding(
@@ -709,16 +801,6 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
           children: [
             _permasalahanCard(), // Ganti _siaCard dengan _permasalahanCard
             const SizedBox(height: 14),
-            Row(
-              children: [
-                _miniCard(Icons.description, 'Laporan',
-                    '$_laporanSelesai/$_laporanBelum', const Color(0xFF009688)),
-                const SizedBox(width: 12),
-                _miniCard(Icons.trending_up, 'Progres',
-                    '$_progresBaik/$_progresKurang', const Color(0xFF9C27B0)),
-              ],
-            ),
-            const SizedBox(height: 14),
             _permasalahanChips(), // Ganti _siaChips dengan _permasalahanChips
             const SizedBox(height: 14),
             _pklStatsCard(),
@@ -737,7 +819,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
         decoration: BoxDecoration(
           color: _primaryRed,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
+          border:
+              Border.all(color: _primaryRed.withValues(alpha: 0.8), width: 1),
           boxShadow: [
             BoxShadow(
                 color: _primaryRed.withValues(alpha: 0.3),
@@ -785,63 +868,25 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       children: [
         Expanded(
             child: _PengajuanChip(
-                count: '$_permasalahanMenunggu', 
-                label: 'Menunggu', 
+                count: '$_permasalahanMenunggu',
+                label: 'Menunggu',
                 color: _purple)), // Ungu untuk Menunggu (opened)
         const SizedBox(width: 8),
         Expanded(
             child: _PengajuanChip(
-                count: '$_permasalahanDiproses', 
-                label: 'Diproses', 
+                count: '$_permasalahanDiproses',
+                label: 'Diproses',
                 color: _blue)), // Biru untuk Diproses (in_progress)
         const SizedBox(width: 8),
         Expanded(
             child: _PengajuanChip(
-                count: '$_permasalahanSelesai', 
-                label: 'Selesai', 
+                count: '$_permasalahanSelesai',
+                label: 'Selesai',
                 color: _green)), // Hijau untuk Selesai (resolved)
       ],
     );
   }
 
-  Widget _miniCard(IconData icon, String title, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: _borderOrange.withValues(alpha: 0.5), width: 1.5),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border:
-                    Border.all(color: color.withValues(alpha: 0.2), width: 1),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                Text(value,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 13)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _pklStatsCard() {
     final totalSiswa = _siswaPKLList.length;
@@ -956,7 +1001,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             const SizedBox(height: 16),
             _siswaPklListHorizontal(),
             const SizedBox(height: 40),
-            _sectionTitleWithSeeAll('Permasalahan Siswa', _permasalahanData.length),
+            _sectionTitleWithSeeAll(
+                'Permasalahan Siswa', _permasalahanData.length),
             const SizedBox(height: 16),
             _permasalahanListHorizontal(),
             const SizedBox(height: 60),
@@ -1191,7 +1237,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
 
     if (siswaSedangPKL.isEmpty) {
       return Container(
-        height: 200,
+        height: 210,
         decoration: BoxDecoration(
           color: Colors.grey[50],
           borderRadius: BorderRadius.circular(12),
@@ -1214,7 +1260,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     }
 
     return SizedBox(
-      height: 380,
+      height: 390,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: siswaSedangPKL.length,
@@ -1620,7 +1666,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // Judul
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1639,7 +1685,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 ),
               ),
               const SizedBox(height: 8),
-              
+
               // Jenis permasalahan
               Row(
                 children: [
@@ -1656,7 +1702,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 ],
               ),
               const SizedBox(height: 4),
-              
+
               // Kelas
               Row(
                 children: [
@@ -1669,7 +1715,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                 ],
               ),
               const SizedBox(height: 4),
-              
+
               // Tanggal
               Row(
                 children: [
@@ -1681,9 +1727,9 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   ),
                 ],
               ),
-              
+
               const Spacer(),
-              
+
               // Tombol Lihat Detail
               SizedBox(
                 width: double.infinity,
@@ -1691,7 +1737,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                   onPressed: () => _showPermasalahanDetail(masalahData),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _primaryRed,
-                    side: BorderSide(color: _primaryRed),
+                    side: const BorderSide(color: _primaryRed),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -2575,7 +2621,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // Title
           const Text(
             'Detail Permasalahan',
@@ -2586,7 +2632,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
             ),
           ),
           const SizedBox(height: 20),
-          
+
           Expanded(
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -2599,7 +2645,8 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.2)),
+                      border:
+                          Border.all(color: statusColor.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       children: [
@@ -2622,8 +2669,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                               Text(
                                 siswaName,
                                 style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700),
+                                    fontSize: 18, fontWeight: FontWeight.w700),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -2635,12 +2681,14 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
                                   color: statusColor.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                      color: statusColor.withValues(alpha: 0.3)),
+                                      color:
+                                          statusColor.withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(statusIcon, size: 12, color: statusColor),
+                                    Icon(statusIcon,
+                                        size: 12, color: statusColor),
                                     const SizedBox(width: 4),
                                     Text(
                                       status,

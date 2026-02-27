@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -219,7 +221,6 @@ class _PermasalahanSiswaContentState extends State<PermasalahanSiswaContent>
   // Pagination
   int _currentPage = 1;
   int _totalPages = 1;
-  int _totalItems = 0;
   final int _itemsPerPage = 10;
   
   // Filter
@@ -285,8 +286,9 @@ class _PermasalahanSiswaContentState extends State<PermasalahanSiswaContent>
       if (status != null && status != 'Semua' && status != 'semua') {
         // Konversi display status ke API status
         String apiStatus = status;
-        if (status == 'Menunggu') apiStatus = 'opened';
-        else if (status == 'Diproses') apiStatus = 'in_progress';
+        if (status == 'Menunggu') {
+          apiStatus = 'opened';
+        } else if (status == 'Diproses') apiStatus = 'in_progress';
         else if (status == 'Selesai') apiStatus = 'resolved';
         
         queryParams['status'] = apiStatus;
@@ -323,7 +325,7 @@ class _PermasalahanSiswaContentState extends State<PermasalahanSiswaContent>
               final pembimbing = item['pembimbing'];
               
               // Format tanggal
-              String formattedDate = _formatDate(item['created_at']);
+              final String formattedDate = _formatDate(item['created_at']);
               
               return {
                 'id': item['id'].toString(),
@@ -353,7 +355,6 @@ class _PermasalahanSiswaContentState extends State<PermasalahanSiswaContent>
             if (jsonResponse.containsKey('pagination')) {
               final pagination = jsonResponse['pagination'];
               _totalPages = pagination['total_pages'] ?? 1;
-              _totalItems = pagination['total_items'] ?? 0;
               _currentPage = pagination['page'] ?? 1;
             }
           });

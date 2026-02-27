@@ -396,7 +396,7 @@ class _PengaturanPageState extends State<PengaturanPage> {
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(color: _primaryColor.withValues(alpha:0.3)),
                                 ),
-                                child: const Text('PEMBIMBING INDUSTRI', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primaryColor)),
+                                child: const Text('PEMBIMBING', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primaryColor)),
                               ),
                             ],
                           ),

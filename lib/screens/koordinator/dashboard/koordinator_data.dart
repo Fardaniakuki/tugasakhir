@@ -497,7 +497,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                 '-- Pilih Guru Pembimbing --',
                 style: TextStyle(
                   color: _textSecondary,
-                  fontSize: 17,
+                  fontSize: 14,
                 ),
               ),
               isExpanded: true,
@@ -880,7 +880,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                     Text(
                       'Pilih Industri / DU/DI',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: _textPrimary,
                       ),
@@ -1342,7 +1342,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Pilih industri/DU/DI dari dropdown di atas untuk melihat daftar siswa',
+                  'Pilih industri/DU/DI untuk melihat daftar siswa',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 13,
@@ -2235,7 +2235,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
         backgroundColor: Colors.white,
         elevation: 2,
         title: const Text(
-          'Generator Dokumen PKL',
+          'Cetak Dokumen',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,

@@ -1,5 +1,7 @@
 // File: lib/screens/siswa/siswa_dashboard.dart
 
+// ignore_for_file: empty_catches, deprecated_member_use
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -30,7 +32,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   int? _kelasId;
   int? _currentUserId;
   bool _isLoading = true;
-  bool _hasToken = false;
   bool _initialLoading = true;
   bool _hasError = false;
   String? _errorMessage;
@@ -91,6 +92,15 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
     // Reload semua data
     await _loadAllData(forceRefresh: true);
+  }
+
+// Tambahkan method ini di dalam class _SiswaDashboardState
+  Future<List<IndustriModel>> _loadAvailableIndustries() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    if (token == null) return [];
+
+    return await IndustriApiHelper.getAvailableIndustries(token: token);
   }
 
   Future<void> _initializeApp() async {
@@ -191,7 +201,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         if (response.statusCode == 200) {
           // Token valid
           print('✅ Token valid! Response 200 OK');
-          setState(() => _hasToken = true);
           return true;
         } else if (response.statusCode == 401) {
           print('❌ Token tidak valid (401 Unauthorized)');
@@ -207,32 +216,27 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           print('⚠️ Server error (500 Internal Server Error)');
           print('Ini bukan masalah token, tapi server bermasalah');
           // Tetap anggap token valid karena ini error server
-          setState(() => _hasToken = true);
           return true;
         } else {
           // Status code lain
           print('⚠️ Response tidak terduga: ${response.statusCode}');
           print('Body: ${response.body}');
           // Anggap token valid untuk sementara
-          setState(() => _hasToken = true);
           return true;
         }
       } on TimeoutException catch (e) {
         // Timeout, anggap token valid untuk sementara
         print('⚠️ Timeout saat cek token: $e');
         print('Koneksi mungkin lambat atau server tidak merespons');
-        setState(() => _hasToken = true);
         return true;
       } on SocketException catch (e) {
         print('⚠️ SocketException: $e');
         print('Tidak bisa connect ke server. Cek koneksi internet');
-        setState(() => _hasToken = true);
         return true;
       } catch (e) {
         // Error lain
         print('❌ Error tidak terduga saat request: $e');
         print('Type error: ${e.runtimeType}');
-        setState(() => _hasToken = true);
         return true;
       }
     } catch (e) {
@@ -335,7 +339,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
     if (siswaUsername == null ||
         currentUsername == null ||
-        siswaUsername != currentUsername) return;
+        siswaUsername != currentUsername) {
+      return;
+    }
 
     final String type = data['type'] ?? '';
     switch (type) {
@@ -606,7 +612,9 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () async {
-                              for (var n in _notifications) n['read'] = true;
+                              for (var n in _notifications) {
+                                n['read'] = true;
+                              }
                               setState(() => _unreadNotificationCount = 0);
                               await _saveNotificationsToPrefs();
                             },
@@ -705,12 +713,14 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
   void _loadFromCache() {
     if (_cachedPklData != null) _pklData = _cachedPklData;
-    if (_cachedPklApplications != null)
+    if (_cachedPklApplications != null) {
       _pklApplications = _cachedPklApplications!;
+    }
     if (_cachedIndustriData != null) _industriData = _cachedIndustriData;
     if (_cachedPembimbingData != null) _pembimbingData = _cachedPembimbingData;
-    if (_cachedProcessedByData != null)
+    if (_cachedProcessedByData != null) {
       _processedByData = _cachedProcessedByData;
+    }
     if (_cachedGroups != null) {
       _myGroups = _cachedGroups!;
       _activeGroup = _myGroups.isNotEmpty ? _myGroups.first : null;
@@ -975,12 +985,12 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         if (data['success'] == true &&
             data['data']['data']?.isNotEmpty == true) {
           final siswaList = data['data']['data'];
-          dynamic matchedSiswa = siswaList.firstWhere(
+          final dynamic matchedSiswa = siswaList.firstWhere(
             (s) => s['nama_lengkap'] == userName,
             orElse: () => siswaList.first,
           );
 
-          int? kelasId = matchedSiswa['kelas_id'] is int
+          final int? kelasId = matchedSiswa['kelas_id'] is int
               ? matchedSiswa['kelas_id']
               : int.tryParse(matchedSiswa['kelas_id']?.toString() ?? '');
           String kelasNama = 'Kelas Tidak Tersedia';
@@ -1166,7 +1176,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 
   Future<void> _submitGroup() async {
+    print('=== SUBMIT GROUP ===');
+
     if (_activeGroup == null) {
+      print('❌ Tidak ada grup aktif');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1179,16 +1192,19 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     }
 
     if (!await _isTokenValid()) {
+      print('❌ Token tidak valid');
       _redirectToLogin();
       return;
     }
 
+    // Validasi hanya ketua kelompok yang bisa submit
     if (_currentUserId == null ||
         !_activeGroup!.isUserLeader(_currentUserId!)) {
+      print('❌ Bukan ketua kelompok');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Hanya ketua kelompok yang bisa mengirim'),
+            content: Text('Hanya ketua kelompok yang bisa mengirim pengajuan'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1196,8 +1212,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       return;
     }
 
-    // Validasi status harus DRAFT
-    if (_activeGroup!.status.toLowerCase() != 'draft') {
+    // Validasi status harus PENDING/DRAFT
+    if (_activeGroup!.status.toLowerCase() != 'pending' &&
+        _activeGroup!.status.toLowerCase() != 'draft') {
+      print('❌ Status grup bukan PENDING/DRAFT: ${_activeGroup!.status}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1209,9 +1227,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       return;
     }
 
-    // Validasi semua anggota sudah menerima
+    // Validasi semua anggota sudah menerima undangan
     final pendingMembers = _activeGroup!.getPendingMembers();
     if (pendingMembers.isNotEmpty) {
+      print(
+          '❌ Masih ada anggota yang belum menerima: ${pendingMembers.length}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1224,9 +1244,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       return;
     }
 
-    // Validasi minimal anggota
+    // Validasi minimal anggota (termasuk ketua)
     final acceptedMembers = _activeGroup!.getAcceptedMembers();
     if (acceptedMembers.length < 2) {
+      print('❌ Anggota kurang dari 2: ${acceptedMembers.length}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1238,15 +1259,454 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
       return;
     }
 
-    // Lanjut dengan dialog submit
+    // Tampilkan dialog untuk input tanggal, catatan, dan pilihan industri
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _buildSubmitGroupDialog(),
     );
 
-    if (result == null) return;
+    if (result == null) {
+      print('Dialog dibatalkan');
+      return;
+    }
 
-    // ... lanjut dengan API call
+    // Validasi industri_id
+    if (result['industri_id'] == null) {
+      print('❌ Industri tidak dipilih');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pilih industri tujuan'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Validasi tanggal
+    final tanggalMulaiStr = result['tanggal_mulai'] as String;
+    final tanggalSelesaiStr = result['tanggal_selesai'] as String;
+
+    DateTime? tanggalMulai;
+    DateTime? tanggalSelesai;
+
+    try {
+      tanggalMulai = DateTime.parse(tanggalMulaiStr);
+      tanggalSelesai = DateTime.parse(tanggalSelesaiStr);
+    } catch (e) {
+      print('❌ Format tanggal tidak valid: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Format tanggal tidak valid'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (tanggalSelesai.isBefore(tanggalMulai)) {
+      print('❌ Tanggal selesai sebelum tanggal mulai');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tanggal selesai harus setelah tanggal mulai'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Konfirmasi sebelum submit
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Konfirmasi Pengajuan'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Yakin ingin mengirim pengajuan grup PKL ini?'),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Informasi Industri
+                      Row(
+                        children: [
+                          const Icon(Icons.business,
+                              size: 16, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Industri',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey),
+                                ),
+                                Text(
+                                  _activeGroup!.industri.nama,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 16),
+
+                      // Tanggal Mulai
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today,
+                              size: 16, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Tanggal Mulai',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey),
+                                ),
+                                Text(
+                                  '${tanggalMulai!.day} ${_getMonthName(tanggalMulai.month)} ${tanggalMulai.year}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Tanggal Selesai
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today,
+                              size: 16, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Tanggal Selesai',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey),
+                                ),
+                                Text(
+                                  '${tanggalSelesai!.day} ${_getMonthName(tanggalSelesai.month)} ${tanggalSelesai.year}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      if (result['catatan'] != null &&
+                          result['catatan'].toString().isNotEmpty) ...[
+                        const Divider(height: 16),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.note,
+                                size: 16, color: Colors.orange),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Catatan',
+                                    style: TextStyle(
+                                        fontSize: 12, color: Colors.grey),
+                                  ),
+                                  Text(
+                                    result['catatan'],
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      const Divider(height: 16),
+
+                      // Jumlah Anggota
+                      Row(
+                        children: [
+                          const Icon(Icons.people,
+                              size: 16, color: Colors.purple),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Jumlah Anggota',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey),
+                                ),
+                                Text(
+                                  '${acceptedMembers.length} orang',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 180, 16, 4),
+              ),
+              child: const Text('Ya, Kirim',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) {
+      print('Submit dibatalkan');
+      return;
+    }
+
+    // Kirim ke API
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    if (token == null) {
+      _redirectToLogin();
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      print('Mengirim request ke API...');
+      print('Group ID: ${_activeGroup!.id}');
+      print('Industri ID: ${result['industri_id']}');
+      print('Tanggal Mulai: ${result['tanggal_mulai']}');
+      print('Tanggal Selesai: ${result['tanggal_selesai']}');
+      print('Catatan: ${result['catatan']}');
+
+      final response = await http
+          .post(
+            Uri.parse(
+                '${dotenv.env['API_BASE_URL']}/api/pkl/group/${_activeGroup!.id}/submit'),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'industri_id': result['industri_id'],
+              'tanggal_mulai': result['tanggal_mulai'],
+              'tanggal_selesai': result['tanggal_selesai'],
+              'catatan': result['catatan'] ?? '',
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        print('✅ Group berhasil disubmit');
+
+        // Clear cache dan reload data
+        _clearCache();
+        await _loadAllData();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Pengajuan grup PKL berhasil dikirim'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else if (response.statusCode == 400) {
+        // Bad request - kemungkinan validasi error
+        try {
+          final errorData = jsonDecode(response.body);
+          String errorMsg = errorData['message'] ?? 'Data tidak valid';
+
+          // Handle specific error messages
+          if (errorMsg.contains('already has an active or pending PKL')) {
+            errorMsg =
+                'Salah satu anggota sudah memiliki PKL aktif atau pending';
+          } else if (errorMsg.contains('not all members have accepted')) {
+            errorMsg = 'Belum semua anggota menerima undangan';
+          } else if (errorMsg.contains('invalid date format')) {
+            errorMsg = 'Format tanggal tidak valid';
+          } else if (errorMsg.contains('end date must be after start date')) {
+            errorMsg = 'Tanggal selesai harus setelah tanggal mulai';
+          } else if (errorMsg.contains('industri not found')) {
+            errorMsg = 'Industri tidak ditemukan';
+          } else if (errorMsg.contains('industri is full')) {
+            errorMsg = 'Kuota industri sudah penuh';
+          }
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMsg),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Data yang dikirim tidak valid'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      } else if (response.statusCode == 403) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Anda tidak memiliki izin untuk submit grup ini'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else if (response.statusCode == 404) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Grup tidak ditemukan'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        // Reload untuk refresh data
+        _clearCache();
+        await _loadAllData();
+      } else if (response.statusCode == 409) {
+        // Conflict - group already submitted or members have conflicts
+        try {
+          final errorData = jsonDecode(response.body);
+          final String errorMsg =
+              errorData['message'] ?? 'Grup sudah dalam proses pengajuan';
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(errorMsg),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Grup sudah dalam proses pengajuan'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      } else {
+        print('❌ Gagal submit group: ${response.statusCode}');
+        _handleErrorResponse(response);
+      }
+    } catch (e) {
+      print('❌ Exception saat submit group: $e');
+      print('Stack trace:');
+      print(StackTrace.current);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      print('=== SELESAI SUBMIT GROUP ===');
+    }
+  }
+
+// Helper method untuk mendapatkan nama bulan
+  String _getMonthName(int month) {
+    const months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember'
+    ];
+    return months[month - 1];
+  }
+
+// Helper method untuk format tanggal ke YYYY-MM-DD
+  String _formatDateForApi(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
+// Helper method untuk parse tanggal dari string
+  DateTime? _parseDate(String dateStr) {
+    try {
+      return DateTime.parse(dateStr);
+    } catch (e) {
+      return null;
+    }
   }
 
   Widget _buildSubmitGroupDialog() {
@@ -1255,198 +1715,508 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     final TextEditingController tanggalSelesaiController =
         TextEditingController();
     final TextEditingController catatanController = TextEditingController();
+    final TextEditingController searchController = TextEditingController();
 
-    final now = DateTime.now();
+    final DateTime now = DateTime.now();
     // Format as YYYY-MM-DD as expected by the API
-    tanggalMulaiController.text = DateFormatter.formatForApi(now);
-    tanggalSelesaiController.text = DateFormatter.formatForApi(
+    tanggalMulaiController.text = _formatDateForApi(now);
+    tanggalSelesaiController.text = _formatDateForApi(
       now.add(const Duration(days: 90)),
     );
 
-    return AlertDialog(
-      title: const Text('Kirim Kelompok PKL'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: tanggalMulaiController,
-              decoration: const InputDecoration(
-                labelText: 'Tanggal Mulai',
-                hintText: 'YYYY-MM-DD',
-                border: OutlineInputBorder(),
-              ),
-              readOnly: true,
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: now,
-                  firstDate: now,
-                  lastDate: now.add(const Duration(days: 365)),
-                );
-                if (date != null) {
-                  tanggalMulaiController.text =
-                      DateFormatter.formatForApi(date);
-                }
-              },
+    // State untuk dialog
+    List<IndustriModel> industries = [];
+    List<IndustriModel> filteredIndustries = [];
+    bool isLoadingIndustries = true;
+    IndustriModel? selectedIndustri;
+    String searchQuery = '';
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        // Load industries if empty
+        if (industries.isEmpty && isLoadingIndustries) {
+          _loadAvailableIndustries().then((loadedIndustries) {
+            setState(() {
+              industries = loadedIndustries;
+              filteredIndustries = loadedIndustries;
+              isLoadingIndustries = false;
+
+              // Auto-select if only one industry available
+              if (loadedIndustries.length == 1) {
+                selectedIndustri = loadedIndustries.first;
+              }
+            });
+          });
+        }
+
+        return AlertDialog(
+          title: const Text(
+            'Kirim Kelompok PKL',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          content: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+              minWidth: 400,
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: tanggalSelesaiController,
-              decoration: const InputDecoration(
-                labelText: 'Tanggal Selesai',
-                hintText: 'YYYY-MM-DD',
-                border: OutlineInputBorder(),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Label Pilihan Industri
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.factory, size: 18, color: Colors.grey[700]),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Pilih Industri Tujuan',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Search Field
+                  TextField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Cari nama industri...',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                            color: Color.fromARGB(255, 180, 16, 4)),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        searchQuery = value.toLowerCase();
+                        if (searchQuery.isEmpty) {
+                          filteredIndustries = industries;
+                        } else {
+                          filteredIndustries = industries.where((industri) {
+                            return industri.name
+                                .toLowerCase()
+                                .contains(searchQuery);
+                          }).toList();
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Daftar Industri (Hanya Nama)
+                  isLoadingIndustries
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      : filteredIndustries.isEmpty
+                          ? Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.grey[300]!),
+                              ),
+                              child: Center(
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.factory_outlined,
+                                        size: 40, color: Colors.grey[400]),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Tidak ada industri tersedia',
+                                      style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 14),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : Container(
+                              constraints: const BoxConstraints(maxHeight: 180),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: ListView.separated(
+                                shrinkWrap: true,
+                                itemCount: filteredIndustries.length,
+                                separatorBuilder: (context, index) =>
+                                    const Divider(height: 1),
+                                itemBuilder: (context, index) {
+                                  final industri = filteredIndustries[index];
+                                  final isSelected =
+                                      selectedIndustri?.id == industri.id;
+                                  final isAvailable = industri.isAvailable;
+
+                                  return ListTile(
+                                    onTap: isAvailable
+                                        ? () {
+                                            setState(() {
+                                              selectedIndustri = industri;
+                                            });
+                                          }
+                                        : null,
+                                    leading: Radio<IndustriModel>(
+                                      value: industri,
+                                      groupValue: selectedIndustri,
+                                      activeColor:
+                                          const Color.fromARGB(255, 180, 16, 4),
+                                      onChanged: isAvailable
+                                          ? (value) {
+                                              setState(() {
+                                                selectedIndustri = value;
+                                              });
+                                            }
+                                          : null,
+                                    ),
+                                    title: Text(
+                                      industri.name,
+                                      style: TextStyle(
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                        color: isAvailable
+                                            ? Colors.black
+                                            : Colors.grey,
+                                      ),
+                                    ),
+                                    trailing: isAvailable
+                                        ? null
+                                        : Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.red
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: const Text(
+                                              'Penuh',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.red,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                  );
+                                },
+                              ),
+                            ),
+
+                  const SizedBox(height: 16),
+
+                  // Informasi Industri Terpilih (Ringkas)
+                  if (selectedIndustri != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color.fromARGB(255, 180, 16, 4)
+                            .withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: const Color.fromARGB(255, 180, 16, 4)
+                                .withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color.fromARGB(255, 180, 16, 4)
+                                  .withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              size: 14,
+                              color: Color.fromARGB(255, 180, 16, 4),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Industri Terpilih',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  selectedIndustri!.name,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // Garis Pemisah
+                  const Divider(),
+
+                  // Tanggal Mulai
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Periode PKL',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Tanggal Mulai
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: TextField(
+                      controller: tanggalMulaiController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tanggal Mulai',
+                        hintText: 'YYYY-MM-DD',
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.calendar_today,
+                            size: 18, color: Colors.grey),
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                      ),
+                      readOnly: true,
+                      onTap: () async {
+                        final DateTime? date = await showDatePicker(
+                          context: context,
+                          initialDate: now,
+                          firstDate: now,
+                          lastDate: now.add(const Duration(days: 365)),
+                        );
+                        if (date != null) {
+                          setState(() {
+                            tanggalMulaiController.text =
+                                _formatDateForApi(date);
+
+                            // Jika tanggal selesai sebelum tanggal mulai, update
+                            final DateTime? selesai =
+                                _parseDate(tanggalSelesaiController.text);
+                            if (selesai != null && selesai.isBefore(date)) {
+                              tanggalSelesaiController.text = _formatDateForApi(
+                                date.add(const Duration(days: 90)),
+                              );
+                            }
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Tanggal Selesai
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: TextField(
+                      controller: tanggalSelesaiController,
+                      decoration: const InputDecoration(
+                        labelText: 'Tanggal Selesai',
+                        hintText: 'YYYY-MM-DD',
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.calendar_today,
+                            size: 18, color: Colors.grey),
+                        contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                      ),
+                      readOnly: true,
+                      onTap: () async {
+                        final DateTime startDate =
+                            _parseDate(tanggalMulaiController.text) ?? now;
+                        final DateTime? date = await showDatePicker(
+                          context: context,
+                          initialDate: startDate.add(const Duration(days: 90)),
+                          firstDate: startDate,
+                          lastDate: startDate.add(const Duration(days: 365)),
+                        );
+                        if (date != null) {
+                          setState(() {
+                            tanggalSelesaiController.text =
+                                _formatDateForApi(date);
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Catatan
+                  const Text(
+                    'Catatan (opsional)',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: TextField(
+                      controller: catatanController,
+                      decoration: const InputDecoration(
+                        hintText:
+                            'Contoh: Ingin belajar di industri ini bersama teman',
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.all(12),
+                      ),
+                      maxLines: 2,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            size: 16, color: Colors.blue[700]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Pastikan semua anggota sudah menerima undangan sebelum mengirim',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              readOnly: true,
-              onTap: () async {
-                final startDate =
-                    DateTime.tryParse(tanggalMulaiController.text) ?? now;
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: startDate.add(const Duration(days: 90)),
-                  firstDate: startDate,
-                  lastDate: startDate.add(const Duration(days: 365)),
-                );
-                if (date != null) {
-                  tanggalSelesaiController.text =
-                      DateFormatter.formatForApi(date);
-                }
-              },
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: catatanController,
-              decoration: const InputDecoration(
-                labelText: 'Catatan (opsional)',
-                hintText: 'Contoh: Ingin belajar di industri ini bersama teman',
-                border: OutlineInputBorder(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey[700],
               ),
-              maxLines: 3,
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Validasi input
+                if (selectedIndustri == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Pilih industri tujuan'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                if (tanggalMulaiController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Pilih tanggal mulai'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                if (tanggalSelesaiController.text.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Pilih tanggal selesai'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+
+                // Validasi tanggal selesai tidak sebelum tanggal mulai
+                final DateTime? mulai = _parseDate(tanggalMulaiController.text);
+                final DateTime? selesai =
+                    _parseDate(tanggalSelesaiController.text);
+
+                if (mulai != null &&
+                    selesai != null &&
+                    selesai.isBefore(mulai)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content:
+                          Text('Tanggal selesai harus setelah tanggal mulai'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.pop(context, {
+                  'industri_id': selectedIndustri!.id,
+                  'tanggal_mulai': tanggalMulaiController.text,
+                  'tanggal_selesai': tanggalSelesaiController.text,
+                  'catatan': catatanController.text,
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 180, 16, 4),
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Kirim Pengajuan',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
             ),
           ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Batal'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context, {
-              'tanggal_mulai': tanggalMulaiController.text,
-              'tanggal_selesai': tanggalSelesaiController.text,
-              'catatan': catatanController.text,
-            });
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color.fromARGB(255, 180, 16, 4),
-          ),
-          child: const Text('Kirim', style: TextStyle(color: Colors.white)),
-        ),
-      ],
+        );
+      },
     );
-  }
-
-  Future<void> _withdrawGroup() async {
-    if (_activeGroup == null) return;
-    if (!await _isTokenValid()) {
-      _redirectToLogin();
-      return;
-    }
-
-    if (_currentUserId == null ||
-        !_activeGroup!.isUserLeader(_currentUserId!)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Hanya ketua kelompok yang bisa tarik'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
-
-    final status = _activeGroup!.status.toLowerCase();
-    if (status != 'submitted' && status != 'pending' && status != 'menunggu') {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Hanya group dengan status MENUNGGU yang bisa ditarik'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-      return;
-    }
-
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Tarik Pengajuan'),
-        content: const Text(
-            'Yakin ingin menarik pengajuan kelompok? Group akan kembali ke status DRAFT.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Tarik', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
-    if (token == null) {
-      _redirectToLogin();
-      return;
-    }
-
-    try {
-      setState(() => _isLoading = true);
-
-      final response = await http.post(
-        Uri.parse(
-            '${dotenv.env['API_BASE_URL']}/api/pkl/group/${_activeGroup!.id}/withdraw'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        _clearCache();
-        await _loadAllData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pengajuan kelompok ditarik kembali'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      } else {
-        _handleErrorResponse(response);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   Future<void> _updateGroupMembers() async {
@@ -1604,89 +2374,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  Widget _buildUpdateMembersDialog() {
-    final TextEditingController anggotaController = TextEditingController();
-    final List<String> tempMembers = [];
-
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return AlertDialog(
-          title: const Text('Ubah Anggota Kelompok'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Masukkan username anggota (pisahkan dengan koma)'),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: anggotaController,
-                  decoration: const InputDecoration(
-                    hintText: 'Contoh: budi123, citra456, dewi789',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    final text = anggotaController.text.trim();
-                    if (text.isNotEmpty) {
-                      final members = text
-                          .split(',')
-                          .map((e) => e.trim())
-                          .where((e) => e.isNotEmpty)
-                          .toList();
-                      setState(() {
-                        tempMembers.clear();
-                        tempMembers.addAll(members);
-                      });
-                    }
-                  },
-                  child: const Text('Proses'),
-                ),
-                if (tempMembers.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Anggota yang akan diundang:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  ...tempMembers.map(
-                    (m) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.person, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(m)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal'),
-            ),
-            ElevatedButton(
-              onPressed: tempMembers.isEmpty
-                  ? null
-                  : () => Navigator.pop(context, tempMembers),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 180, 16, 4),
-              ),
-              child: const Text('Ubah', style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   // Tambahkan method ini ke dalam class _SiswaDashboardState
@@ -2115,7 +2802,7 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           await _loadAllData();
 
           if (mounted) {
-            String successMessage = result['tipe'] == 'group'
+            final String successMessage = result['tipe'] == 'group'
                 ? 'Group PKL berhasil dibuat'
                 : 'Pengajuan PKL berhasil dikirim';
 
@@ -2145,11 +2832,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content:
                     Text('Pengajuan group PKL sudah ada yang sedang diproses'),
                 backgroundColor: Colors.green,
-                duration: const Duration(seconds: 3),
+                duration: Duration(seconds: 3),
               ),
             );
           }
@@ -2186,8 +2873,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
     try {
       final errorData = jsonDecode(response.body);
-      String errorCode = errorData['error'] ?? '';
-      String msg = errorData['message'] ?? 'Gagal';
+      final String errorCode = errorData['error'] ?? '';
+      final String msg = errorData['message'] ?? 'Gagal';
       print('Error code: $errorCode');
       print('Error message: $msg');
 
@@ -2202,11 +2889,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content:
                     Text('Anda sudah memiliki group PKL yang sedang diproses'),
                 backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 3),
+                duration: Duration(seconds: 3),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -2216,10 +2903,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
           print('⚠️ 409 Conflict: User sudah dalam group');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text('Anda sudah tergabung dalam group PKL'),
                 backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 3),
+                duration: Duration(seconds: 3),
                 behavior: SnackBarBehavior.floating,
               ),
             );
@@ -2256,10 +2943,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         print('⚠️ 403 Forbidden: Tidak memiliki akses');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Anda tidak memiliki akses untuk melakukan ini'),
               backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
+              duration: Duration(seconds: 3),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -2272,10 +2959,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         print('⚠️ 404 Not Found: Resource tidak ditemukan');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Data tidak ditemukan'),
               backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 3),
+              duration: Duration(seconds: 3),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -2288,11 +2975,11 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
         print('⚠️ ${response.statusCode} Server Error');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content:
                   Text('Terjadi kesalahan pada server. Silakan coba lagi.'),
               backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
+              duration: Duration(seconds: 3),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -2694,10 +3381,10 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
                     topRight: Radius.circular(40),
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+                child: const Padding(
+                  padding: EdgeInsets.all(20),
                   child: Column(
-                    children: const [
+                    children: [
                       SkeletonQuickActions(),
                       SizedBox(height: 30),
                       SkeletonTitle(),

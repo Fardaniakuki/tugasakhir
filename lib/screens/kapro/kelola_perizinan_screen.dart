@@ -101,7 +101,7 @@ class _KelolaPerizinanTabScreenState extends State<KelolaPerizinanTabScreen>
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF6B1B1B))),
           SizedBox(height: 8),
-          Text('Kelola pengajuan pindah PKL (Kaprog)',
+          Text('Kelola pengajuan pindah PKL',
             style: TextStyle(
                 fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w600),
           ),

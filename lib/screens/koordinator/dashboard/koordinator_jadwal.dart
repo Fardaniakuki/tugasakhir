@@ -51,33 +51,54 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
   // Fungsi untuk mengubah nama hari ke Bahasa Indonesia
   String _getIndonesianDayName(String englishDay) {
     switch (englishDay.toLowerCase()) {
-      case 'monday': return 'Senin';
-      case 'tuesday': return 'Selasa';
-      case 'wednesday': return 'Rabu';
-      case 'thursday': return 'Kamis';
-      case 'friday': return 'Jumat';
-      case 'saturday': return 'Sabtu';
-      case 'sunday': return 'Minggu';
-      default: return englishDay;
+      case 'monday':
+        return 'Senin';
+      case 'tuesday':
+        return 'Selasa';
+      case 'wednesday':
+        return 'Rabu';
+      case 'thursday':
+        return 'Kamis';
+      case 'friday':
+        return 'Jumat';
+      case 'saturday':
+        return 'Sabtu';
+      case 'sunday':
+        return 'Minggu';
+      default:
+        return englishDay;
     }
   }
 
   // Fungsi untuk mengubah nama bulan ke Bahasa Indonesia
   String _getIndonesianMonthName(String englishMonth) {
     switch (englishMonth.toLowerCase()) {
-      case 'january': return 'Januari';
-      case 'february': return 'Februari';
-      case 'march': return 'Maret';
-      case 'april': return 'April';
-      case 'may': return 'Mei';
-      case 'june': return 'Juni';
-      case 'july': return 'Juli';
-      case 'august': return 'Agustus';
-      case 'september': return 'September';
-      case 'october': return 'Oktober';
-      case 'november': return 'November';
-      case 'december': return 'Desember';
-      default: return englishMonth;
+      case 'january':
+        return 'Januari';
+      case 'february':
+        return 'Februari';
+      case 'march':
+        return 'Maret';
+      case 'april':
+        return 'April';
+      case 'may':
+        return 'Mei';
+      case 'june':
+        return 'Juni';
+      case 'july':
+        return 'Juli';
+      case 'august':
+        return 'Agustus';
+      case 'september':
+        return 'September';
+      case 'october':
+        return 'Oktober';
+      case 'november':
+        return 'November';
+      case 'december':
+        return 'Desember';
+      default:
+        return englishMonth;
     }
   }
 
@@ -128,14 +149,17 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
   }
 
   void _generateCalendar() {
-    _currentMonth = _formatMonthYearIndonesian(_currentDate); // Pakai format Indonesia
+    _currentMonth =
+        _formatMonthYearIndonesian(_currentDate); // Pakai format Indonesia
     _calendarDays = [];
     final firstDayOfMonth = DateTime(_currentDate.year, _currentDate.month, 1);
-    final lastDayOfMonth = DateTime(_currentDate.year, _currentDate.month + 1, 0);
+    final lastDayOfMonth =
+        DateTime(_currentDate.year, _currentDate.month + 1, 0);
     final int startingWeekday = firstDayOfMonth.weekday % 7;
     final List<DateTime?> currentWeek = [];
     if (startingWeekday > 0) {
-      final previousMonthLastDay = DateTime(_currentDate.year, _currentDate.month, 0);
+      final previousMonthLastDay =
+          DateTime(_currentDate.year, _currentDate.month, 0);
       for (int i = startingWeekday - 1; i >= 0; i--) {
         final previousDate = DateTime(previousMonthLastDay.year,
             previousMonthLastDay.month, previousMonthLastDay.day - i);
@@ -168,35 +192,61 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
       _isLoading = true;
       _errorMessage = '';
     });
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('access_token');
+
       if (token == null) {
         _redirectToLogin();
         return;
       }
+
       final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/kegiatan-pkl/tahun-ajaran/$_tahunAjaranId'),
+        Uri.parse(
+            '${dotenv.env['API_BASE_URL']}/api/kegiatan-pkl/tahun-ajaran/$_tahunAjaranId'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
       );
+
       if (response.statusCode == 200) {
-        final List<dynamic> responseData = json.decode(response.body);
-        final List<KegiatanPkl> kegiatanList =
-            responseData.map((item) => KegiatanPkl.fromJson(item)).toList();
-        setState(() {
-          _allKegiatan = kegiatanList;
-          _initializeEvents();
-          _isLoading = false;
-        });
+        // Handle kemungkinan response kosong
+        if (response.body.isEmpty) {
+          setState(() {
+            _allKegiatan = [];
+            _initializeEvents();
+            _isLoading = false;
+          });
+          return;
+        }
+
+        try {
+          final List<dynamic> responseData = json.decode(response.body);
+          final List<KegiatanPkl> kegiatanList =
+              responseData.map((item) => KegiatanPkl.fromJson(item)).toList();
+
+          setState(() {
+            _allKegiatan = kegiatanList;
+            _initializeEvents();
+            _isLoading = false;
+          });
+        } catch (e) {
+          print('Error parsing JSON: $e');
+          setState(() {
+            _allKegiatan = [];
+            _initializeEvents();
+            _isLoading = false;
+          });
+        }
       } else if (response.statusCode == 401) {
         _redirectToLogin();
       } else {
         throw Exception('Failed to load kegiatan PKL: ${response.statusCode}');
       }
     } catch (e) {
+      print('Error fetching kegiatan: $e');
       setState(() {
         _errorMessage = 'Error: $e';
         _isLoading = false;
@@ -213,7 +263,6 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
         return;
       }
 
-      // Debug: Print data yang dikirim
       print('🟡 Creating kegiatan with data: $data');
 
       final response = await http.post(
@@ -231,16 +280,31 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
       if (response.statusCode == 201 || response.statusCode == 200) {
         await _fetchKegiatanPkl();
         if (!mounted) return;
+
+        // Tutup loading dialog terlebih dahulu
+        Navigator.pop(context); // Tutup loading dialog
+
+        // Beri sedikit jeda untuk memastikan dialog loading benar-benar tertutup
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        if (!mounted) return;
         _showSuccessPopup('Kegiatan berhasil ditambahkan');
       } else if (response.statusCode == 401) {
         _redirectToLogin();
       } else {
         final errorData = json.decode(response.body);
-        final errorMessage = errorData['message'] ?? errorData['error'] ?? 'Failed to create kegiatan: ${response.statusCode}';
+        final errorMessage = errorData['message'] ??
+            errorData['error'] ??
+            'Failed to create kegiatan: ${response.statusCode}';
         throw Exception(errorMessage);
       }
     } catch (e) {
       print('❌ Error creating kegiatan: $e');
+      if (!mounted) return;
+
+      // Tutup loading dialog jika error
+      Navigator.pop(context);
+
       if (!mounted) return;
       _showErrorPopup('Gagal menambahkan kegiatan: $e');
     }
@@ -254,6 +318,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
         _redirectToLogin();
         return;
       }
+
       final response = await http.put(
         Uri.parse('${dotenv.env['API_BASE_URL']}/api/kegiatan-pkl/$id'),
         headers: {
@@ -262,17 +327,32 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
         },
         body: json.encode(data),
       );
+
       if (response.statusCode == 200) {
         await _fetchKegiatanPkl();
+        if (!mounted) return;
+
+        // Tutup loading dialog
+        Navigator.pop(context);
+
+        // Beri jeda kecil
+        await Future.delayed(const Duration(milliseconds: 100));
+
         if (!mounted) return;
         _showSuccessPopup('Kegiatan berhasil diperbarui');
       } else if (response.statusCode == 401) {
         _redirectToLogin();
       } else {
         final errorData = json.decode(response.body);
-        throw Exception('Failed to update kegiatan: ${errorData['message'] ?? response.statusCode}');
+        throw Exception(
+            'Failed to update kegiatan: ${errorData['message'] ?? response.statusCode}');
       }
     } catch (e) {
+      if (!mounted) return;
+
+      // Tutup loading dialog jika error
+      Navigator.pop(context);
+
       if (!mounted) return;
       _showErrorPopup('Gagal memperbarui kegiatan: $e');
     }
@@ -286,30 +366,77 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
         _redirectToLogin();
         return;
       }
+
       final response = await http.delete(
         Uri.parse('${dotenv.env['API_BASE_URL']}/api/kegiatan-pkl/$id'),
         headers: {'Authorization': 'Bearer $token'},
       );
+
       if (response.statusCode == 200) {
+        // Tutup loading dialog terlebih dahulu
+        if (mounted) Navigator.pop(context);
+
+        // Langsung fetch data ulang tanpa perlu parse response body
         await _fetchKegiatanPkl();
+
+        if (!mounted) return;
+
+        // Beri jeda kecil untuk memastikan fetch selesai
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        if (!mounted) return;
+        _showSuccessPopup('Kegiatan berhasil dihapus');
+      } else if (response.statusCode == 204) {
+        // Status 204 No Content juga berarti sukses tanpa body
+        if (mounted) Navigator.pop(context);
+        await _fetchKegiatanPkl();
+
+        if (!mounted) return;
+        await Future.delayed(const Duration(milliseconds: 100));
+
         if (!mounted) return;
         _showSuccessPopup('Kegiatan berhasil dihapus');
       } else if (response.statusCode == 401) {
         _redirectToLogin();
       } else {
-        final errorData = json.decode(response.body);
-        throw Exception('Failed to delete kegiatan: ${errorData['message'] ?? response.statusCode}');
+        // Hanya parse JSON jika response tidak kosong
+        String errorMessage =
+            'Failed to delete kegiatan: ${response.statusCode}';
+
+        if (response.body.isNotEmpty) {
+          try {
+            final errorData = json.decode(response.body);
+            errorMessage =
+                errorData['message'] ?? errorData['error'] ?? errorMessage;
+          } catch (e) {
+            // Abaikan error parsing
+          }
+        }
+
+        throw Exception(errorMessage);
       }
     } catch (e) {
+      print('❌ Error deleting kegiatan: $e');
+
       if (!mounted) return;
-      _showErrorPopup('Gagal menghapus kegiatan: $e');
+
+      // Tutup loading dialog jika masih ada
+      try {
+        Navigator.pop(context);
+      } catch (e) {
+        // Abaikan jika dialog sudah tidak ada
+      }
+
+      if (!mounted) return;
+      _showErrorPopup('Gagal menghapus kegiatan: ${e.toString()}');
     }
   }
 
   void _initializeEvents() {
     _events.clear();
     for (var kegiatan in _allKegiatan) {
-      final dateKey = DateTime(kegiatan.tanggalMulai.year, kegiatan.tanggalMulai.month, kegiatan.tanggalMulai.day);
+      final dateKey = DateTime(kegiatan.tanggalMulai.year,
+          kegiatan.tanggalMulai.month, kegiatan.tanggalMulai.day);
       if (_events.containsKey(dateKey)) {
         _events[dateKey]!.add(kegiatan);
       } else {
@@ -353,7 +480,12 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.15), blurRadius: 24, offset: const Offset(0, 12))],
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12))
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -361,24 +493,37 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
               Container(
                 width: 60,
                 height: 60,
-                decoration: BoxDecoration(color: _greenColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(30)),
-                child: const Icon(Icons.check_circle, color: _greenColor, size: 36),
+                decoration: BoxDecoration(
+                    color: _greenColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(30)),
+                child: const Icon(Icons.check_circle,
+                    color: _greenColor, size: 36),
               ),
               const SizedBox(height: 16),
-              const Text('Berhasil!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+              const Text('Berhasil!',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87)),
               const SizedBox(height: 8),
-              Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: _textSecondary)),
+              Text(message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: _textSecondary)),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primaryColor,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   elevation: 2,
                 ),
-                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                child: const Text('OK',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
             ],
           ),
@@ -399,7 +544,12 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.15), blurRadius: 24, offset: const Offset(0, 12))],
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12))
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -407,30 +557,59 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
               Container(
                 width: 60,
                 height: 60,
-                decoration: BoxDecoration(color: _redColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(30)),
-                child: const Icon(Icons.error_outline, color: _redColor, size: 36),
+                decoration: BoxDecoration(
+                    color: _redColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(30)),
+                child:
+                    const Icon(Icons.error_outline, color: _redColor, size: 36),
               ),
               const SizedBox(height: 16),
-              const Text('Terjadi Kesalahan', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+              const Text('Terjadi Kesalahan',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87)),
               const SizedBox(height: 8),
-              Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: _textSecondary)),
+              Text(message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: _textSecondary)),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _primaryColor,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   elevation: 2,
                 ),
-                child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                child: const Text('OK',
+                    style:
+                        TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  // FUNGSI UNTUK MENERJEMAHKAN JENIS KEGIATAN KE TAMPILAN
+  String _getJenisText(String jenis) {
+    switch (jenis) {
+      case 'Pembekalan':
+        return 'Pengantaran'; // Pembekalan ditampilkan sebagai Pengantaran
+      case 'Monitoring1':
+        return 'Monitoring 1';
+      case 'Monitoring2':
+        return 'Monitoring 2';
+      case 'Penjemputan':
+        return 'Penjemputan';
+      default:
+        return jenis;
+    }
   }
 
   void _showCreateKegiatanDialog() {
@@ -444,7 +623,8 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             backgroundColor: Colors.transparent,
             child: SingleChildScrollView(
               child: Container(
@@ -452,7 +632,12 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.15), blurRadius: 24, offset: const Offset(0, 12))],
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12))
+                  ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -463,149 +648,347 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                         Container(
                           width: 52,
                           height: 52,
-                          decoration: BoxDecoration(color: _primaryColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(16)),
-                          child: const Icon(Icons.add_circle, color: _primaryColor, size: 28),
+                          decoration: BoxDecoration(
+                              color: _primaryColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16)),
+                          child: const Icon(Icons.add_circle,
+                              color: _primaryColor, size: 28),
                         ),
                         const SizedBox(width: 16),
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('BUAT KEGIATAN BARU', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF641E20))),
+                              Text('BUAT KEGIATAN BARU',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF641E20))),
                               SizedBox(height: 4),
-                              Text('Tambahkan jadwal kegiatan PKL baru', style: TextStyle(fontSize: 13, color: _textSecondary, fontWeight: FontWeight.w500)),
+                              Text('Tambahkan jadwal kegiatan PKL baru',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: _textSecondary,
+                                      fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 28),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [Icon(Icons.calendar_today_outlined, color: _primaryColor, size: 18), SizedBox(width: 8), Text('Tanggal Mulai', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87))]),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          final selectedDate = await showDatePicker(context: context, initialDate: tanggalMulai, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 730)), builder: (context, child) => Theme(
-                                data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: _primaryColor, onPrimary: Colors.white, surface: Colors.white, onSurface: Colors.black), dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 10, backgroundColor: Colors.white)),
-                                child: child!,
-                              ));
-                          if (selectedDate != null) {
-                            setState(() {
-                              tanggalMulai = selectedDate;
-                              if (tanggalSelesai.isBefore(selectedDate)) tanggalSelesai = selectedDate;
-                            });
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-                          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Text(_formatDateIndonesian(tanggalMulai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
-                            const Icon(Icons.calendar_month, color: _primaryColor, size: 24),
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(children: [
+                            Icon(Icons.calendar_today_outlined,
+                                color: _primaryColor, size: 18),
+                            SizedBox(width: 8),
+                            Text('Tanggal Mulai',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87))
                           ]),
-                        ),
-                      ),
-                    ]),
-                    const SizedBox(height: 20),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [Icon(Icons.calendar_today, color: _primaryColor, size: 18), SizedBox(width: 8), Text('Tanggal Selesai', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87))]),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          final selectedDate = await showDatePicker(context: context, initialDate: tanggalSelesai, firstDate: tanggalMulai, lastDate: DateTime.now().add(const Duration(days: 730)), builder: (context, child) => Theme(
-                                data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: _primaryColor, onPrimary: Colors.white, surface: Colors.white, onSurface: Colors.black), dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 10, backgroundColor: Colors.white)),
-                                child: child!,
-                              ));
-                          if (selectedDate != null) {
-                            setState(() => tanggalSelesai = selectedDate);
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-                          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Text(_formatDateIndonesian(tanggalSelesai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
-                            const Icon(Icons.calendar_month, color: _primaryColor, size: 24),
-                          ]),
-                        ),
-                      ),
-                    ]),
-                    const SizedBox(height: 20),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [Icon(Icons.category_outlined, color: _primaryColor, size: 18), SizedBox(width: 8), Text('Jenis Kegiatan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87))]),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: jenisKegiatan,
-                            isExpanded: true,
-                            icon: const Padding(padding: EdgeInsets.only(right: 12), child: Icon(Icons.arrow_drop_down, color: _primaryColor, size: 24)),
-                            dropdownColor: Colors.white,
-                            elevation: 4,
-                            style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500),
-                            items: _validJenisKegiatan.map((jenis) {
-                              Color itemColor;
-                              String label;
-                              switch (jenis) {
-                                case 'Pembekalan':
-                                  itemColor = _primaryColor;
-                                  label = 'Pembekalan';
-                                  break;
-                                case 'Monitoring1':
-                                  itemColor = _greenColor;
-                                  label = 'Monitoring 1';
-                                  break;
-                                case 'Monitoring2':
-                                  itemColor = _blueColor;
-                                  label = 'Monitoring 2';
-                                  break;
-                                case 'Penjemputan':
-                                  itemColor = _purpleColor;
-                                  label = 'Penjemputan';
-                                  break;
-                                default:
-                                  itemColor = _primaryColor;
-                                  label = jenis;
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () async {
+                              final selectedDate = await showDatePicker(
+                                  context: context,
+                                  initialDate: tanggalMulai,
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now()
+                                      .add(const Duration(days: 730)),
+                                  builder: (context, child) => Theme(
+                                        data: Theme.of(context).copyWith(
+                                            colorScheme:
+                                                const ColorScheme.light(
+                                                    primary: _primaryColor,
+                                                    onPrimary: Colors.white,
+                                                    surface: Colors.white,
+                                                    onSurface: Colors.black),
+                                            dialogTheme: DialogThemeData(
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            20)),
+                                                elevation: 10,
+                                                backgroundColor: Colors.white)),
+                                        child: child!,
+                                      ));
+                              if (selectedDate != null) {
+                                setState(() {
+                                  tanggalMulai = selectedDate;
+                                  if (tanggalSelesai.isBefore(selectedDate)) {
+                                    tanggalSelesai = selectedDate;
+                                  }
+                                });
                               }
-                              return DropdownMenuItem<String>(
-                                value: jenis,
-                                child: Container(padding: const EdgeInsets.symmetric(vertical: 12), child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                  Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 12), decoration: BoxDecoration(color: itemColor, shape: BoxShape.circle)),
-                                  Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
-                                ])),
-                              );
-                            }).toList(),
-                            onChanged: (value) => setState(() => jenisKegiatan = value ?? 'Pembekalan'),
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 16),
+                              decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: _borderColor, width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4))
+                                  ]),
+                              child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(_formatDateIndonesian(tanggalMulai),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                            color: Colors.black87)),
+                                    const Icon(Icons.calendar_month,
+                                        color: _primaryColor, size: 24),
+                                  ]),
+                            ),
                           ),
-                        ),
-                      ),
-                    ]),
+                        ]),
                     const SizedBox(height: 20),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [Icon(Icons.description_outlined, color: _primaryColor, size: 18), SizedBox(width: 8), Text('Deskripsi Kegiatan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87))]),
-                      const SizedBox(height: 8),
-                      Container(
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-                        child: TextField(
-                          maxLines: 4,
-                          minLines: 3,
-                          decoration: const InputDecoration(contentPadding: EdgeInsets.all(16), hintText: 'Masukkan deskripsi kegiatan...', hintStyle: TextStyle(color: Colors.grey, fontSize: 14), border: InputBorder.none),
-                          onChanged: (value) => deskripsi = value,
-                          style: const TextStyle(fontSize: 14, color: Colors.black87),
-                        ),
-                      ),
-                    ]),
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(children: [
+                            Icon(Icons.calendar_today,
+                                color: _primaryColor, size: 18),
+                            SizedBox(width: 8),
+                            Text('Tanggal Selesai',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87))
+                          ]),
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () async {
+                              final selectedDate = await showDatePicker(
+                                  context: context,
+                                  initialDate: tanggalSelesai,
+                                  firstDate: tanggalMulai,
+                                  lastDate: DateTime.now()
+                                      .add(const Duration(days: 730)),
+                                  builder: (context, child) => Theme(
+                                        data: Theme.of(context).copyWith(
+                                            colorScheme:
+                                                const ColorScheme.light(
+                                                    primary: _primaryColor,
+                                                    onPrimary: Colors.white,
+                                                    surface: Colors.white,
+                                                    onSurface: Colors.black),
+                                            dialogTheme: DialogThemeData(
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            20)),
+                                                elevation: 10,
+                                                backgroundColor: Colors.white)),
+                                        child: child!,
+                                      ));
+                              if (selectedDate != null) {
+                                setState(() => tanggalSelesai = selectedDate);
+                              }
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 16),
+                              decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: _borderColor, width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4))
+                                  ]),
+                              child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(_formatDateIndonesian(tanggalSelesai),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                            color: Colors.black87)),
+                                    const Icon(Icons.calendar_month,
+                                        color: _primaryColor, size: 24),
+                                  ]),
+                            ),
+                          ),
+                        ]),
+                    const SizedBox(height: 20),
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(children: [
+                            Icon(Icons.category_outlined,
+                                color: _primaryColor, size: 18),
+                            SizedBox(width: 8),
+                            Text('Jenis Kegiatan',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87))
+                          ]),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border:
+                                    Border.all(color: _borderColor, width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4))
+                                ]),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: jenisKegiatan,
+                                isExpanded: true,
+                                icon: const Padding(
+                                    padding: EdgeInsets.only(right: 12),
+                                    child: Icon(Icons.arrow_drop_down,
+                                        color: _primaryColor, size: 24)),
+                                dropdownColor: Colors.white,
+                                elevation: 4,
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w500),
+                                items: _validJenisKegiatan.map((jenis) {
+                                  Color itemColor;
+                                  String label;
+                                  switch (jenis) {
+                                    case 'Pembekalan':
+                                      itemColor = _primaryColor;
+                                      label = 'Pengantaran'; // TAMPILAN: Pengantaran
+                                      break;
+                                    case 'Monitoring1':
+                                      itemColor = _greenColor;
+                                      label = 'Monitoring 1';
+                                      break;
+                                    case 'Monitoring2':
+                                      itemColor = _blueColor;
+                                      label = 'Monitoring 2';
+                                      break;
+                                    case 'Penjemputan':
+                                      itemColor = _purpleColor;
+                                      label = 'Penjemputan';
+                                      break;
+                                    default:
+                                      itemColor = _primaryColor;
+                                      label = jenis;
+                                  }
+                                  return DropdownMenuItem<String>(
+                                    value: jenis, // VALUE tetap Pembekalan untuk DB
+                                    child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                  width: 8,
+                                                  height: 8,
+                                                  margin: const EdgeInsets.only(
+                                                      right: 12),
+                                                  decoration: BoxDecoration(
+                                                      color: itemColor,
+                                                      shape: BoxShape.circle)),
+                                              Text(label, // TAMPILAN: Pengantaran
+                                                  style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Colors.black87)),
+                                            ])),
+                                  );
+                                }).toList(),
+                                onChanged: (value) => setState(() =>
+                                    jenisKegiatan = value ?? 'Pembekalan'),
+                              ),
+                            ),
+                          ),
+                        ]),
+                    const SizedBox(height: 20),
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(children: [
+                            Icon(Icons.description_outlined,
+                                color: _primaryColor, size: 18),
+                            SizedBox(width: 8),
+                            Text('Deskripsi Kegiatan',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87))
+                          ]),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border:
+                                    Border.all(color: _borderColor, width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4))
+                                ]),
+                            child: TextField(
+                              maxLines: 4,
+                              minLines: 3,
+                              decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.all(16),
+                                  hintText: 'Masukkan deskripsi kegiatan...',
+                                  hintStyle: TextStyle(
+                                      color: Colors.grey, fontSize: 14),
+                                  border: InputBorder.none),
+                              onChanged: (value) => deskripsi = value,
+                              style: const TextStyle(
+                                  fontSize: 14, color: Colors.black87),
+                            ),
+                          ),
+                        ]),
                     const SizedBox(height: 32),
                     Row(children: [
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(foregroundColor: _primaryColor, side: const BorderSide(color: _primaryColor, width: 2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), padding: const EdgeInsets.symmetric(vertical: 18), backgroundColor: Colors.white),
-                          child: const Text('BATAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.5)),
+                          style: OutlinedButton.styleFrom(
+                              foregroundColor: _primaryColor,
+                              side: const BorderSide(
+                                  color: _primaryColor, width: 2),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              backgroundColor: Colors.white),
+                          child: const Text('BATAL',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  letterSpacing: 0.5)),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -613,41 +996,82 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                         child: ElevatedButton(
                           onPressed: () async {
                             if (deskripsi.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: const Text('Deskripsi tidak boleh kosong', style: TextStyle(fontWeight: FontWeight.w600)),
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                content: const Text(
+                                    'Deskripsi tidak boleh kosong',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w600)),
                                 backgroundColor: _redColor,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
                               ));
                               return;
                             }
+
                             if (tanggalSelesai.isBefore(tanggalMulai)) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: const Text('Tanggal selesai harus setelah tanggal mulai', style: TextStyle(fontWeight: FontWeight.w600)),
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                content: const Text(
+                                    'Tanggal selesai harus setelah tanggal mulai',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w600)),
                                 backgroundColor: _redColor,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
                               ));
                               return;
                             }
+
                             final data = {
                               'deskripsi': deskripsi,
-                              'jenis_kegiatan': jenisKegiatan,
+                              'jenis_kegiatan': jenisKegiatan, // KIRIM Pembekalan ke DB
                               'tahun_ajaran_id': _tahunAjaranId,
-                              'tanggal_mulai': DateFormat('yyyy-MM-dd').format(tanggalMulai),
-                              'tanggal_selesai': DateFormat('yyyy-MM-dd').format(tanggalSelesai),
+                              'tanggal_mulai':
+                                  DateFormat('yyyy-MM-dd').format(tanggalMulai),
+                              'tanggal_selesai': DateFormat('yyyy-MM-dd')
+                                  .format(tanggalSelesai),
                             };
-                            showDialog(context: context, barrierDismissible: false, builder: (context) => const Center(child: CircularProgressIndicator(color: _primaryColor)));
+
+                            // Tutup dialog form terlebih dahulu
+                            Navigator.pop(context); // Tutup dialog form
+
+                            // Tampilkan loading dialog
+                            showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(
+                                    child: CircularProgressIndicator(
+                                        color: _primaryColor)));
+
                             await _createKegiatanPkl(data);
-                            if (mounted) {
-                              Navigator.pop(context);
-                              Navigator.pop(context);
-                            }
                           },
-                          style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), padding: const EdgeInsets.symmetric(vertical: 18), elevation: 4, shadowColor: _primaryColor.withValues(alpha:0.4)),
-                          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.check_circle_outline, size: 20), SizedBox(width: 8), Text('SIMPAN', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.5))]),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: _primaryColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              elevation: 4,
+                              shadowColor:
+                                  _primaryColor.withValues(alpha: 0.4)),
+                          child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle_outline, size: 20),
+                                SizedBox(width: 8),
+                                Text('SIMPAN',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        letterSpacing: 0.5))
+                              ]),
                         ),
                       ),
                     ]),
@@ -672,7 +1096,8 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             backgroundColor: Colors.transparent,
             child: SingleChildScrollView(
               child: Container(
@@ -680,7 +1105,12 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.15), blurRadius: 24, offset: const Offset(0, 12))],
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12))
+                  ],
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -691,150 +1121,349 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                         Container(
                           width: 52,
                           height: 52,
-                          decoration: BoxDecoration(color: _primaryColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(16)),
-                          child: const Icon(Icons.edit, color: _primaryColor, size: 28),
+                          decoration: BoxDecoration(
+                              color: _primaryColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(16)),
+                          child: const Icon(Icons.edit,
+                              color: _primaryColor, size: 28),
                         ),
                         const SizedBox(width: 16),
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('EDIT KEGIATAN', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF641E20))),
+                              Text('UBAH KEGIATAN',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF641E20))),
                               SizedBox(height: 4),
-                              Text('Ubah detail kegiatan PKL', style: TextStyle(fontSize: 13, color: _textSecondary, fontWeight: FontWeight.w500)),
+                              Text('Ubah detail kegiatan PKL',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: _textSecondary,
+                                      fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 28),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [Icon(Icons.calendar_today_outlined, color: _primaryColor, size: 18), SizedBox(width: 8), Text('Tanggal Mulai', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87))]),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          final selectedDate = await showDatePicker(context: context, initialDate: tanggalMulai, firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 730)), builder: (context, child) => Theme(
-                                data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: _primaryColor, onPrimary: Colors.white, surface: Colors.white, onSurface: Colors.black), dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 10, backgroundColor: Colors.white)),
-                                child: child!,
-                              ));
-                          if (selectedDate != null) {
-                            setState(() {
-                              tanggalMulai = selectedDate;
-                              if (tanggalSelesai.isBefore(selectedDate)) tanggalSelesai = selectedDate;
-                            });
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-                          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Text(_formatDateIndonesian(tanggalMulai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
-                            const Icon(Icons.calendar_month, color: _primaryColor, size: 24),
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(children: [
+                            Icon(Icons.calendar_today_outlined,
+                                color: _primaryColor, size: 18),
+                            SizedBox(width: 8),
+                            Text('Tanggal Mulai',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87))
                           ]),
-                        ),
-                      ),
-                    ]),
-                    const SizedBox(height: 20),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [Icon(Icons.calendar_today, color: _primaryColor, size: 18), SizedBox(width: 8), Text('Tanggal Selesai', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87))]),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          final selectedDate = await showDatePicker(context: context, initialDate: tanggalSelesai, firstDate: tanggalMulai, lastDate: DateTime.now().add(const Duration(days: 730)), builder: (context, child) => Theme(
-                                data: Theme.of(context).copyWith(colorScheme: const ColorScheme.light(primary: _primaryColor, onPrimary: Colors.white, surface: Colors.white, onSurface: Colors.black), dialogTheme: DialogThemeData(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)), elevation: 10, backgroundColor: Colors.white)),
-                                child: child!,
-                              ));
-                          if (selectedDate != null) {
-                            setState(() => tanggalSelesai = selectedDate);
-                          }
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-                          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                            Text(_formatDateIndonesian(tanggalSelesai), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black87)),
-                            const Icon(Icons.calendar_month, color: _primaryColor, size: 24),
-                          ]),
-                        ),
-                      ),
-                    ]),
-                    const SizedBox(height: 20),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [Icon(Icons.category_outlined, color: _primaryColor, size: 18), SizedBox(width: 8), Text('Jenis Kegiatan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87))]),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: jenisKegiatan,
-                            isExpanded: true,
-                            icon: const Padding(padding: EdgeInsets.only(right: 12), child: Icon(Icons.arrow_drop_down, color: _primaryColor, size: 24)),
-                            dropdownColor: Colors.white,
-                            elevation: 4,
-                            style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500),
-                            items: _validJenisKegiatan.map((jenis) {
-                              Color itemColor;
-                              String label;
-                              switch (jenis) {
-                                case 'Pembekalan':
-                                  itemColor = _primaryColor;
-                                  label = 'Pembekalan';
-                                  break;
-                                case 'Monitoring1':
-                                  itemColor = _greenColor;
-                                  label = 'Monitoring 1';
-                                  break;
-                                case 'Monitoring2':
-                                  itemColor = _blueColor;
-                                  label = 'Monitoring 2';
-                                  break;
-                                case 'Penjemputan':
-                                  itemColor = _purpleColor;
-                                  label = 'Penjemputan';
-                                  break;
-                                default:
-                                  itemColor = _primaryColor;
-                                  label = jenis;
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () async {
+                              final selectedDate = await showDatePicker(
+                                  context: context,
+                                  initialDate: tanggalMulai,
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now()
+                                      .add(const Duration(days: 730)),
+                                  builder: (context, child) => Theme(
+                                        data: Theme.of(context).copyWith(
+                                            colorScheme:
+                                                const ColorScheme.light(
+                                                    primary: _primaryColor,
+                                                    onPrimary: Colors.white,
+                                                    surface: Colors.white,
+                                                    onSurface: Colors.black),
+                                            dialogTheme: DialogThemeData(
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            20)),
+                                                elevation: 10,
+                                                backgroundColor: Colors.white)),
+                                        child: child!,
+                                      ));
+                              if (selectedDate != null) {
+                                setState(() {
+                                  tanggalMulai = selectedDate;
+                                  if (tanggalSelesai.isBefore(selectedDate)) {
+                                    tanggalSelesai = selectedDate;
+                                  }
+                                });
                               }
-                              return DropdownMenuItem<String>(
-                                value: jenis,
-                                child: Container(padding: const EdgeInsets.symmetric(vertical: 12), child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                  Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 12), decoration: BoxDecoration(color: itemColor, shape: BoxShape.circle)),
-                                  Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
-                                ])),
-                              );
-                            }).toList(),
-                            onChanged: (value) => setState(() => jenisKegiatan = value ?? 'Pembekalan'),
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 16),
+                              decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: _borderColor, width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4))
+                                  ]),
+                              child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(_formatDateIndonesian(tanggalMulai),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                            color: Colors.black87)),
+                                    const Icon(Icons.calendar_month,
+                                        color: _primaryColor, size: 24),
+                                  ]),
+                            ),
                           ),
-                        ),
-                      ),
-                    ]),
+                        ]),
                     const SizedBox(height: 20),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [Icon(Icons.description_outlined, color: _primaryColor, size: 18), SizedBox(width: 8), Text('Deskripsi Kegiatan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87))]),
-                      const SizedBox(height: 8),
-                      Container(
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _borderColor, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))]),
-                        child: TextField(
-                          maxLines: 4,
-                          minLines: 3,
-                          controller: TextEditingController(text: deskripsi),
-                          decoration: const InputDecoration(contentPadding: EdgeInsets.all(16), hintText: 'Masukkan deskripsi kegiatan...', hintStyle: TextStyle(color: Colors.grey, fontSize: 14), border: InputBorder.none),
-                          onChanged: (value) => deskripsi = value,
-                          style: const TextStyle(fontSize: 14, color: Colors.black87),
-                        ),
-                      ),
-                    ]),
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(children: [
+                            Icon(Icons.calendar_today,
+                                color: _primaryColor, size: 18),
+                            SizedBox(width: 8),
+                            Text('Tanggal Selesai',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87))
+                          ]),
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: () async {
+                              final selectedDate = await showDatePicker(
+                                  context: context,
+                                  initialDate: tanggalSelesai,
+                                  firstDate: tanggalMulai,
+                                  lastDate: DateTime.now()
+                                      .add(const Duration(days: 730)),
+                                  builder: (context, child) => Theme(
+                                        data: Theme.of(context).copyWith(
+                                            colorScheme:
+                                                const ColorScheme.light(
+                                                    primary: _primaryColor,
+                                                    onPrimary: Colors.white,
+                                                    surface: Colors.white,
+                                                    onSurface: Colors.black),
+                                            dialogTheme: DialogThemeData(
+                                                shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            20)),
+                                                elevation: 10,
+                                                backgroundColor: Colors.white)),
+                                        child: child!,
+                                      ));
+                              if (selectedDate != null) {
+                                setState(() => tanggalSelesai = selectedDate);
+                              }
+                            },
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 16),
+                              decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                      color: _borderColor, width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4))
+                                  ]),
+                              child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(_formatDateIndonesian(tanggalSelesai),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                            color: Colors.black87)),
+                                    const Icon(Icons.calendar_month,
+                                        color: _primaryColor, size: 24),
+                                  ]),
+                            ),
+                          ),
+                        ]),
+                    const SizedBox(height: 20),
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(children: [
+                            Icon(Icons.category_outlined,
+                                color: _primaryColor, size: 18),
+                            SizedBox(width: 8),
+                            Text('Jenis Kegiatan',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87))
+                          ]),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border:
+                                    Border.all(color: _borderColor, width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4))
+                                ]),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: jenisKegiatan,
+                                isExpanded: true,
+                                icon: const Padding(
+                                    padding: EdgeInsets.only(right: 12),
+                                    child: Icon(Icons.arrow_drop_down,
+                                        color: _primaryColor, size: 24)),
+                                dropdownColor: Colors.white,
+                                elevation: 4,
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w500),
+                                items: _validJenisKegiatan.map((jenis) {
+                                  Color itemColor;
+                                  String label;
+                                  switch (jenis) {
+                                    case 'Pembekalan':
+                                      itemColor = _primaryColor;
+                                      label = 'Pengantaran'; // TAMPILAN: Pengantaran
+                                      break;
+                                    case 'Monitoring1':
+                                      itemColor = _greenColor;
+                                      label = 'Monitoring 1';
+                                      break;
+                                    case 'Monitoring2':
+                                      itemColor = _blueColor;
+                                      label = 'Monitoring 2';
+                                      break;
+                                    case 'Penjemputan':
+                                      itemColor = _purpleColor;
+                                      label = 'Penjemputan';
+                                      break;
+                                    default:
+                                      itemColor = _primaryColor;
+                                      label = jenis;
+                                  }
+                                  return DropdownMenuItem<String>(
+                                    value: jenis, // VALUE tetap Pembekalan
+                                    child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 12),
+                                        child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                  width: 8,
+                                                  height: 8,
+                                                  margin: const EdgeInsets.only(
+                                                      right: 12),
+                                                  decoration: BoxDecoration(
+                                                      color: itemColor,
+                                                      shape: BoxShape.circle)),
+                                              Text(label, // TAMPILAN: Pengantaran
+                                                  style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Colors.black87)),
+                                            ])),
+                                  );
+                                }).toList(),
+                                onChanged: (value) => setState(() =>
+                                    jenisKegiatan = value ?? 'Pembekalan'),
+                              ),
+                            ),
+                          ),
+                        ]),
+                    const SizedBox(height: 20),
+                    Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(children: [
+                            Icon(Icons.description_outlined,
+                                color: _primaryColor, size: 18),
+                            SizedBox(width: 8),
+                            Text('Deskripsi Kegiatan',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.black87))
+                          ]),
+                          const SizedBox(height: 8),
+                          Container(
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border:
+                                    Border.all(color: _borderColor, width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4))
+                                ]),
+                            child: TextField(
+                              maxLines: 4,
+                              minLines: 3,
+                              controller:
+                                  TextEditingController(text: deskripsi),
+                              decoration: const InputDecoration(
+                                  contentPadding: EdgeInsets.all(16),
+                                  hintText: 'Masukkan deskripsi kegiatan...',
+                                  hintStyle: TextStyle(
+                                      color: Colors.grey, fontSize: 14),
+                                  border: InputBorder.none),
+                              onChanged: (value) => deskripsi = value,
+                              style: const TextStyle(
+                                  fontSize: 14, color: Colors.black87),
+                            ),
+                          ),
+                        ]),
                     const SizedBox(height: 32),
                     Row(children: [
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(foregroundColor: _primaryColor, side: const BorderSide(color: _primaryColor, width: 2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), padding: const EdgeInsets.symmetric(vertical: 18), backgroundColor: Colors.white),
-                          child: const Text('BATAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.5)),
+                          style: OutlinedButton.styleFrom(
+                              foregroundColor: _primaryColor,
+                              side: const BorderSide(
+                                  color: _primaryColor, width: 2),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              backgroundColor: Colors.white),
+                          child: const Text('BATAL',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  letterSpacing: 0.5)),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -842,41 +1471,78 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                         child: ElevatedButton(
                           onPressed: () async {
                             if (deskripsi.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: const Text('Deskripsi tidak boleh kosong', style: TextStyle(fontWeight: FontWeight.w600)),
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                content: const Text(
+                                    'Deskripsi tidak boleh kosong',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w600)),
                                 backgroundColor: _redColor,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
                               ));
                               return;
                             }
                             if (tanggalSelesai.isBefore(tanggalMulai)) {
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content: const Text('Tanggal selesai harus setelah tanggal mulai', style: TextStyle(fontWeight: FontWeight.w600)),
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                content: const Text(
+                                    'Tanggal selesai harus setelah tanggal mulai',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w600)),
                                 backgroundColor: _redColor,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
                               ));
                               return;
                             }
                             final data = {
                               'deskripsi': deskripsi,
-                              'jenis_kegiatan': jenisKegiatan,
+                              'jenis_kegiatan': jenisKegiatan, // KIRIM Pembekalan ke DB
                               'tahun_ajaran_id': _tahunAjaranId,
-                              'tanggal_mulai': DateFormat('yyyy-MM-dd').format(tanggalMulai),
-                              'tanggal_selesai': DateFormat('yyyy-MM-dd').format(tanggalSelesai),
+                              'tanggal_mulai':
+                                  DateFormat('yyyy-MM-dd').format(tanggalMulai),
+                              'tanggal_selesai': DateFormat('yyyy-MM-dd')
+                                  .format(tanggalSelesai),
                             };
-                            showDialog(context: context, barrierDismissible: false, builder: (context) => const Center(child: CircularProgressIndicator(color: _primaryColor)));
+                            showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(
+                                    child: CircularProgressIndicator(
+                                        color: _primaryColor)));
                             await _updateKegiatanPkl(kegiatan.id, data);
                             if (mounted) {
                               Navigator.pop(context);
                               Navigator.pop(context);
                             }
                           },
-                          style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)), padding: const EdgeInsets.symmetric(vertical: 18), elevation: 4, shadowColor: _primaryColor.withValues(alpha:0.4)),
-                          child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.check_circle_outline, size: 20), SizedBox(width: 8), Text('UPDATE', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.5))]),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: _primaryColor,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              elevation: 4,
+                              shadowColor:
+                                  _primaryColor.withValues(alpha: 0.4)),
+                          child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.check_circle_outline, size: 20),
+                                SizedBox(width: 8),
+                                Text('PERBARUI',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                        letterSpacing: 0.5))
+                              ]),
                         ),
                       ),
                     ]),
@@ -901,7 +1567,12 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(24),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.15), blurRadius: 24, offset: const Offset(0, 12))],
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12))
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -909,18 +1580,36 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
               Container(
                 width: 60,
                 height: 60,
-                decoration: BoxDecoration(color: _primaryColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(30)),
-                child: const Icon(Icons.delete_outline, color: _primaryColor, size: 36),
+                decoration: BoxDecoration(
+                    color: _primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(30)),
+                child: const Icon(Icons.delete_outline,
+                    color: _primaryColor, size: 36),
               ),
               const SizedBox(height: 16),
-              const Text('Konfirmasi Hapus', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+              const Text('Konfirmasi Hapus',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.black87)),
               const SizedBox(height: 12),
-              const Text('Apakah Anda yakin ingin menghapus kegiatan:', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: _textSecondary)),
+              const Text('Apakah Anda yakin ingin menghapus kegiatan:',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: _textSecondary)),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: _primaryColor.withValues(alpha:0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: _primaryColor.withValues(alpha:0.1))),
-                child: Text('"${kegiatan.deskripsi}"', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600, color: _primaryColor, fontSize: 15)),
+                decoration: BoxDecoration(
+                    color: _primaryColor.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: _primaryColor.withValues(alpha: 0.1))),
+                child: Text('"${kegiatan.deskripsi}"',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: _primaryColor,
+                        fontSize: 15)),
               ),
               const SizedBox(height: 24),
               Row(
@@ -928,24 +1617,54 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(foregroundColor: _primaryColor, side: const BorderSide(color: _primaryColor, width: 2), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 14), backgroundColor: Colors.white),
-                      child: const Text('BATAL', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      style: OutlinedButton.styleFrom(
+                          foregroundColor: _primaryColor,
+                          side:
+                              const BorderSide(color: _primaryColor, width: 2),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: Colors.white),
+                      child: const Text('BATAL',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 14)),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
+                        // Tutup dialog konfirmasi
                         Navigator.pop(context);
-                        showDialog(context: context, barrierDismissible: false, builder: (context) => const Center(child: CircularProgressIndicator(color: _primaryColor)));
-                        try {
-                          await _deleteKegiatanPkl(kegiatan.id);
-                        } finally {
-                          if (mounted) Navigator.pop(context);
-                        }
+
+                        // Beri sedikit jeda
+                        await Future.delayed(const Duration(milliseconds: 50));
+
+                        if (!mounted) return;
+
+                        // Tampilkan loading dialog
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const Center(
+                            child:
+                                CircularProgressIndicator(color: _primaryColor),
+                          ),
+                        );
+
+                        // Panggil method delete
+                        await _deleteKegiatanPkl(kegiatan.id);
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: _primaryColor, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(vertical: 14), elevation: 2),
-                      child: const Text('HAPUS', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 2),
+                      child: const Text('HAPUS',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 14)),
                     ),
                   ),
                 ],
@@ -959,7 +1678,9 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
 
   bool _isToday(DateTime date) {
     final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 
   bool _isSelected(DateTime date) {
@@ -999,6 +1720,7 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
     }
   }
 
+  // Fungsi untuk mendapatkan warna berdasarkan status (tetap pakai value dari DB)
   Color _getStatusColor(String status) {
     switch (status) {
       case 'active':
@@ -1012,28 +1734,46 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
     }
   }
 
+  // Fungsi untuk menerjemahkan status ke Bahasa Indonesia (UNTUK TAMPILAN UI)
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'active':
+        return 'Aktif';
+      case 'completed':
+        return 'Selesai';
+      case 'pending':
+        return 'Tertunda';
+      default:
+        return status;
+    }
+  }
+
   String _formatDateForDisplay(DateTime date) {
-    return _formatDateIndonesian(date); // Gunakan format Indonesia
+    return _formatDateIndonesian(date);
   }
 
   List<KegiatanPkl> _getKegiatanForDay(DateTime day) {
     final dateKey = DateTime(day.year, day.month, day.day);
     final dayKegiatan = _events[dateKey] ?? [];
     if (_selectedFilter == 'SEMUA') return dayKegiatan;
-    return dayKegiatan.where((kegiatan) => kegiatan.jenisKegiatan == _selectedFilter).toList();
+    return dayKegiatan
+        .where((kegiatan) => kegiatan.jenisKegiatan == _selectedFilter)
+        .toList();
   }
 
   List<KegiatanPkl> _getUpcomingKegiatan() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     List<KegiatanPkl> upcomingKegiatan = _allKegiatan
-        .where((kegiatan) =>
-            DateTime(kegiatan.tanggalMulai.year, kegiatan.tanggalMulai.month, kegiatan.tanggalMulai.day)
-                .isAfter(today.subtract(const Duration(days: 1))))
+        .where((kegiatan) => DateTime(kegiatan.tanggalMulai.year,
+                kegiatan.tanggalMulai.month, kegiatan.tanggalMulai.day)
+            .isAfter(today.subtract(const Duration(days: 1))))
         .toList();
     upcomingKegiatan.sort((a, b) => a.tanggalMulai.compareTo(b.tanggalMulai));
     if (_selectedFilter != 'SEMUA') {
-      upcomingKegiatan = upcomingKegiatan.where((kegiatan) => kegiatan.jenisKegiatan == _selectedFilter).toList();
+      upcomingKegiatan = upcomingKegiatan
+          .where((kegiatan) => kegiatan.jenisKegiatan == _selectedFilter)
+          .toList();
     }
     return upcomingKegiatan;
   }
@@ -1049,10 +1789,28 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
     if (_isCheckingToken) {
       return Scaffold(
         backgroundColor: Colors.white,
-        body: Center(child: Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: _primaryColor, width: 2), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.1), blurRadius: 8, offset: const Offset(0, 4))]), child: const CircularProgressIndicator(color: _primaryColor))),
+        body: Center(
+            child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _primaryColor, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4))
+                    ]),
+                child: const CircularProgressIndicator(color: _primaryColor))),
       );
     }
-    if (_isLoading) return const Scaffold(backgroundColor: Colors.white, body: Center(child: CircularProgressIndicator(color: _primaryColor)));
+    if (_isLoading) {
+      return const Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(child: CircularProgressIndicator(color: _primaryColor)));
+    }
     if (_errorMessage.isNotEmpty) {
       return Scaffold(
         backgroundColor: Colors.white,
@@ -1060,16 +1818,27 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             const Icon(Icons.error_outline, color: _redColor, size: 64),
             const SizedBox(height: 16),
-            Text(_errorMessage, style: const TextStyle(color: _redColor), textAlign: TextAlign.center),
+            Text(_errorMessage,
+                style: const TextStyle(color: _redColor),
+                textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            ElevatedButton(onPressed: _fetchKegiatanPkl, style: ElevatedButton.styleFrom(backgroundColor: _primaryColor), child: const Text('Coba Lagi')),
+            ElevatedButton(
+                onPressed: _fetchKegiatanPkl,
+                style: ElevatedButton.styleFrom(backgroundColor: _primaryColor),
+                child: const Text('Coba Lagi')),
           ]),
         ),
       );
     }
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: Container(margin: const EdgeInsets.only(top: 650), child: FloatingActionButton(onPressed: _showCreateKegiatanDialog, backgroundColor: _primaryColor, elevation: 4, child: const Icon(Icons.add, color: Colors.white, size: 28))),
+      floatingActionButton: Container(
+          margin: const EdgeInsets.only(top: 650),
+          child: FloatingActionButton(
+              onPressed: _showCreateKegiatanDialog,
+              backgroundColor: _primaryColor,
+              elevation: 4,
+              child: const Icon(Icons.add, color: Colors.white, size: 28))),
       floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
       body: SafeArea(
         child: RefreshIndicator(
@@ -1083,60 +1852,173 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _borderColor), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.08), blurRadius: 16, offset: const Offset(0, 6))]),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Kalender Kegiatan', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF641E20))),
-                      SizedBox(height: 4),
-                      Text('PKL Tahun Ajaran 2026', style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6))
                     ]),
-                    Row(children: [
-                      IconButton(
-                        onPressed: _goToToday,
-                        icon: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _primaryColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: _primaryColor.withValues(alpha:0.3))), child: const Icon(Icons.today, color: _primaryColor, size: 20)),
-                      ),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Kalender Kegiatan',
+                                      style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF641E20))),
+                                  SizedBox(height: 4),
+                                  Text('PKL Tahun Ajaran 2026',
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.w500)),
+                                ]),
+                            Row(children: [
+                              IconButton(
+                                onPressed: _goToToday,
+                                icon: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                        color: _primaryColor.withValues(
+                                            alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: _primaryColor.withValues(
+                                                alpha: 0.3))),
+                                    child: const Icon(Icons.today,
+                                        color: _primaryColor, size: 20)),
+                              ),
+                            ]),
+                          ]),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                                color: _primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color:
+                                        _primaryColor.withValues(alpha: 0.2))),
+                            child: Text('${_allKegiatan.length} Total Kegiatan',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _primaryColor))),
+                        const SizedBox(width: 8),
+                        Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                                color: _greenColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: _greenColor.withValues(alpha: 0.2))),
+                            child: Text(
+                                '${_getUpcomingKegiatan().length} Akan Datang',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _greenColor))),
+                      ]),
                     ]),
-                  ]),
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: _primaryColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: _primaryColor.withValues(alpha:0.2))), child: Text('${_allKegiatan.length} Total Kegiatan', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _primaryColor))),
-                    const SizedBox(width: 8),
-                    Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: _greenColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: _greenColor.withValues(alpha:0.2))), child: Text('${_getUpcomingKegiatan().length} Akan Datang', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _greenColor))),
-                  ]),
-                ]),
               ),
               const SizedBox(height: 20),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _borderColor), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.08), blurRadius: 18, offset: const Offset(0, 8))]),
-                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  _buildNavButton(icon: Icons.chevron_left, onPressed: _goToPreviousMonth),
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(gradient: LinearGradient(colors: [_primaryColor.withValues(alpha:0.05), _primaryColor.withValues(alpha:0.05)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.circular(16), border: Border.all(color: _primaryColor.withValues(alpha:0.2))),
-                      child: Center(child: Text(_currentMonth.toUpperCase(), style: const TextStyle(color: _primaryColor, fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: 1.2))),
-                    ),
-                  ),
-                  _buildNavButton(icon: Icons.chevron_right, onPressed: _goToNextMonth),
-                ]),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8))
+                    ]),
+                child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildNavButton(
+                          icon: Icons.chevron_left,
+                          onPressed: _goToPreviousMonth),
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                  colors: [
+                                    _primaryColor.withValues(alpha: 0.05),
+                                    _primaryColor.withValues(alpha: 0.05)
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                  color: _primaryColor.withValues(alpha: 0.2))),
+                          child: Center(
+                              child: Text(_currentMonth.toUpperCase(),
+                                  style: const TextStyle(
+                                      color: _primaryColor,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 18,
+                                      letterSpacing: 1.2))),
+                        ),
+                      ),
+                      _buildNavButton(
+                          icon: Icons.chevron_right, onPressed: _goToNextMonth),
+                    ]),
               ),
               const SizedBox(height: 10),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _borderColor), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.08), blurRadius: 18, offset: const Offset(0, 8))]),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8))
+                    ]),
                 child: Column(children: [
-                  Row(children: ['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day) => Expanded(child: Center(child: Text(day, style: const TextStyle(fontWeight: FontWeight.w800, color: _textSecondary, fontSize: 14))))).toList()),
+                  Row(
+                      children: ['M', 'S', 'S', 'R', 'K', 'J', 'S']
+                          .map((day) => Expanded(
+                              child: Center(
+                                  child: Text(day,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          color: _textSecondary,
+                                          fontSize: 14)))))
+                          .toList()),
                   const SizedBox(height: 12),
-                  Column(children: _calendarDays.map((week) {
+                  Column(
+                      children: _calendarDays.map((week) {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
-                      child: Row(children: week.map((date) {
-                        if (date == null) return Expanded(child: Container(margin: const EdgeInsets.all(4), height: 50));
+                      child: Row(
+                          children: week.map((date) {
+                        if (date == null) {
+                          return Expanded(
+                              child: Container(
+                                  margin: const EdgeInsets.all(4), height: 50));
+                        }
                         final isCurrentMonth = _isCurrentMonth(date);
                         final hasEvent = _hasEvent(date);
                         final isToday = _isToday(date);
@@ -1148,7 +2030,8 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                               setState(() {
                                 _selectedDate = date;
                                 if (!isCurrentMonth) {
-                                  _currentDate = DateTime(date.year, date.month, 1);
+                                  _currentDate =
+                                      DateTime(date.year, date.month, 1);
                                   _generateCalendar();
                                 }
                               });
@@ -1162,20 +2045,72 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
                                     : isSelected
                                         ? _primaryColor
                                         : isToday
-                                            ? _yellowColor.withValues(alpha:0.15)
+                                            ? _yellowColor.withValues(
+                                                alpha: 0.15)
                                             : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: isPastDay ? Colors.grey[200]! : isSelected ? _primaryColor : isToday ? _yellowColor : Colors.grey[200]!, width: isPastDay ? 1 : isSelected ? 2 : (isToday ? 1.5 : 1)),
-                                boxShadow: isSelected ? [BoxShadow(color: _primaryColor.withValues(alpha:0.3), blurRadius: 6, offset: const Offset(0, 3))] : null,
+                                border: Border.all(
+                                    color: isPastDay
+                                        ? Colors.grey[200]!
+                                        : isSelected
+                                            ? _primaryColor
+                                            : isToday
+                                                ? _yellowColor
+                                                : Colors.grey[200]!,
+                                    width: isPastDay
+                                        ? 1
+                                        : isSelected
+                                            ? 2
+                                            : (isToday ? 1.5 : 1)),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                            color: _primaryColor.withValues(
+                                                alpha: 0.3),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 3))
+                                      ]
+                                    : null,
                               ),
-                              child: Stack(alignment: Alignment.center, children: [
-                                Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                  Text(date.day.toString(), style: TextStyle(fontSize: 16, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600, color: isPastDay ? _pastDayTextColor : isSelected ? Colors.white : isCurrentMonth ? Colors.black : Colors.grey[400])),
-                                  if (hasEvent && isPastDay)
-                                    Container(margin: const EdgeInsets.only(top: 2), width: 6, height: 6, decoration: const BoxDecoration(color: _pastDayTextColor, shape: BoxShape.circle)),
-                                  if (hasEvent && !isPastDay)
-                                    Container(margin: const EdgeInsets.only(top: 2), width: 6, height: 6, decoration: BoxDecoration(color: isSelected ? Colors.white : _primaryColor, shape: BoxShape.circle)),
-                                ]),
+                              child:
+                                  Stack(alignment: Alignment.center, children: [
+                                Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(date.day.toString(),
+                                          style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w600,
+                                              color: isPastDay
+                                                  ? _pastDayTextColor
+                                                  : isSelected
+                                                      ? Colors.white
+                                                      : isCurrentMonth
+                                                          ? Colors.black
+                                                          : Colors.grey[400])),
+                                      if (hasEvent && isPastDay)
+                                        Container(
+                                            margin:
+                                                const EdgeInsets.only(top: 2),
+                                            width: 6,
+                                            height: 6,
+                                            decoration: const BoxDecoration(
+                                                color: _pastDayTextColor,
+                                                shape: BoxShape.circle)),
+                                      if (hasEvent && !isPastDay)
+                                        Container(
+                                            margin:
+                                                const EdgeInsets.only(top: 2),
+                                            width: 6,
+                                            height: 6,
+                                            decoration: BoxDecoration(
+                                                color: isSelected
+                                                    ? Colors.white
+                                                    : _primaryColor,
+                                                shape: BoxShape.circle)),
+                                    ]),
                               ]),
                             ),
                           ),
@@ -1189,127 +2124,405 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _borderColor), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.08), blurRadius: 18, offset: const Offset(0, 8))]),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Filter Jenis Kegiatan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF641E20))),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(children: _filterOptions.map((filter) {
-                      final isSelected = _selectedFilter == filter;
-                      return GestureDetector(
-                        onTap: () => setState(() => _selectedFilter = filter),
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(color: isSelected ? _getJenisColor(filter) : Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: isSelected ? _getJenisColor(filter) : _borderColor, width: isSelected ? 2 : 1), boxShadow: isSelected ? [BoxShadow(color: _getJenisColor(filter).withValues(alpha:0.3), blurRadius: 6, offset: const Offset(0, 3))] : null),
-                          child: Row(children: [
-                            if (filter != 'SEMUA') Container(width: 8, height: 8, margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: isSelected ? Colors.white : _getJenisColor(filter), shape: BoxShape.circle)),
-                            Text(filter, style: TextStyle(fontSize: 13, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? Colors.white : Colors.black)),
-                          ]),
-                        ),
-                      );
-                    }).toList()),
-                  ),
-                ]),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8))
+                    ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Filter Jenis Kegiatan',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF641E20))),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                            children: _filterOptions.map((filter) {
+                          final isSelected = _selectedFilter == filter;
+                          return GestureDetector(
+                            onTap: () =>
+                                setState(() => _selectedFilter = filter),
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? _getJenisColor(filter)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: isSelected
+                                          ? _getJenisColor(filter)
+                                          : _borderColor,
+                                      width: isSelected ? 2 : 1),
+                                  boxShadow: isSelected
+                                      ? [
+                                          BoxShadow(
+                                              color: _getJenisColor(filter)
+                                                  .withValues(alpha: 0.3),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 3))
+                                        ]
+                                      : null),
+                              child: Row(children: [
+                                if (filter != 'SEMUA')
+                                  Container(
+                                      width: 8,
+                                      height: 8,
+                                      margin: const EdgeInsets.only(right: 6),
+                                      decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? Colors.white
+                                              : _getJenisColor(filter),
+                                          shape: BoxShape.circle)),
+                                // PERBAIKAN: Tampilkan "Pengantaran" untuk filter Pembekalan
+                                Text(filter == 'Pembekalan' ? 'Pengantaran' : filter,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : Colors.black)),
+                              ]),
+                            ),
+                          );
+                        }).toList()),
+                      ),
+                    ]),
               ),
               const SizedBox(height: 20),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22), border: Border.all(color: _borderColor), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.08), blurRadius: 18, offset: const Offset(0, 8))]),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_selectedDate != null ? _formatDateForDisplay(_selectedDate!) : 'Pilih Tanggal', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.black)),
-                      const SizedBox(height: 4),
-                      Text(_getKegiatanForDay(_selectedDate ?? DateTime.now()).isEmpty ? 'Menampilkan jadwal yang akan datang' : '${_getKegiatanForDay(_selectedDate ?? DateTime.now()).length} kegiatan pada hari ini', style: const TextStyle(fontSize: 12, color: _textSecondary)),
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: _borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8))
                     ]),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: _getDisplayedKegiatan().isEmpty ? Colors.grey.withValues(alpha:0.1) : _greenColor.withValues(alpha:0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: _getDisplayedKegiatan().isEmpty ? Colors.grey.withValues(alpha:0.3) : _greenColor.withValues(alpha:0.3))),
-                      child: Text('${_getDisplayedKegiatan().length} Kegiatan', style: TextStyle(color: _getDisplayedKegiatan().isEmpty ? Colors.grey : _greenColor, fontSize: 12, fontWeight: FontWeight.w600)),
-                    ),
-                  ]),
-                  const SizedBox(height: 16),
-                  if (_getDisplayedKegiatan().isEmpty)
-                    Container(
-                      padding: const EdgeInsets.all(40),
-                      decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: _borderColor)),
-                      child: Column(children: [
-                        Icon(Icons.event_available, size: 48, color: Colors.grey[400]),
-                        const SizedBox(height: 12),
-                        const Text('Tidak ada jadwal kegiatan', style: TextStyle(color: Colors.grey, fontSize: 14, fontWeight: FontWeight.w500)),
-                        const SizedBox(height: 8),
-                        Text(_selectedFilter == 'SEMUA' ? 'Belum ada jadwal yang dijadwalkan' : 'Belum ada jadwal ${_selectedFilter.toLowerCase()}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                      ]),
-                    )
-                  else
-                    Column(children: _getDisplayedKegiatan().map((kegiatan) {
-                      final isPastEvent = kegiatan.tanggalMulai.isBefore(DateTime.now());
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isPastEvent ? Colors.grey[300]! : _getJenisColor(kegiatan.jenisKegiatan).withValues(alpha:0.3), width: isPastEvent ? 1 : 1.5),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 8, offset: const Offset(0, 4))],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Row(children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: _getJenisColor(kegiatan.jenisKegiatan).withValues(alpha:isPastEvent ? 0.05 : 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: _getJenisColor(kegiatan.jenisKegiatan).withValues(alpha:isPastEvent ? 0.1 : 0.3))),
-                                child: Text(kegiatan.jenisKegiatan, style: TextStyle(color: isPastEvent ? Colors.grey[600] : _getJenisColor(kegiatan.jenisKegiatan), fontSize: 12, fontWeight: FontWeight.w600)),
-                              ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(color: _getStatusColor(kegiatan.status).withValues(alpha:isPastEvent ? 0.05 : 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: _getStatusColor(kegiatan.status).withValues(alpha:isPastEvent ? 0.1 : 0.3))),
-                                child: Text(isPastEvent ? 'Selesai' : kegiatan.status, style: TextStyle(color: isPastEvent ? Colors.grey[600] : _getStatusColor(kegiatan.status), fontSize: 12, fontWeight: FontWeight.w600)),
-                              ),
-                            ]),
-                            const SizedBox(height: 12),
-                            Text(kegiatan.deskripsi, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: isPastEvent ? Colors.grey[700] : Colors.black)),
-                            const SizedBox(height: 8),
-                            Row(children: [
-                              Icon(Icons.calendar_today, size: 16, color: isPastEvent ? Colors.grey[500] : _textSecondary),
-                              const SizedBox(width: 6),
-                              Text(_formatShortDateIndonesian(kegiatan.tanggalMulai), style: TextStyle(color: isPastEvent ? Colors.grey[600] : _textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-                              if (kegiatan.tanggalSelesai != kegiatan.tanggalMulai) ...[
-                                const SizedBox(width: 8),
-                                Text('-', style: TextStyle(color: isPastEvent ? Colors.grey[500] : _textSecondary)),
-                                const SizedBox(width: 8),
-                                Text(_formatShortDateIndonesian(kegiatan.tanggalSelesai), style: TextStyle(color: isPastEvent ? Colors.grey[600] : _textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
-                              ],
-                              if (isPastEvent)
-                                Container(margin: const EdgeInsets.only(left: 8), padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(4)), child: const Text('Lewat', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.w600))),
-                            ]),
-                            const SizedBox(height: 16),
-                            Row(children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _showEditKegiatanDialog(kegiatan),
-                                  style: OutlinedButton.styleFrom(foregroundColor: _primaryColor, side: BorderSide(color: _primaryColor.withValues(alpha:0.3), width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(vertical: 10), backgroundColor: _primaryColor.withValues(alpha:0.05)),
-                                  child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.edit, size: 16), SizedBox(width: 6), Text('EDIT', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13))]),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _showDeleteConfirmationDialog(kegiatan),
-                                  style: OutlinedButton.styleFrom(foregroundColor: _primaryColor, side: BorderSide(color: _primaryColor.withValues(alpha:0.3), width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)), padding: const EdgeInsets.symmetric(vertical: 10), backgroundColor: _primaryColor.withValues(alpha:0.05)),
-                                  child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.delete, size: 16), SizedBox(width: 6), Text('HAPUS', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13))]),
-                                ),
-                              ),
-                            ]),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                      _selectedDate != null
+                                          ? _formatDateForDisplay(
+                                              _selectedDate!)
+                                          : 'Pilih Tanggal',
+                                      style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.black)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                      _getKegiatanForDay(_selectedDate ??
+                                                  DateTime.now())
+                                              .isEmpty
+                                          ? 'Menampilkan jadwal yang akan datang'
+                                          : '${_getKegiatanForDay(_selectedDate ?? DateTime.now()).length} kegiatan pada hari ini',
+                                      style: const TextStyle(
+                                          fontSize: 12, color: _textSecondary)),
+                                ]),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                  color: _getDisplayedKegiatan().isEmpty
+                                      ? Colors.grey.withValues(alpha: 0.1)
+                                      : _greenColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                      color: _getDisplayedKegiatan().isEmpty
+                                          ? Colors.grey.withValues(alpha: 0.3)
+                                          : _greenColor.withValues(
+                                              alpha: 0.3))),
+                              child: Text(
+                                  '${_getDisplayedKegiatan().length} Kegiatan',
+                                  style: TextStyle(
+                                      color: _getDisplayedKegiatan().isEmpty
+                                          ? Colors.grey
+                                          : _greenColor,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600)),
+                            ),
                           ]),
-                        ),
-                      );
-                    }).toList()),
-                ]),
+                      const SizedBox(height: 16),
+                      if (_getDisplayedKegiatan().isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(40),
+                          decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: _borderColor)),
+                          child: Column(children: [
+                            Icon(Icons.event_available,
+                                size: 48, color: Colors.grey[400]),
+                            const SizedBox(height: 12),
+                            const Text('Tidak ada jadwal kegiatan',
+                                style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500)),
+                            const SizedBox(height: 8),
+                            Text(
+                                _selectedFilter == 'SEMUA'
+                                    ? 'Belum ada jadwal yang dijadwalkan'
+                                    : 'Belum ada jadwal ${_selectedFilter == 'Pembekalan' ? 'pengantaran' : _selectedFilter.toLowerCase()}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    color: Colors.grey, fontSize: 12)),
+                          ]),
+                        )
+                      else
+                        Column(
+                            children: _getDisplayedKegiatan().map((kegiatan) {
+                          final isPastEvent =
+                              kegiatan.tanggalMulai.isBefore(DateTime.now());
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                  color: isPastEvent
+                                      ? Colors.grey[300]!
+                                      : _getJenisColor(kegiatan.jenisKegiatan)
+                                          .withValues(alpha: 0.3),
+                                  width: isPastEvent ? 1 : 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4))
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                            color: _getJenisColor(
+                                                    kegiatan.jenisKegiatan)
+                                                .withValues(
+                                                    alpha: isPastEvent
+                                                        ? 0.05
+                                                        : 0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                                color: _getJenisColor(
+                                                        kegiatan.jenisKegiatan)
+                                                    .withValues(
+                                                        alpha: isPastEvent
+                                                            ? 0.1
+                                                            : 0.3))),
+                                        // PERBAIKAN: Pakai _getJenisText untuk tampilan jenis kegiatan
+                                        child: Text(_getJenisText(kegiatan.jenisKegiatan),
+                                            style: TextStyle(
+                                                color: isPastEvent
+                                                    ? Colors.grey[600]
+                                                    : _getJenisColor(
+                                                        kegiatan.jenisKegiatan),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600)),
+                                      ),
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                            color:
+                                                _getStatusColor(kegiatan.status)
+                                                    .withValues(
+                                                        alpha: isPastEvent
+                                                            ? 0.05
+                                                            : 0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                                color: _getStatusColor(
+                                                        kegiatan.status)
+                                                    .withValues(
+                                                        alpha: isPastEvent
+                                                            ? 0.1
+                                                            : 0.3))),
+                                        child: Text(
+                                            isPastEvent
+                                                ? 'Selesai'
+                                                : _getStatusText(
+                                                    kegiatan.status),
+                                            style: TextStyle(
+                                                color: isPastEvent
+                                                    ? Colors.grey[600]
+                                                    : _getStatusColor(
+                                                        kegiatan.status),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600)),
+                                      ),
+                                    ]),
+                                    const SizedBox(height: 12),
+                                    Text(kegiatan.deskripsi,
+                                        style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: isPastEvent
+                                                ? Colors.grey[700]
+                                                : Colors.black)),
+                                    const SizedBox(height: 8),
+                                    Row(children: [
+                                      Icon(Icons.calendar_today,
+                                          size: 16,
+                                          color: isPastEvent
+                                              ? Colors.grey[500]
+                                              : _textSecondary),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                          _formatShortDateIndonesian(
+                                              kegiatan.tanggalMulai),
+                                          style: TextStyle(
+                                              color: isPastEvent
+                                                  ? Colors.grey[600]
+                                                  : _textSecondary,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600)),
+                                      if (kegiatan.tanggalSelesai !=
+                                          kegiatan.tanggalMulai) ...[
+                                        const SizedBox(width: 8),
+                                        Text('-',
+                                            style: TextStyle(
+                                                color: isPastEvent
+                                                    ? Colors.grey[500]
+                                                    : _textSecondary)),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                            _formatShortDateIndonesian(
+                                                kegiatan.tanggalSelesai),
+                                            style: TextStyle(
+                                                color: isPastEvent
+                                                    ? Colors.grey[600]
+                                                    : _textSecondary,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600)),
+                                      ],
+                                      if (isPastEvent)
+                                        Container(
+                                            margin:
+                                                const EdgeInsets.only(left: 8),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                                color: Colors.grey[200],
+                                                borderRadius:
+                                                    BorderRadius.circular(4)),
+                                            child: const Text('Lewat',
+                                                style: TextStyle(
+                                                    color: Colors.grey,
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.w600))),
+                                    ]),
+                                    const SizedBox(height: 16),
+                                    Row(children: [
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () =>
+                                              _showEditKegiatanDialog(kegiatan),
+                                          style: OutlinedButton.styleFrom(
+                                              foregroundColor: _primaryColor,
+                                              side: BorderSide(
+                                                  color: _primaryColor
+                                                      .withValues(alpha: 0.3),
+                                                  width: 1.5),
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          10)),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 10),
+                                              backgroundColor: _primaryColor
+                                                  .withValues(alpha: 0.05)),
+                                          child: const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.edit, size: 16),
+                                                SizedBox(width: 6),
+                                                Text('UBAH',
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize: 13))
+                                              ]),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () =>
+                                              _showDeleteConfirmationDialog(
+                                                  kegiatan),
+                                          style: OutlinedButton.styleFrom(
+                                              foregroundColor: _primaryColor,
+                                              side: BorderSide(
+                                                  color: _primaryColor
+                                                      .withValues(alpha: 0.3),
+                                                  width: 1.5),
+                                              shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          10)),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 10),
+                                              backgroundColor: _primaryColor
+                                                  .withValues(alpha: 0.05)),
+                                          child: const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(Icons.delete, size: 16),
+                                                SizedBox(width: 6),
+                                                Text('HAPUS',
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        fontSize: 13))
+                                              ]),
+                                        ),
+                                      ),
+                                    ]),
+                                  ]),
+                            ),
+                          );
+                        }).toList()),
+                    ]),
               ),
               const SizedBox(height: 80),
             ]),
@@ -1319,13 +2532,23 @@ class _KoordinatorJadwalState extends State<KoordinatorJadwal> {
     );
   }
 
-  Widget _buildNavButton({required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildNavButton(
+      {required IconData icon, required VoidCallback onPressed}) {
     return GestureDetector(
       onTap: onPressed,
       child: Container(
         width: 44,
         height: 44,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: _borderColor), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha:0.05), blurRadius: 4, offset: const Offset(0, 2))]),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _borderColor),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2))
+            ]),
         child: Center(child: Icon(icon, color: _primaryColor, size: 22)),
       ),
     );

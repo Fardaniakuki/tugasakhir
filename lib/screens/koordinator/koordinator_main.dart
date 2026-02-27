@@ -3,7 +3,8 @@ import 'dashboard/koordinator_dashboard.dart';
 import 'dashboard/koordinator_jadwal.dart';
 import 'dashboard/koordinator_data.dart';
 import 'dashboard/koordinator_pengaturan.dart';
-import 'dashboard/koordinator_perizinan_screen.dart'; // Halaman baru
+import 'dashboard/koordinator_perizinan_screen.dart';
+import 'dashboard/koordinator_generate_surat.dart'; // IMPORT HALAMAN BARU
 
 class KoordinatorMain extends StatefulWidget {
   const KoordinatorMain({super.key});
@@ -25,26 +26,28 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     ScrollController(),
     ScrollController(),
     ScrollController(),
-    ScrollController(), // Tambah controller untuk perizinan
+    ScrollController(),
+    ScrollController(), // TAMBAH CONTROLLER UNTUK GENERATE SURAT (index 5)
   ];
 
   late final List<Widget> _pageBuilders;
 
   // WARNA SAMA PERSIS DENGAN PEMBIMBING
-  final Color _primaryColor = const Color(0xFF641E20); // MAROON/MERAH TUA (sama dengan pembimbing)
+  final Color _primaryColor = const Color(0xFF641E20); // MAROON/MERAH TUA
   final Color _blackColor = Colors.black;
 
   @override
   void initState() {
     super.initState();
     
-    // Inisialisasi page builders
+    // Inisialisasi page builders (SEKARANG 6 HALAMAN)
     _pageBuilders = [
-      _buildDashboardPage(),
-      _buildJadwalPage(),
-      _buildDataPage(),
-      _buildPerizinanPage(), // Ganti pengaturan dengan perizinan
-      _buildPengaturanPage(), // Pengaturan dipindah ke index 4
+      _buildDashboardPage(),      // index 0
+      _buildJadwalPage(),         // index 1
+      _buildDataPage(),           // index 2
+      _buildPerizinanPage(),      // index 3
+      _buildGenerateSuratPage(),  // index 4 - GANTI PENGATURAN DENGAN GENERATE SURAT
+      _buildPengaturanPage(),     // index 5 - PENGATURAN PINDAH KE SINI
     ];
   }
 
@@ -106,10 +109,23 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     );
   }
 
-  // Builder untuk halaman Pengaturan dengan caching sederhana
-  Widget _buildPengaturanPage() {
+  // Builder untuk halaman Generate Surat (BARU)
+  Widget _buildGenerateSuratPage() {
     return _buildCachedPage(
       index: 4,
+      builder: () {
+        return KoordinatorGenerateSurat(
+          key: const ValueKey('generate_surat_page'),
+          scrollController: _scrollControllers[4],
+        );
+      },
+    );
+  }
+
+  // Builder untuk halaman Pengaturan (SEKARANG DI INDEX 5)
+  Widget _buildPengaturanPage() {
+    return _buildCachedPage(
+      index: 5,
       builder: () {
         return const KoordinatorPengaturan(
           key: ValueKey('pengaturan_page'),
@@ -276,9 +292,17 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
             label: 'Perizinan',
           ),
 
-          // Menu 5: Pengaturan
+          // Menu 5: Generate Surat (BARU)
           _buildTabItem(
             index: 4,
+            icon: Icons.description_outlined,
+            activeIcon: Icons.description,
+            label: 'Buat Surat',
+          ),
+
+          // Menu 6: Pengaturan
+          _buildTabItem(
+            index: 5,
             icon: Icons.settings_outlined,
             activeIcon: Icons.settings,
             label: 'Pengaturan',

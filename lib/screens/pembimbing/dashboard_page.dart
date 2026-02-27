@@ -280,10 +280,10 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
             {
               'id': 1,
               'siswa_id': 78,
-              'siswa_nama': 'zeze',
-              'tanggal': '2024-03-15',
+              'siswa_nama': 'Bintang Firman Ardana',
+              'tanggal': '2026-02-27',
               'jenis': 'Sakit',
-              'keterangan': 'Demam tinggi, ada surat dokter',
+              'keterangan': 'Sakit panas dalam',
               'status': 'pending',
             },
             {
@@ -767,7 +767,7 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
       return _emptyList('Belum ada siswa bimbingan', Icons.person_outline);
     }
     return SizedBox(
-        height: 218,
+        height: 240,
         child: Column(children: [
           Expanded(
               child: ListView.builder(
@@ -996,37 +996,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                     ],
                   ),
                 ),
-
-                // Status badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _getStatusIcon(status),
-                        size: 12,
-                        color: statusColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        status,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
 
@@ -1163,18 +1132,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
     );
   }
 
-  IconData _getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case 'disetujui':
-        return Icons.check_circle_outline;
-      case 'ditolak':
-        return Icons.highlight_off;
-      case 'menunggu':
-        return Icons.access_time;
-      default:
-        return Icons.help_outline;
-    }
-  }
 
   String _formatDate(String dateString) {
     if (dateString.isEmpty) return '-';
@@ -1990,12 +1947,18 @@ class _SiswaDataScreenState extends State<SiswaDataScreen> {
                                               ),
                                             ],
                                           ),
-                                          Text(
-                                            siswa['industri_alamat'] ?? '-',
-                                            style: const TextStyle(
-                                              color: Color(0xFF6B1B1B),
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w600,
+                                          // PERBAIKAN: Alamat industri dibungkus dengan Expanded agar tidak panjang ke samping
+                                          Expanded(
+                                            child: Text(
+                                              siswa['industri_alamat'] ?? '-',
+                                              style: const TextStyle(
+                                                color: Color(0xFF6B1B1B),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.right,
                                             ),
                                           ),
                                         ],

@@ -946,7 +946,7 @@ Future<void> _showApplicationDetailDialog(Map<String, dynamic> item) async {
                             _buildDialogInfoRow('Nama Siswa', siswaNama),
                             _buildDialogInfoRow('NISN', item['siswa_nisn'] ?? '-'),
                             _buildDialogInfoRow('Kelas', item['kelas_nama'] ?? '-'),
-                            _buildDialogInfoRow('Jurusan', item['jurusan_nama'] ?? '-'),
+                            _buildDialogInfoRow('Konsentrasi Keahlian', item['jurusan_nama'] ?? '-'),
                           ],
                         ),
                         
@@ -985,7 +985,7 @@ Future<void> _showApplicationDetailDialog(Map<String, dynamic> item) async {
                         if (status == 'Pending') ...[
                           const SizedBox(height: 20),
                           Text(
-                            'Catatan Kaprog',
+                            'Catatan',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,

@@ -807,14 +807,14 @@ class _IndustryDetailPageState extends State<IndustryDetailPage> {
                                                 
                                                 _buildProfileItem(
                                                   icon: Icons.person_rounded,
-                                                  title: 'PIC',
+                                                  title: 'Pembimbing Industri',
                                                   value: industryData!['pic'] ?? '-',
                                                 ),
                                                 const SizedBox(height: 16),
                                                 
                                                 _buildProfileItem(
                                                   icon: Icons.phone_android_rounded,
-                                                  title: 'No. Telp PIC',
+                                                  title: 'No. Telp',
                                                   value: industryData!['pic_telp'] ?? '-',
                                                 ),
                                                 const SizedBox(height: 50),

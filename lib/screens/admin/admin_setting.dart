@@ -370,7 +370,7 @@ class AdminSetting extends StatelessWidget {
                                   border: Border.all(color: _successColor, width: 1),
                                 ),
                                 child: Text(
-                                  'Super Admin',
+                                  'Admin',
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,

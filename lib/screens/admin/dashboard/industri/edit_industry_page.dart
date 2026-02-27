@@ -1237,13 +1237,13 @@ Widget _buildFormField(
                                 _buildJurusanField(),
                                 _buildFormField(
                                   Icons.person_rounded,
-                                  'Nama PIC',
+                                  'Nama Pembimbing Industri',
                                   _picController,
                                   _picFocusNode,
                                 ),
                                 _buildFormField(
                                   Icons.phone_android_rounded,
-                                  'Telepon PIC',
+                                  'Telepon',
                                   _picTelpController,
                                   _picTelpFocusNode,
                                   keyboardType: TextInputType.phone,

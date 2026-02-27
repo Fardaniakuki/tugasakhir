@@ -58,5 +58,6 @@ flutter:
     - assets/images/login_background.webp
     - assets/images/login_background.png
     - assets/images/smkn2.webp
+    - assets/images/jatimm.png
     - assets/animations/
     - .env

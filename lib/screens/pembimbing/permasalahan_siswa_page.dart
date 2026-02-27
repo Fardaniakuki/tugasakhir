@@ -1,3 +1,5 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -224,7 +226,6 @@ class _PermasalahanAPIContentState extends State<PermasalahanAPIContent>
   String? _selectedStatus;
 
   // Untuk edit mode (hanya status dan tindak lanjut)
-  bool _isEditing = false;
   int? _editingId;
   bool _isLoading = false;
   bool _isLoadingSiswa = false;
@@ -232,7 +233,6 @@ class _PermasalahanAPIContentState extends State<PermasalahanAPIContent>
   // Pagination
   int _currentPage = 1;
   int _totalPages = 1;
-  int _totalItems = 0;
   final int _itemsPerPage = 10;
 
   // Filter
@@ -389,7 +389,6 @@ class _PermasalahanAPIContentState extends State<PermasalahanAPIContent>
             if (jsonResponse.containsKey('pagination')) {
               final pagination = jsonResponse['pagination'];
               _totalPages = pagination['total_pages'] ?? 1;
-              _totalItems = pagination['total_items'] ?? 0;
               _currentPage = pagination['page'] ?? 1;
             }
           });
@@ -516,7 +515,7 @@ class _PermasalahanAPIContentState extends State<PermasalahanAPIContent>
         _fetchMyIssues(); // Refresh data
       } else {
         final error = jsonDecode(response.body);
-        String errorMessage =
+        final String errorMessage =
             error['error']?['message'] ?? 'Gagal menambahkan data';
         _showSnackBar(errorMessage, isError: true);
       }
@@ -575,7 +574,7 @@ class _PermasalahanAPIContentState extends State<PermasalahanAPIContent>
         _fetchMyIssues(); // Refresh data
       } else {
         final error = jsonDecode(response.body);
-        String errorMessage =
+        final String errorMessage =
             error['error']?['message'] ?? 'Gagal memperbarui data';
         _showSnackBar(errorMessage, isError: true);
       }
@@ -729,7 +728,6 @@ class _PermasalahanAPIContentState extends State<PermasalahanAPIContent>
     _deskripsiController.clear();
     _tindakLanjutController.clear();
     setState(() {
-      _isEditing = false;
       _editingId = null;
       _selectedKategori = null;
       _selectedSiswaId = null;
@@ -754,7 +752,6 @@ class _PermasalahanAPIContentState extends State<PermasalahanAPIContent>
     }
 
     setState(() {
-      _isEditing = true;
       _editingId = data['id'];
       _judulController.text = data['judul'] ?? '';
       _deskripsiController.text = data['deskripsi'] ?? '';

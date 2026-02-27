@@ -1,11 +1,15 @@
+// lib/screens/kaprog/kaprog_dashboard.dart
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/intl.dart'; // Tambahkan import intl
 import 'kaprog_profile_page.dart';
 import '../login/login_screen.dart';
 import 'industri_detail_screen.dart';
+import 'kaprog_add_industri_screen.dart'; // Import halaman tambah industri
 
 class KaprogDashboard extends StatefulWidget {
   const KaprogDashboard(
@@ -41,6 +45,74 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
   // Controller untuk dialog
   final TextEditingController _catatanController = TextEditingController();
   final TextEditingController _alasanTolakController = TextEditingController();
+
+  // Fungsi untuk mengubah nama hari ke Bahasa Indonesia
+  String _getIndonesianDayName(String englishDay) {
+    switch (englishDay.toLowerCase()) {
+      case 'monday':
+        return 'Senin';
+      case 'tuesday':
+        return 'Selasa';
+      case 'wednesday':
+        return 'Rabu';
+      case 'thursday':
+        return 'Kamis';
+      case 'friday':
+        return 'Jumat';
+      case 'saturday':
+        return 'Sabtu';
+      case 'sunday':
+        return 'Minggu';
+      default:
+        return englishDay;
+    }
+  }
+
+  // Fungsi untuk mengubah nama bulan ke Bahasa Indonesia
+  String _getIndonesianMonthName(String englishMonth) {
+    switch (englishMonth.toLowerCase()) {
+      case 'january':
+        return 'Januari';
+      case 'february':
+        return 'Februari';
+      case 'march':
+        return 'Maret';
+      case 'april':
+        return 'April';
+      case 'may':
+        return 'Mei';
+      case 'june':
+        return 'Juni';
+      case 'july':
+        return 'Juli';
+      case 'august':
+        return 'Agustus';
+      case 'september':
+        return 'September';
+      case 'october':
+        return 'Oktober';
+      case 'november':
+        return 'November';
+      case 'december':
+        return 'Desember';
+      default:
+        return englishMonth;
+    }
+  }
+
+  // Format tanggal ke Bahasa Indonesia lengkap
+  String _formatDateIndonesian(String? dateString) {
+    if (dateString == null || dateString.isEmpty) return '-';
+    try {
+      final date = DateTime.parse(dateString);
+      final dayName = _getIndonesianDayName(DateFormat('EEEE').format(date));
+      final monthName =
+          _getIndonesianMonthName(DateFormat('MMMM').format(date));
+      return '$dayName, ${date.day} $monthName ${date.year}';
+    } catch (e) {
+      return dateString;
+    }
+  }
 
   @override
   void initState() {
@@ -489,6 +561,48 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     );
   }
 
+  // ============= FUNGSI NAVIGASI =============
+  void _navigateToPengaturan() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const KaprogProfilePage(),
+      ),
+    );
+  }
+
+  void _navigateToPengajuanMenunggu() {
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (_) => PengajuanMenungguScreen(
+    //       pendingApplications: _pendingApplications,
+    //     ),
+    //   ),
+    // );
+  }
+
+  // ============= FUNGSI NAVIGASI TAMBAH INDUSTRI =============
+  void _navigateToAddIndustri() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const KaprogAddIndustriScreen(),
+      ),
+    ).then((refresh) {
+      if (refresh == true) {
+        _loadAllData(); // Refresh data setelah menambah industri
+      }
+    });
+  }
+
+  void _performSearch() {
+    final query = _searchController.text.toLowerCase().trim();
+    if (query.isNotEmpty) {
+      print('Mencari: $query');
+    }
+  }
+
   // ============= SKELETON LOADING =============
   Widget _buildSkeletonLoading() {
     return Scaffold(
@@ -786,7 +900,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     );
   }
 
-  // ============= DIALOG SETUJUI YANG DIPERBAIKI =============
+  // ============= DIALOG SETUJUI =============
   void _showApproveDialog(Map<String, dynamic> appData) {
     String? selectedGuruId;
     final TextEditingController catatanController = TextEditingController();
@@ -880,9 +994,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                         _buildDetailItem(
                           icon: Icons.calendar_today,
                           label: 'Tanggal Pengajuan',
-                          value: appData['application']
-                                  ?['tanggal_permohonan'] ??
-                              '-',
+                          value: _formatDateIndonesian(appData['application']?[
+                              'tanggal_permohonan']), // DIUBAH: Menggunakan format Indonesia
                         ),
                       ],
                     ),
@@ -1243,7 +1356,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     );
   }
 
-  // ============= DIALOG TOLAK YANG DIPERBAIKI =============
+  // ============= DIALOG TOLAK =============
   void _showRejectDialog(Map<String, dynamic> appData) {
     final TextEditingController alasanController = TextEditingController();
 
@@ -1332,8 +1445,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
                     _buildDetailItem(
                       icon: Icons.calendar_today,
                       label: 'Tanggal Pengajuan',
-                      value:
-                          appData['application']?['tanggal_permohonan'] ?? '-',
+                      value: _formatDateIndonesian(appData['application']?[
+                          'tanggal_permohonan']), // DIUBAH: Menggunakan format Indonesia
                     ),
                   ],
                 ),
@@ -1576,7 +1689,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               _buildDetailItem(
                 icon: Icons.calendar_today,
                 label: 'Tanggal Pengajuan',
-                value: appData['application']?['tanggal_permohonan'] ?? '-',
+                value: _formatDateIndonesian(appData['application']?[
+                    'tanggal_permohonan']), // DIUBAH: Menggunakan format Indonesia
               ),
               if (appData['application']?['catatan'] != null)
                 _buildDetailItem(
@@ -1647,34 +1761,6 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
         ],
       ),
     );
-  }
-
-  // ============= FUNGSI NAVIGASI =============
-  void _navigateToPengaturan() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const KaprogProfilePage(),
-      ),
-    );
-  }
-
-  void _navigateToPengajuanMenunggu() {
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (_) => PengajuanMenungguScreen(
-    //       pendingApplications: _pendingApplications,
-    //     ),
-    //   ),
-    // );
-  }
-
-  void _performSearch() {
-    final query = _searchController.text.toLowerCase().trim();
-    if (query.isNotEmpty) {
-      print('Mencari: $query');
-    }
   }
 
   @override
@@ -1833,10 +1919,10 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
             Row(
               children: [
                 _miniCard(
-                    Icons.person, 'Pembimbing', '${_teachers.length} Aktif'),
+                    Icons.person, 'Pembimbing', '${_teachers.length} Guru'),
                 const SizedBox(width: 12),
                 _miniCard(Icons.apartment, 'Industri',
-                    '${_industries.length} Tersedia'),
+                    '${_industries.length}'),
               ],
             ),
             const SizedBox(height: 14),
@@ -2058,7 +2144,12 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
             const SizedBox(height: 16),
             _pengajuanList(),
             const SizedBox(height: 40),
-            _sectionTitleWithSeeAll('Daftar Industri', _industries.length),
+            _sectionTitleWithSeeAll(
+              'Daftar Industri',
+              _industries.length,
+              onAddPressed:
+                  _navigateToAddIndustri, // Tambah button untuk industri
+            ),
             const SizedBox(height: 16),
             _industriList(),
             const SizedBox(height: 40),
@@ -2072,7 +2163,8 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     );
   }
 
-  Widget _sectionTitleWithSeeAll(String title, int count) {
+  Widget _sectionTitleWithSeeAll(String title, int count,
+      {VoidCallback? onAddPressed}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
@@ -2086,24 +2178,54 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               color: _primaryRed,
             ),
           ),
-          if (count > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: _primaryRed.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: _primaryRed.withValues(alpha: 0.2), width: 1),
-              ),
-              child: Text(
-                '$count total',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: _primaryRed,
+          Row(
+            children: [
+              // Tombol Tambah hanya untuk Daftar Industri
+              if (title == 'Daftar Industri' && onAddPressed != null)
+                Container(
+                  margin: const EdgeInsets.only(right: 8),
+                  child: ElevatedButton(
+                    onPressed: onAddPressed,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryRed,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      elevation: 0,
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.add, size: 16),
+                        SizedBox(width: 4),
+                        Text('Tambah', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              if (count > 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _primaryRed.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: _primaryRed.withValues(alpha: 0.2), width: 1),
+                  ),
+                  child: Text(
+                    '$count total',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: _primaryRed,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -2115,7 +2237,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     }
 
     return SizedBox(
-      height: 220,
+      height: 230,
       child: Column(
         children: [
           Expanded(
@@ -2347,7 +2469,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     }
 
     return SizedBox(
-      height: 190,
+      height: 210,
       child: Column(
         children: [
           Expanded(
@@ -2522,7 +2644,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
 
   Widget _emptyIndustriList() {
     return Container(
-      height: 160,
+      height: 200,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2546,6 +2668,27 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
               'Belum ada data industri',
               style: TextStyle(color: _textSecondary, fontSize: 14),
             ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _navigateToAddIndustri,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryRed,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add, size: 18),
+                  SizedBox(width: 8),
+                  Text('Tambah Industri Pertama'),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -2558,7 +2701,7 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
     }
 
     return SizedBox(
-      height: 190,
+      height: 210,
       child: Column(
         children: [
           Expanded(
@@ -2617,7 +2760,6 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
           builder: (context) => _PembimbingDetailDialog(
             nama: nama,
             teacherData: teacherData,
-            mapel: teacherData['mapel'] ?? 'Mata Pelajaran',
           ),
         );
       },
@@ -2764,15 +2906,14 @@ class _KaprogDashboardState extends State<KaprogDashboard> {
   // ignore: non_constant_identifier_names
   void PengajuanMenungguScreen({required List pendingApplications}) {}
 }
+
 // ============= POPUP DETAIL PEMBIMBING DENGAN PAGINATION =============
 class _PembimbingDetailDialog extends StatefulWidget {
   final String nama;
-  final String mapel;
   final dynamic teacherData;
 
   const _PembimbingDetailDialog({
     required this.nama,
-    required this.mapel,
     required this.teacherData,
   });
 
@@ -2788,13 +2929,13 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
   static const Color _textPrimary = Color(0xFF1A1A1A);
   static const Color _textSecondary = Color(0xFF666666);
   static const Color _green = Color(0xFF4CAF50);
-  
+
   // Pagination variables
   int _currentPage = 1;
   final int _itemsPerPage = 5;
-  
+
   List<dynamic> get _allStudents => widget.teacherData?['students'] ?? [];
-  
+
   List<dynamic> get _currentPageStudents {
     final startIndex = (_currentPage - 1) * _itemsPerPage;
     final endIndex = startIndex + _itemsPerPage;
@@ -2803,9 +2944,9 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
       endIndex.clamp(0, _allStudents.length),
     );
   }
-  
+
   int get _totalPages => (_allStudents.length / _itemsPerPage).ceil();
-  
+
   void _goToNextPage() {
     if (_currentPage < _totalPages) {
       setState(() {
@@ -2813,7 +2954,7 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
       });
     }
   }
-  
+
   void _goToPrevPage() {
     if (_currentPage > 1) {
       setState(() {
@@ -2821,7 +2962,7 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
       });
     }
   }
-  
+
   void _goToPage(int page) {
     if (page >= 1 && page <= _totalPages) {
       setState(() {
@@ -2834,7 +2975,7 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
   Widget build(BuildContext context) {
     final students = _currentPageStudents;
     final hasStudents = _allStudents.isNotEmpty;
-    
+
     return Dialog(
       insetPadding: const EdgeInsets.all(20),
       shape: RoundedRectangleBorder(
@@ -2905,7 +3046,8 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
                     const SizedBox(height: 12),
 
                     _buildInfoItem('NIP', widget.teacherData?['nip'] ?? '-'),
-                    _buildInfoItem('No. HP', widget.teacherData?['no_telp'] ?? '-'),
+                    _buildInfoItem(
+                        'No. HP', widget.teacherData?['no_telp'] ?? '-'),
 
                     const SizedBox(height: 20),
 
@@ -2928,8 +3070,8 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
                             decoration: BoxDecoration(
                               color: _primaryRed.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
-                              border:
-                                  Border.all(color: _primaryRed.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                  color: _primaryRed.withValues(alpha: 0.3)),
                             ),
                             child: Text(
                               'Total: ${_allStudents.length} siswa',
@@ -2946,10 +3088,10 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
 
                     if (hasStudents) ...[
                       ..._buildStudentList(students),
-                      
+
                       // Pagination Controls
                       if (_totalPages > 1) _buildPaginationControls(),
-                      
+
                       // Empty space indicator jika data sedang kosong di halaman ini
                       if (students.isEmpty)
                         Container(
@@ -3062,14 +3204,6 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
                     color: _textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  widget.mapel,
-                  style: const TextStyle(
-                    color: _textSecondary,
-                    fontSize: 14,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -3269,7 +3403,8 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
             onPressed: _goToNextPage,
             icon: Icon(
               Icons.chevron_right,
-              color: _currentPage < _totalPages ? _primaryRed : Colors.grey[400],
+              color:
+                  _currentPage < _totalPages ? _primaryRed : Colors.grey[400],
             ),
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
@@ -3291,22 +3426,22 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
   List<Widget> _buildPageNumbers() {
     final List<Widget> pageWidgets = [];
     const int maxVisiblePages = 5;
-    
+
     // Tentukan halaman awal dan akhir
     int startPage = _currentPage - 2;
     int endPage = _currentPage + 2;
-    
+
     if (startPage < 1) {
       endPage += (1 - startPage);
       startPage = 1;
     }
-    
+
     if (endPage > _totalPages) {
       startPage -= (endPage - _totalPages);
       endPage = _totalPages;
       if (startPage < 1) startPage = 1;
     }
-    
+
     // Batasi agar tidak melebihi maxVisiblePages
     if (endPage - startPage + 1 > maxVisiblePages) {
       if (_currentPage - startPage > endPage - _currentPage) {
@@ -3315,7 +3450,7 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
         endPage = startPage + maxVisiblePages - 1;
       }
     }
-    
+
     // Tombol untuk halaman pertama jika tidak terlihat
     if (startPage > 1) {
       pageWidgets.add(
@@ -3325,14 +3460,14 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
         pageWidgets.add(const Text('...'));
       }
     }
-    
+
     // Tombol untuk halaman-halaman
     for (int i = startPage; i <= endPage; i++) {
       pageWidgets.add(
         _buildPageButton(i, isActive: i == _currentPage),
       );
     }
-    
+
     // Tombol untuk halaman terakhir jika tidak terlihat
     if (endPage < _totalPages) {
       if (endPage < _totalPages - 1) {
@@ -3342,7 +3477,7 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
         _buildPageButton(_totalPages, isActive: false),
       );
     }
-    
+
     return pageWidgets;
   }
 
@@ -3378,6 +3513,7 @@ class __PembimbingDetailDialogState extends State<_PembimbingDetailDialog> {
     );
   }
 }
+
 class _PengajuanChip extends StatelessWidget {
   final String count;
   final String label;

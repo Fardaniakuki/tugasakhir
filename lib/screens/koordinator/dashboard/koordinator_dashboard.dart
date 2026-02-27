@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/intl.dart'; // Tambahkan import intl
 import '../../login/login_screen.dart';
 import 'koordinator_pengaturan.dart';
 import 'industri_detail_screen.dart'; // Anda mungkin sudah punya ini
@@ -35,6 +36,78 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
   final Color _red = const Color(0xFFF44336);
   final Color _secondaryColor = Colors.white;
   final Color _blackColor = Colors.black;
+
+  // Fungsi untuk mengubah nama hari ke Bahasa Indonesia
+  String _getIndonesianDayName(String englishDay) {
+    switch (englishDay.toLowerCase()) {
+      case 'monday':
+        return 'Senin';
+      case 'tuesday':
+        return 'Selasa';
+      case 'wednesday':
+        return 'Rabu';
+      case 'thursday':
+        return 'Kamis';
+      case 'friday':
+        return 'Jumat';
+      case 'saturday':
+        return 'Sabtu';
+      case 'sunday':
+        return 'Minggu';
+      default:
+        return englishDay;
+    }
+  }
+
+  // Fungsi untuk mengubah nama bulan ke Bahasa Indonesia
+  String _getIndonesianMonthName(String englishMonth) {
+    switch (englishMonth.toLowerCase()) {
+      case 'january':
+        return 'Januari';
+      case 'february':
+        return 'Februari';
+      case 'march':
+        return 'Maret';
+      case 'april':
+        return 'April';
+      case 'may':
+        return 'Mei';
+      case 'june':
+        return 'Juni';
+      case 'july':
+        return 'Juli';
+      case 'august':
+        return 'Agustus';
+      case 'september':
+        return 'September';
+      case 'october':
+        return 'Oktober';
+      case 'november':
+        return 'November';
+      case 'december':
+        return 'Desember';
+      default:
+        return englishMonth;
+    }
+  }
+
+  // Format tanggal ke Bahasa Indonesia lengkap
+  String _formatDateIndonesian(String? dateString) {
+    if (dateString == null || dateString.isEmpty || dateString == '-') {
+      return '-';
+    }
+    try {
+      final date = DateTime.parse(dateString);
+      final dayName = _getIndonesianDayName(DateFormat('EEEE').format(date));
+      final monthName =
+          _getIndonesianMonthName(DateFormat('MMMM').format(date));
+      return '$dayName, ${date.day} $monthName ${date.year}';
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  // Format tanggal singkat (dd MMMM yyyy)
 
   @override
   void initState() {
@@ -407,8 +480,13 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
     }
   }
 
-  // ============= DIALOG DETAIL SISWA PKL =============
+  // ============= DIALOG DETAIL SISWA PKL DENGAN FORMAT TANGGAL INDONESIA =============
   void _showStudentDetailDialog(Map<String, dynamic> studentData) {
+    // Format tanggal Indonesia
+    final tanggalMulai = _formatDateIndonesian(studentData['tanggal_mulai']);
+    final tanggalSelesai =
+        _formatDateIndonesian(studentData['tanggal_selesai']);
+
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -495,9 +573,9 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
                       _detailItem('Kelas', studentData['kelas'] ?? '-'),
                       _detailItem('Status', studentData['status'] ?? 'Aktif'),
                       _detailItem(
-                          'Tanggal Mulai', studentData['tanggal_mulai'] ?? '-'),
+                          'Tanggal Mulai', tanggalMulai), // FORMAT INDONESIA
                       _detailItem('Tanggal Selesai',
-                          studentData['tanggal_selesai'] ?? '-'),
+                          tanggalSelesai), // FORMAT INDONESIA
                     ],
                   ),
                 ),
@@ -1506,7 +1584,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
                     Icons.people, 'Siswa PKL', '${_pklStudents.length} Aktif'),
                 const SizedBox(width: 12),
                 _miniCard(Icons.apartment, 'Industri',
-                    '${_industries.length} Tersedia'),
+                    '${_industries.length}'),
               ],
             ),
             const SizedBox(height: 14),
@@ -2028,7 +2106,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
     }
 
     return SizedBox(
-      height: 190,
+      height: 220,
       child: Column(
         children: [
           Expanded(

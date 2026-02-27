@@ -250,92 +250,7 @@ class _AjukanPKLDialogState extends State<AjukanPKLDialog> {
   }
   // Di file tempat memanggil AjukanPKLDialog, tambahkan pengecekan:
 
-  Future<bool> _checkExistingPengajuan() async {
-    try {
-      final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/api/pkl/applications/status'),
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': 'Bearer ${widget.token}',
-        },
-      );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        // Cek apakah ada pengajuan aktif
-        if (data['has_active_application'] == true) {
-          _showExistingPengajuanWarning(data['applications']);
-          return false;
-        }
-        return true;
-      }
-      return true;
-    } catch (e) {
-      print('Error checking existing pengajuan: $e');
-      return true;
-    }
-  }
-
-  void _showExistingPengajuanWarning(List applications) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pengajuan Belum Selesai'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Anda masih memiliki pengajuan PKL yang belum selesai:',
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 16),
-            ...applications.map((app) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Status: ${app['status']}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      if (app['industri'] != null)
-                        Text('Industri: ${app['industri']['nama']}'),
-                      Text('Tanggal: ${app['created_at']}'),
-                    ],
-                  ),
-                )),
-            const SizedBox(height: 16),
-            const Text(
-              'Selesaikan pengajuan yang ada sebelum mengajukan yang baru.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Optional: Navigasi ke halaman detail pengajuan
-              // _navigateToApplicationDetail();
-            },
-            child: const Text('Lihat Detail'),
-          ),
-        ],
-      ),
-    );
-  }
 
 // Panggil fungsi ini sebelum membuka dialog
 
@@ -1060,6 +975,7 @@ Future<void> _submitPengajuan() async {
         final errorData = jsonDecode(response.body);
         errorMessage = errorData['message'] ?? errorMessage;
         print('Error message: $errorMessage');
+      // ignore: empty_catches
       } catch (e) {}
       
       if (mounted) {
@@ -1113,19 +1029,6 @@ Future<void> _submitPengajuan() async {
     );
   }
 
-  void _showSuccessSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: _successColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-    );
-  }
 
   // Fungsi untuk menghitung posisi popup
   Offset _calculatePopupPosition(

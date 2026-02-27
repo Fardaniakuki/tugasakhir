@@ -1,8 +1,10 @@
 // File: lib/screens/siswa/dashboard_helpers.dart
 
 import 'dart:async';
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // ============== MODELS ==============
 
@@ -30,6 +32,39 @@ class SiswaInfo {
     );
   }
 }
+// ============== INDUSTRI MODEL ==============
+class IndustriModel {
+  final int id;
+  final String name;
+  final String address;
+  final String sector;
+  final int quota;
+  final int remainingSlots;
+
+  IndustriModel({
+    required this.id,
+    required this.name,
+    required this.address,
+    required this.sector,
+    required this.quota,
+    required this.remainingSlots,
+  });
+
+  factory IndustriModel.fromJson(Map<String, dynamic> json) {
+    return IndustriModel(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      address: json['address'] as String,
+      sector: json['sector'] as String,
+      quota: json['quota'] as int,
+      remainingSlots: json['remaining_slots'] as int,
+    );
+  }
+
+  bool get isAvailable => remainingSlots > 0;
+  
+  String get quotaInfo => '$remainingSlots/$quota tersedia';
+}
 // ============== AVAILABLE MEMBER MODEL ==============
 class AvailableMember {
   final int id;
@@ -46,7 +81,9 @@ class AvailableMember {
 
   factory AvailableMember.fromJson(Map<String, dynamic> json) {
     return AvailableMember(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      id: json['id'] is int
+          ? json['id']
+          : int.tryParse(json['id'].toString()) ?? 0,
       nama: json['nama']?.toString() ?? '',
       nisn: json['nisn']?.toString() ?? '',
       kelas: json['kelas']?.toString() ?? '',
@@ -55,304 +92,6 @@ class AvailableMember {
 
   @override
   String toString() => '$nama - $kelas';
-}
-// ============== EDIT MEMBERS DROPDOWN DIALOG ==============
-class EditMembersDropdownDialog extends StatefulWidget {
-  final PKLGroupModel group;
-  final int currentUserId;
-  final Future<List<AvailableMember>> Function({String query}) onGetAvailableMembers;
-
-  const EditMembersDropdownDialog({
-    super.key,
-    required this.group,
-    required this.currentUserId,
-    required this.onGetAvailableMembers,
-  });
-
-  @override
-  State<EditMembersDropdownDialog> createState() => _EditMembersDropdownDialogState();
-}
-
-class _EditMembersDropdownDialogState extends State<EditMembersDropdownDialog> {
-  final List<AvailableMember> _selectedMembers = [];
-  final List<AvailableMember> _availableMembers = [];
-  final TextEditingController _searchController = TextEditingController();
-  bool _isLoading = true;
-  String? _errorMessage;
-  Timer? _debounce;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadAvailableMembers();
-    _searchController.addListener(_onSearchChanged);
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onSearchChanged() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _loadAvailableMembers(query: _searchController.text);
-    });
-  }
-
-  Future<void> _loadAvailableMembers({String query = ''}) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final members = await widget.onGetAvailableMembers(query: query);
-      
-      // Filter out current user (ketua) and existing members
-      final existingMemberIds = widget.group.members
-          .where((m) => m.siswa.id != widget.currentUserId)
-          .map((m) => m.siswa.id)
-          .toSet();
-
-      final filteredMembers = members.where((m) => 
-        m.id != widget.currentUserId && !existingMemberIds.contains(m.id)
-      ).toList();
-
-      setState(() {
-        _availableMembers.clear();
-        _availableMembers.addAll(filteredMembers);
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Gagal memuat daftar anggota';
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _addMember(AvailableMember? member) {
-    if (member != null && !_selectedMembers.contains(member)) {
-      setState(() {
-        _selectedMembers.add(member);
-      });
-    }
-  }
-
-  void _removeMember(AvailableMember member) {
-    setState(() {
-      _selectedMembers.remove(member);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final existingMembers = widget.group.members
-        .where((m) => m.siswa.id != widget.currentUserId)
-        .toList();
-
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.group, color: Colors.blue[700]),
-          const SizedBox(width: 8),
-          const Text('Edit Anggota Kelompok'),
-        ],
-      ),
-      content: Container(
-        width: double.maxFinite,
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Current members section
-              if (existingMembers.isNotEmpty) ...[
-                const Text(
-                  'Anggota Saat Ini:',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                const SizedBox(height: 8),
-                ...existingMembers.map((member) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person, size: 16, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              member.siswa.nama,
-                              style: const TextStyle(fontWeight: FontWeight.w500),
-                            ),
-                            Text(
-                              member.siswa.kelas,
-                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: member.invitationStatus == 'accepted' 
-                              ? Colors.green.withValues(alpha: 0.1)
-                              : Colors.orange.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          member.invitationStatus == 'accepted' ? 'DITERIMA' : 'MENUNGGU',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: member.invitationStatus == 'accepted' 
-                                ? Colors.green 
-                                : Colors.orange,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-                const Divider(height: 24),
-              ],
-
-              // New members selection
-              const Text(
-                'Tambah Anggota Baru:',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              const SizedBox(height: 8),
-
-              // Search field
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Cari nama atau NISN...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Selected members chips
-              if (_selectedMembers.isNotEmpty) ...[
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _selectedMembers.map((member) => Chip(
-                    label: Text(member.nama),
-                    deleteIcon: const Icon(Icons.close, size: 16),
-                    onDeleted: () => _removeMember(member),
-                    backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                    labelStyle: const TextStyle(fontSize: 12),
-                  )).toList(),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Available members dropdown
-              if (_isLoading)
-                const Center(child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
-                ))
-              else if (_errorMessage != null)
-                Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.red)))
-              else if (_availableMembers.isEmpty)
-                const Center(child: Text('Tidak ada anggota tersedia'))
-              else
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Pilih anggota:', style: TextStyle(fontSize: 12)),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[400]!),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<AvailableMember>(
-                          isExpanded: true,
-                          hint: const Text('-- Pilih anggota --'),
-                          value: null,
-                          items: _availableMembers.map((member) {
-                            return DropdownMenuItem(
-                              value: member,
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.person_outline, size: 16, color: Colors.grey),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          member.nama,
-                                          style: const TextStyle(fontWeight: FontWeight.w500),
-                                        ),
-                                        Text(
-                                          '${member.kelas} • NISN: ${member.nisn}',
-                                          style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: _addMember,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Batal'),
-        ),
-        ElevatedButton(
-          onPressed: _selectedMembers.isEmpty
-              ? null
-              : () {
-                  // Convert selected members to list of usernames
-                  final usernames = _selectedMembers.map((m) => m.nama).toList();
-                  Navigator.pop(context, usernames);
-                },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green,
-          ),
-          child: const Text('Simpan Perubahan'),
-        ),
-      ],
-    );
-  }
 }
 
 class GroupMember {
@@ -538,57 +277,237 @@ class GroupInvitation {
   }
 }
 
-// ============== UTILS ==============
-
-class DateFormatter {
-  static String format(String? dateString) {
-    if (dateString == null || dateString.isEmpty) return '-';
+// ============== API HELPER ==============
+class IndustriApiHelper {
+  static Future<List<IndustriModel>> getAvailableIndustries({
+    required String token,
+    String search = '',
+    int limit = 100,
+  }) async {
+    print('=== GET AVAILABLE INDUSTRIES ===');
+    
     try {
-      final date = DateTime.parse(dateString);
-      const bulan = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'Mei',
-        'Jun',
-        'Jul',
-        'Agu',
-        'Sep',
-        'Okt',
-        'Nov',
-        'Des'
-      ];
-      return '${date.day} ${bulan[date.month - 1]} ${date.year}';
+      // Build URL dengan query parameters
+      String urlString = '${dotenv.env['API_BASE_URL']}/api/pkl/industri/available';
+      
+      // Tambahkan query parameters jika ada
+      final Map<String, String> queryParams = {};
+      if (search.isNotEmpty) {
+        queryParams['search'] = search;
+      }
+      queryParams['limit'] = limit.toString();
+      
+      if (queryParams.isNotEmpty) {
+        final uri = Uri.parse(urlString);
+        final newUri = uri.replace(queryParameters: queryParams);
+        urlString = newUri.toString();
+      }
+      
+      print('GET: $urlString');
+      
+      final response = await http.get(
+        Uri.parse(urlString),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print('Response status: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        final List<dynamic> data = jsonResponse['data'] ?? [];
+        
+        print('Found ${data.length} industries');
+        
+        return data.map((item) => IndustriModel.fromJson(item)).toList();
+      } else {
+        print('Failed to load industries: ${response.statusCode}');
+        print('Response body: ${response.body}');
+      }
     } catch (e) {
-      return '-';
+      print('❌ Error getting available industries: $e');
+      print('Stack trace:');
+      print(StackTrace.current);
     }
+    
+    return [];
   }
+}
 
+// ============== DATE FORMATTER ==============
+class DateFormatter {
+  // Format untuk API (YYYY-MM-DD)
   static String formatForApi(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    return '${date.year.toString().padLeft(4, '0')}-'
+           '${date.month.toString().padLeft(2, '0')}-'
+           '${date.day.toString().padLeft(2, '0')}';
   }
-
-  static String timeAgo(DateTime timestamp) {
-    final now = DateTime.now();
-    final difference = now.difference(timestamp);
-
-    if (difference.inDays > 365) {
-      return '${(difference.inDays / 365).floor()} tahun lalu';
-    } else if (difference.inDays > 30) {
-      return '${(difference.inDays / 30).floor()} bulan lalu';
-    } else if (difference.inDays > 0) {
-      return '${difference.inDays} hari lalu';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} jam lalu';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} menit lalu';
+  
+  // Format untuk tampilan (dd MMMM yyyy)
+  static String format(dynamic date) {
+    if (date == null) return '-';
+    
+    DateTime dateTime;
+    
+    // Handle jika date sudah berupa DateTime
+    if (date is DateTime) {
+      dateTime = date;
+    }
+    // Handle jika date berupa String
+    else if (date is String) {
+      try {
+        dateTime = DateTime.parse(date);
+      } catch (e) {
+        return date; // Return original string jika tidak bisa parse
+      }
+    }
+    // Handle jika date berupa int (timestamp)
+    else if (date is int) {
+      dateTime = DateTime.fromMillisecondsSinceEpoch(date);
+    }
+    else {
+      return date.toString();
+    }
+    
+    // Format: 15 Maret 2025
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    
+    return '${dateTime.day} ${months[dateTime.month - 1]} ${dateTime.year}';
+  }
+  
+  // Format singkat (dd/MM/yyyy)
+  static String formatShort(dynamic date) {
+    if (date == null) return '-';
+    
+    DateTime dateTime;
+    
+    if (date is DateTime) {
+      dateTime = date;
+    } else if (date is String) {
+      try {
+        dateTime = DateTime.parse(date);
+      } catch (e) {
+        return date;
+      }
     } else {
-      return 'Baru saja';
+      return date.toString();
+    }
+    
+    return '${dateTime.day.toString().padLeft(2, '0')}/'
+           '${dateTime.month.toString().padLeft(2, '0')}/'
+           '${dateTime.year}';
+  }
+  
+  // Method untuk menampilkan waktu relatif (misal: "2 jam yang lalu", "kemarin", dll)
+  static String timeAgo(dynamic date) {
+    if (date == null) return '-';
+    
+    DateTime dateTime;
+    
+    // Handle berbagai tipe input
+    if (date is DateTime) {
+      dateTime = date;
+    } else if (date is String) {
+      try {
+        dateTime = DateTime.parse(date);
+      } catch (e) {
+        return date.toString();
+      }
+    } else if (date is int) {
+      dateTime = DateTime.fromMillisecondsSinceEpoch(date);
+    } else {
+      return date.toString();
+    }
+    
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+    
+    // Kurang dari 1 menit
+    if (difference.inSeconds < 60) {
+      return 'baru saja';
+    }
+    
+    // Kurang dari 1 jam
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} menit yang lalu';
+    }
+    
+    // Kurang dari 24 jam
+    if (difference.inHours < 24) {
+      return '${difference.inHours} jam yang lalu';
+    }
+    
+    // Kurang dari 7 hari
+    if (difference.inDays < 7) {
+      if (difference.inDays == 1) {
+        return 'kemarin';
+      }
+      return '${difference.inDays} hari yang lalu';
+    }
+    
+    // Kurang dari 30 hari
+    if (difference.inDays < 30) {
+      final weeks = (difference.inDays / 7).floor();
+      if (weeks == 1) {
+        return 'minggu lalu';
+      }
+      return '$weeks minggu yang lalu';
+    }
+    
+    // Kurang dari 365 hari
+    if (difference.inDays < 365) {
+      final months = (difference.inDays / 30).floor();
+      if (months == 1) {
+        return 'bulan lalu';
+      }
+      return '$months bulan yang lalu';
+    }
+    
+    // Lebih dari setahun
+    final years = (difference.inDays / 365).floor();
+    if (years == 1) {
+      return 'tahun lalu';
+    }
+    return '$years tahun yang lalu';
+  }
+  
+  // Helper method untuk mendapatkan nama bulan
+  static String getMonthName(int month) {
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return months[month - 1];
+  }
+  
+  // Helper method untuk membandingkan apakah tanggal sama
+  static bool isSameDay(DateTime? date1, DateTime? date2) {
+    if (date1 == null || date2 == null) return false;
+    return date1.year == date2.year && 
+           date1.month == date2.month && 
+           date1.day == date2.day;
+  }
+  
+  // Helper method untuk mendapatkan range tanggal
+  static String getDateRange(DateTime? start, DateTime? end) {
+    if (start == null || end == null) return '-';
+    
+    if (start.year == end.year && start.month == end.month) {
+      return '${start.day} - ${end.day} ${getMonthName(end.month)} ${end.year}';
+    } else if (start.year == end.year) {
+      return '${start.day} ${getMonthName(start.month)} - ${end.day} ${getMonthName(end.month)} ${end.year}';
+    } else {
+      return '${format(start)} - ${format(end)}';
     }
   }
 }
 
+// ============== STATUS HELPER ==============
 class StatusHelper {
   static Color getColor(String status) {
     switch (status.toLowerCase()) {
@@ -670,10 +589,331 @@ class StatusHelper {
   // Helper untuk mengecek apakah status termasuk dalam kategori "dapat diedit"
   static bool isEditable(String status) {
     final lowerStatus = status.toLowerCase();
-    return lowerStatus == 'pending' || 
-           lowerStatus == 'menunggu' || 
-           lowerStatus == 'submitted' || 
-           lowerStatus == 'draft';
+    return lowerStatus == 'pending' ||
+        lowerStatus == 'menunggu' ||
+        lowerStatus == 'submitted' ||
+        lowerStatus == 'draft';
+  }
+}
+
+// ============== EDIT MEMBERS DROPDOWN DIALOG ==============
+class EditMembersDropdownDialog extends StatefulWidget {
+  final PKLGroupModel group;
+  final int currentUserId;
+  final Future<List<AvailableMember>> Function({String query})
+      onGetAvailableMembers;
+
+  const EditMembersDropdownDialog({
+    super.key,
+    required this.group,
+    required this.currentUserId,
+    required this.onGetAvailableMembers,
+  });
+
+  @override
+  State<EditMembersDropdownDialog> createState() =>
+      _EditMembersDropdownDialogState();
+}
+
+class _EditMembersDropdownDialogState extends State<EditMembersDropdownDialog> {
+  final List<AvailableMember> _selectedMembers = [];
+  final List<AvailableMember> _availableMembers = [];
+  final TextEditingController _searchController = TextEditingController();
+  bool _isLoading = true;
+  String? _errorMessage;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvailableMembers();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _loadAvailableMembers(query: _searchController.text);
+    });
+  }
+
+  Future<void> _loadAvailableMembers({String query = ''}) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final members = await widget.onGetAvailableMembers(query: query);
+
+      // Filter out current user (ketua) and existing members
+      final existingMemberIds = widget.group.members
+          .where((m) => m.siswa.id != widget.currentUserId)
+          .map((m) => m.siswa.id)
+          .toSet();
+
+      final filteredMembers = members
+          .where((m) =>
+              m.id != widget.currentUserId && !existingMemberIds.contains(m.id))
+          .toList();
+
+      setState(() {
+        _availableMembers.clear();
+        _availableMembers.addAll(filteredMembers);
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Gagal memuat daftar anggota';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _addMember(AvailableMember? member) {
+    if (member != null && !_selectedMembers.contains(member)) {
+      setState(() {
+        _selectedMembers.add(member);
+      });
+    }
+  }
+
+  void _removeMember(AvailableMember member) {
+    setState(() {
+      _selectedMembers.remove(member);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final existingMembers = widget.group.members
+        .where((m) => m.siswa.id != widget.currentUserId)
+        .toList();
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.group, color: Colors.blue[700]),
+          const SizedBox(width: 8),
+          const Text('Edit Anggota Kelompok'),
+        ],
+      ),
+      content: Container(
+        width: double.maxFinite,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Current members section
+              if (existingMembers.isNotEmpty) ...[
+                const Text(
+                  'Anggota Saat Ini:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                const SizedBox(height: 8),
+                ...existingMembers.map((member) => Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.person,
+                              size: 16, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  member.siswa.nama,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w500),
+                                ),
+                                Text(
+                                  member.siswa.kelas,
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: member.invitationStatus == 'accepted'
+                                  ? Colors.green.withValues(alpha: 0.1)
+                                  : Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              member.invitationStatus == 'accepted'
+                                  ? 'DITERIMA'
+                                  : 'MENUNGGU',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: member.invitationStatus == 'accepted'
+                                    ? Colors.green
+                                    : Colors.orange,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                const Divider(height: 24),
+              ],
+
+              // New members selection
+              const Text(
+                'Tambah Anggota Baru:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
+
+              // Search field
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Cari nama atau NISN...',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Selected members chips
+              if (_selectedMembers.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _selectedMembers
+                      .map((member) => Chip(
+                            label: Text(member.nama),
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                            onDeleted: () => _removeMember(member),
+                            backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                            labelStyle: const TextStyle(fontSize: 12),
+                          ))
+                      .toList(),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Available members dropdown
+              if (_isLoading)
+                const Center(
+                    child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ))
+              else if (_errorMessage != null)
+                Center(
+                    child: Text(_errorMessage!,
+                        style: const TextStyle(color: Colors.red)))
+              else if (_availableMembers.isEmpty)
+                const Center(child: Text('Tidak ada anggota tersedia'))
+              else
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Pilih anggota:',
+                        style: TextStyle(fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey[400]!),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<AvailableMember>(
+                          isExpanded: true,
+                          hint: const Text('-- Pilih anggota --'),
+                          value: null,
+                          items: _availableMembers.map((member) {
+                            return DropdownMenuItem(
+                              value: member,
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.person_outline,
+                                      size: 16, color: Colors.grey),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          member.nama,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w500),
+                                        ),
+                                        Text(
+                                          '${member.kelas} • NISN: ${member.nisn}',
+                                          style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.grey[600]),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: _addMember,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
+        ElevatedButton(
+          onPressed: _selectedMembers.isEmpty
+              ? null
+              : () {
+                  // Convert selected members to list of usernames
+                  final usernames =
+                      _selectedMembers.map((m) => m.nama).toList();
+                  Navigator.pop(context, usernames);
+                },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+          ),
+          child: const Text('Simpan Perubahan'),
+        ),
+      ],
+    );
   }
 }
 
@@ -1669,6 +1909,7 @@ class QuickActionsMenu extends StatelessWidget {
     );
   }
 }
+
 class GroupCard extends StatelessWidget {
   final PKLGroupModel group;
   final int? currentUserId;
@@ -1694,22 +1935,20 @@ class GroupCard extends StatelessWidget {
     final acceptedMembers = group.getAcceptedMembers();
     final pendingMembers = group.getPendingMembers();
     final status = group.status.toLowerCase();
-    
+
     // Status yang bisa diedit (PENDING = DRAFT di database)
-    final canEdit = isUserLeader && 
-                    onEditMembers != null && 
-                    status == 'pending';
-    
+    final canEdit =
+        isUserLeader && onEditMembers != null && status == 'pending';
+
     // Status yang bisa dihapus (PENDING = DRAFT di database)
-    final canDelete = isUserLeader && 
-                      onDeleteGroup != null && 
-                      status == 'pending';
-    
+    final canDelete =
+        isUserLeader && onDeleteGroup != null && status == 'pending';
+
     // Status yang bisa di-submit (PENDING dengan syarat)
-    final canSubmit = isUserLeader && 
-                      status == 'pending' && 
-                      pendingMembers.isEmpty && 
-                      acceptedMembers.length >= 2;
+    final canSubmit = isUserLeader &&
+        status == 'pending' &&
+        pendingMembers.isEmpty &&
+        acceptedMembers.length >= 2;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -1798,7 +2037,7 @@ class GroupCard extends StatelessWidget {
                           constraints: const BoxConstraints(),
                         ),
                       ),
-                    
+
                     // Tombol Hapus - hanya untuk status PENDING
                     if (canDelete)
                       Container(
@@ -1822,7 +2061,8 @@ class GroupCard extends StatelessWidget {
                     // Info untuk status SUBMITTED (tidak bisa diedit/dihapus)
                     if (status == 'submitted' || status == 'menunggu')
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.orange.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
@@ -1860,7 +2100,8 @@ class GroupCard extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color.fromARGB(255, 180, 16, 4).withValues(alpha: 0.1),
+                color: const Color.fromARGB(255, 180, 16, 4)
+                    .withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
@@ -1914,7 +2155,8 @@ class GroupCard extends StatelessWidget {
                         color: Colors.amber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.star, size: 14, color: Colors.amber),
+                      child:
+                          const Icon(Icons.star, size: 14, color: Colors.amber),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1978,7 +2220,8 @@ class GroupCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                        border: Border.all(
+                            color: Colors.green.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
@@ -1988,7 +2231,8 @@ class GroupCard extends StatelessWidget {
                               color: Colors.green.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Icon(Icons.check, size: 12, color: Colors.green),
+                            child: const Icon(Icons.check,
+                                size: 12, color: Colors.green),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -2059,7 +2303,8 @@ class GroupCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                        border: Border.all(
+                            color: Colors.orange.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         children: [
@@ -2069,7 +2314,8 @@ class GroupCard extends StatelessWidget {
                               color: Colors.orange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Icon(Icons.access_time, size: 12, color: Colors.orange),
+                            child: const Icon(Icons.access_time,
+                                size: 12, color: Colors.orange),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -2176,7 +2422,7 @@ class GroupCard extends StatelessWidget {
 
           // ===== TOMBOL SUBMIT (hijau besar) - hanya untuk status PENDING =====
           if (canSubmit)
-            Container(
+            SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton(
@@ -2195,7 +2441,7 @@ class GroupCard extends StatelessWidget {
                     Icon(Icons.send, size: 20),
                     SizedBox(width: 8),
                     Text(
-                      'KIRIM KELOMPOK KE KAPROG',
+                      'KIRIM KELOMPOK',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -2205,7 +2451,9 @@ class GroupCard extends StatelessWidget {
                 ),
               ),
             )
-          else if (isUserLeader && status == 'pending' && pendingMembers.isNotEmpty)
+          else if (isUserLeader &&
+              status == 'pending' &&
+              pendingMembers.isNotEmpty)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -2231,7 +2479,9 @@ class GroupCard extends StatelessWidget {
                 ],
               ),
             )
-          else if (isUserLeader && status == 'pending' && acceptedMembers.length < 2)
+          else if (isUserLeader &&
+              status == 'pending' &&
+              acceptedMembers.length < 2)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -2317,6 +2567,7 @@ class GroupCard extends StatelessWidget {
     );
   }
 }
+
 class PengajuanCard extends StatelessWidget {
   final Map<String, dynamic> pengajuan;
   final Map<String, dynamic>? industriData;

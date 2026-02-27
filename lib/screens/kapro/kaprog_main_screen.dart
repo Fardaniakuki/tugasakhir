@@ -1,10 +1,11 @@
-// kaprog_main_screen.dart
+// lib/screens/kaprog/kaprog_main_screen.dart (update)
 import 'package:flutter/material.dart';
 
-// Import halaman-halaman (sesuaikan dengan path Anda)
-import 'kaprog_dashboard.dart'; // Import dashboard yang sudah ada
-import 'bukti_pkl_screen.dart'; // Screen baru untuk Bukti PKL
-import 'kelola_perizinan_screen.dart'; // Screen baru untuk Perizinan
+// Import halaman-halaman
+import 'kaprog_dashboard.dart';
+import 'bukti_pkl_screen.dart';
+import 'kelola_perizinan_screen.dart';
+import 'group_review_screen.dart'; // IMPORT HALAMAN BARU
 
 class KaprogMainScreen extends StatefulWidget {
   const KaprogMainScreen({super.key});
@@ -25,22 +26,24 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
     ScrollController(),
     ScrollController(),
     ScrollController(),
+    ScrollController(), // Tambah untuk halaman ke-4
   ];
 
   late final List<Widget> _pageBuilders;
 
   // WARNA UNTUK KAPROG
-  final Color _primaryColor = const Color(0xFF6B1B1B); // WARNA KAPROG
+  final Color _primaryColor = const Color(0xFF6B1B1B);
 
   @override
   void initState() {
     super.initState();
     
-    // Inisialisasi page builders
+    // Inisialisasi page builders (SEKARANG 4 HALAMAN)
     _pageBuilders = [
       _buildDashboardPage(),
-      _buildBuktiPklPage(),
-      _buildPerizinanPage(),
+      _buildGroupReviewPage(),    // HALAMAN BARU (index 1)
+      _buildBuktiPklPage(),       // (index 2)
+      _buildPerizinanPage(),       // (index 3)
     ];
   }
 
@@ -53,7 +56,7 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
     super.dispose();
   }
 
-  // Builder untuk halaman Dashboard dengan caching sederhana
+  // Builder untuk halaman Dashboard
   Widget _buildDashboardPage() {
     return _buildCachedPage(
       index: 0,
@@ -64,24 +67,35 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
     );
   }
 
-  // Builder untuk halaman Bukti PKL dengan caching sederhana
-  Widget _buildBuktiPklPage() {
+  // Builder untuk halaman Group Review (BARU)
+  Widget _buildGroupReviewPage() {
     return _buildCachedPage(
       index: 1,
-      builder: () => BuktiPklScreen(
-        key: const ValueKey('bukti_pkl_page'),
+      builder: () => GroupReviewScreen(
+        key: const ValueKey('group_review_page'),
         scrollController: _scrollControllers[1],
       ),
     );
   }
 
-  // Builder untuk halaman Perizinan dengan caching sederhana
-  Widget _buildPerizinanPage() {
+  // Builder untuk halaman Bukti PKL
+  Widget _buildBuktiPklPage() {
     return _buildCachedPage(
       index: 2,
+      builder: () => BuktiPklScreen(
+        key: const ValueKey('bukti_pkl_page'),
+        scrollController: _scrollControllers[2],
+      ),
+    );
+  }
+
+  // Builder untuk halaman Perizinan
+  Widget _buildPerizinanPage() {
+    return _buildCachedPage(
+      index: 3,
       builder: () => KelolaPerizinanTabScreen(
         key: const ValueKey('perizinan_page'),
-        scrollController: _scrollControllers[2],
+        scrollController: _scrollControllers[3],
       ),
     );
   }
@@ -123,10 +137,10 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Background utama putih
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Halaman konten - mengisi seluruh layar
+          // Halaman konten
           Positioned.fill(
             child: IndexedStack(
               index: _currentIndex,
@@ -134,7 +148,7 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
             ),
           ),
           
-          // Bottom Navigation Bar - posisi absolute di bawah
+          // Bottom Navigation Bar
           Positioned(
             left: 0,
             right: 0,
@@ -163,9 +177,7 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
   }
 }
 
-// ============== BOTTOM NAVIGATION BAR ==============
-// Dipindahkan ke dalam file yang sama
-
+// ============== BOTTOM NAVIGATION BAR (SEKARANG 4 MENU) ==============
 class _KaprogBottomBar extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTabSelected;
@@ -200,11 +212,6 @@ class __KaprogBottomBarState extends State<_KaprogBottomBar> {
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
-          const BoxShadow(
-            color: Colors.black,
-            offset: Offset(0, 0),
-            blurRadius: 0,
-          ),
         ],
       ),
       child: Row(
@@ -218,17 +225,25 @@ class __KaprogBottomBarState extends State<_KaprogBottomBar> {
             label: 'Beranda',
           ),
 
-          // Menu 2: Data Bukti Diterima PKL
+          // Menu 2: Group Review (BARU)
           _buildTabItem(
             index: 1,
+            icon: Icons.group_work_outlined,
+            activeIcon: Icons.group_work,
+            label: 'Tinjau Grup',
+          ),
+
+          // Menu 3: Bukti PKL
+          _buildTabItem(
+            index: 2,
             icon: Icons.fact_check_outlined,
             activeIcon: Icons.fact_check,
             label: 'Bukti PKL',
           ),
 
-          // Menu 3: Kelola Perizinan
+          // Menu 4: Perizinan
           _buildTabItem(
-            index: 2,
+            index: 3,
             icon: Icons.assignment_outlined,
             activeIcon: Icons.assignment,
             label: 'Perizinan',
@@ -277,7 +292,7 @@ class __KaprogBottomBarState extends State<_KaprogBottomBar> {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                   color: isActive ? activeColor : _inactiveColor,
                 ),

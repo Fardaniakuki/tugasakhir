@@ -24,21 +24,35 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
   bool _isLoading = true;
   Map<String, dynamic>? _industriData;
   List<dynamic> _allSiswaList = []; // Menyimpan semua data
-  
+
   // Filter dan Pagination
   String _selectedFilter = 'Semua';
-  final List<String> _filterOptions = ['Semua', 'Menunggu', 'Diterima', 'Ditolak'];
-  
+  final List<String> _filterOptions = [
+    'Semua',
+    'Menunggu',
+    'Diterima',
+    'Ditolak'
+  ];
+
   // Pagination untuk filtered data
   int _currentPage = 1;
   final int _itemsPerPage = 10;
   int _totalFilteredItems = 0;
   int _totalFilteredPages = 1;
 
+  // Controller untuk form kuota
+  final TextEditingController _kuotaController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     _loadIndustriData();
+  }
+
+  @override
+  void dispose() {
+    _kuotaController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadIndustriData() async {
@@ -115,6 +129,10 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
 
       setState(() {
         _industriData = combinedData;
+        // Set initial kuota value to controller
+        _kuotaController.text =
+            (_industriData?['kuota_siswa'] ?? _industriData?['kuota'] ?? 0)
+                .toString();
       });
 
       // 4. Load semua data siswa di industri ini
@@ -157,21 +175,702 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
       print('Error loading siswa data: $e');
     }
   }
+// =================== FITUR UPDATE KUOTA DENGAN DESIGN BAGUS ===================
+Future<void> _showUpdateKuotaDialog() async {
+  final kuotaSiswa = _industriData?['kuota_siswa'] ?? _industriData?['kuota'] ?? 0;
+  _kuotaController.text = kuotaSiswa.toString();
+  
+  final jumlahSiswaAktif = _getJumlahSiswaAktif();
+  final remainingSlots = _industriData?['remaining_slots'] ?? _industriData?['sisa_kuota'] ?? 0;
+
+  return showModalBottomSheet(
+    context: context,
+    isScrollControlled: true, // Penting! untuk menyesuaikan dengan keyboard
+    backgroundColor: Colors.transparent,
+    builder: (BuildContext context) {
+      return Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom, // Menyesuaikan dengan keyboard
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: SingleChildScrollView( // Agar bisa di-scroll
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header dengan icon
+                Center(
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: _primaryRed.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.edit_note,
+                      color: _primaryRed,
+                      size: 30,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                // Title
+                const Center(
+                  child: Text(
+                    'Update Kuota PKL',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                // Info industri
+                Center(
+                  child: Text(
+                    _industriData?['nama'] ?? 'Industri',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Info kuota saat ini
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildInfoChip(
+                        icon: Icons.people,
+                        label: 'Kuota Saat Ini',
+                        value: '$kuotaSiswa',
+                        color: _primaryRed,
+                      ),
+                      Container(
+                        height: 30,
+                        width: 1,
+                        color: Colors.grey[300],
+                      ),
+                      _buildInfoChip(
+                        icon: Icons.person,
+                        label: 'Siswa Aktif',
+                        value: '$jumlahSiswaAktif',
+                        color: _green,
+                      ),
+                      Container(
+                        height: 30,
+                        width: 1,
+                        color: Colors.grey[300],
+                      ),
+                      _buildInfoChip(
+                        icon: Icons.event_available,
+                        label: 'Slot Tersisa',
+                        value: '$remainingSlots',
+                        color: remainingSlots > 0 ? _green : Colors.orange,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Form input kuota
+                const Text(
+                  'Masukkan kuota baru',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _kuotaController,
+                  keyboardType: TextInputType.number,
+                  autofocus: true, // Auto focus saat dialog terbuka
+                  decoration: InputDecoration(
+                    labelText: 'Kuota Siswa',
+                    hintText: 'Contoh: 50',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: _primaryRed, width: 2),
+                    ),
+                    prefixIcon: const Icon(Icons.people, color: _primaryRed),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                // Info tambahan
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, size: 16, color: Colors.blue[700]),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Kuota baru harus lebih besar atau sama dengan jumlah siswa aktif ($jumlahSiswaAktif siswa)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Actions buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          side: BorderSide(color: Colors.grey[300]!),
+                        ),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (_kuotaController.text.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Kuota tidak boleh kosong'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final int newKuota = int.tryParse(_kuotaController.text) ?? 0;
+                          if (newKuota <= 0) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Kuota harus lebih dari 0'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (newKuota < jumlahSiswaAktif) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Kuota baru tidak boleh kurang dari jumlah siswa aktif ($jumlahSiswaAktif)'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.pop(context); // Tutup dialog
+                          await _updateKuota(newKuota);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryRed,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Update Kuota',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10), // Extra padding di bagian bawah
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+// Helper widget untuk info chip
+  Widget _buildInfoChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
+    );
+  }
+
+// =================== FITUR HAPUS DENGAN DESIGN BAGUS ===================
+  Future<void> _showDeleteConfirmationDialog() async {
+    final jumlahSiswaAktif = _getJumlahSiswaAktif();
+    final hasActiveStudents = jumlahSiswaAktif > 0;
+
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Animated warning icon
+                Stack(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: hasActiveStudents
+                            ? Colors.orange.withValues(alpha: 0.1)
+                            : Colors.red.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: Icon(
+                        hasActiveStudents
+                            ? Icons.warning_rounded
+                            : Icons.delete_forever_rounded,
+                        color: hasActiveStudents ? Colors.orange : Colors.red,
+                        size: 50,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                Text(
+                  hasActiveStudents
+                      ? 'Tidak Dapat Menghapus'
+                      : 'Hapus Industri',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: hasActiveStudents ? Colors.orange : Colors.red,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Nama industri
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _primaryRed.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    _industriData?['nama'] ?? 'Industri',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: _primaryRed,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Warning message
+                if (hasActiveStudents) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Industri ini masih memiliki siswa aktif:',
+                          style: TextStyle(fontSize: 13),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.person, size: 18, color: Colors.orange),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$jumlahSiswaAktif Siswa',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Pindahkan atau selesaikan siswa terlebih dahulu sebelum menghapus industri.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          _primaryRed, // Warna merah/coklat untuk tombol OK
+                      minimumSize: const Size(double.infinity, 45),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'Mengerti',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                    ),
+                    child: const Column(
+                      children: [
+                        Text(
+                          'Apakah Anda yakin ingin menghapus industri ini?',
+                          style: TextStyle(fontSize: 14),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.warning, size: 16, color: Colors.red),
+                            SizedBox(width: 4),
+                            Text(
+                              'Tindakan ini tidak dapat dibatalkan!',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            side: BorderSide(color: Colors.grey[300]!),
+                          ),
+                          child: const Text(
+                            'Batal',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(context); // Tutup dialog konfirmasi
+                            await _deleteIndustri();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                                Colors.red, // WARNA MERAH untuk tombol hapus
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'Ya, Hapus',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+// Loading dialog yang lebih bagus
+// Helper widget untuk info chip
+
+// =================== FITUR HAPUS DENGAN DESIGN BAGUS ===================
+
+// Loading dialog yang lebih bagus
+
+  Future<void> _updateKuota(int newKuota) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      if (token == null) {
+        _showErrorSnackBar('Token tidak ditemukan');
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
+      final response = await http.put(
+        Uri.parse(
+            '${dotenv.env['API_BASE_URL']}/api/pkl/industri/${widget.industriId}/quota'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'kuota_siswa': newKuota,
+        }),
+      );
+
+      Navigator.pop(context); // Tutup loading dialog
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text(responseData['message'] ?? 'Kuota berhasil diupdate'),
+              backgroundColor: _green,
+            ),
+          );
+        }
+
+        // Refresh data
+        await _loadIndustriData();
+      } else {
+        String errorMessage = 'Gagal mengupdate kuota';
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['message'] ?? errorMessage;
+        } catch (e) {
+          // Ignore parsing error
+        }
+
+        if (mounted) {
+          _showErrorSnackBar(errorMessage);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Tutup loading dialog jika masih ada
+        _showErrorSnackBar('Error: ${e.toString()}');
+      }
+    }
+  }
+
+  // =================== FITUR BARU: HAPUS INDUSTRI ===================
+
+  Future<void> _deleteIndustri() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('access_token');
+
+      if (token == null) {
+        _showErrorSnackBar('Token tidak ditemukan');
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        },
+      );
+
+      final response = await http.delete(
+        Uri.parse(
+            '${dotenv.env['API_BASE_URL']}/api/industri/${widget.industriId}'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      Navigator.pop(context); // Tutup loading dialog
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content:
+                  Text(responseData['message'] ?? 'Industri berhasil dihapus'),
+              backgroundColor: _green,
+            ),
+          );
+
+          // Kembali ke halaman sebelumnya
+          Navigator.pop(
+              context, true); // true menandakan bahwa data telah dihapus
+        }
+      } else {
+        String errorMessage = 'Gagal menghapus industri';
+        try {
+          final errorData = jsonDecode(response.body);
+          errorMessage = errorData['message'] ?? errorMessage;
+        } catch (e) {
+          // Ignore parsing error
+        }
+
+        if (mounted) {
+          _showErrorSnackBar(errorMessage);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Tutup loading dialog jika masih ada
+        _showErrorSnackBar('Error: ${e.toString()}');
+      }
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
 
   // Helper untuk mendapatkan data yang sudah difilter
   List<dynamic> get _filteredSiswaList {
     List<dynamic> filteredList;
-    
+
     if (_selectedFilter == 'Semua') {
       filteredList = _allSiswaList;
     } else {
       filteredList = _allSiswaList.where((siswa) {
-        final status = siswa['application']?['status']?.toString().toLowerCase() ?? '';
+        final status =
+            siswa['application']?['status']?.toString().toLowerCase() ?? '';
         switch (_selectedFilter) {
           case 'Menunggu':
             return status == 'pending' || status.contains('menunggu');
           case 'Diterima':
-            return status == 'approved' || status == 'active' || status.contains('diterima');
+            return status == 'approved' ||
+                status == 'active' ||
+                status.contains('diterima');
           case 'Ditolak':
             return status == 'rejected' || status.contains('ditolak');
           default:
@@ -179,7 +878,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
         }
       }).toList();
     }
-    
+
     return filteredList;
   }
 
@@ -188,7 +887,9 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
     final filteredList = _filteredSiswaList;
     final startIndex = (_currentPage - 1) * _itemsPerPage;
     final endIndex = startIndex + _itemsPerPage;
-    
+
+    if (filteredList.isEmpty) return [];
+
     return filteredList.sublist(
       startIndex.clamp(0, filteredList.length),
       endIndex.clamp(0, filteredList.length),
@@ -197,12 +898,12 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
 
   void _updatePaginationInfo() {
     final filteredList = _filteredSiswaList;
-    
+
     setState(() {
       _totalFilteredItems = filteredList.length;
       _totalFilteredPages = (_totalFilteredItems / _itemsPerPage).ceil();
       if (_totalFilteredPages == 0) _totalFilteredPages = 1;
-      
+
       // Pastikan current page tidak melebihi total pages
       if (_currentPage > _totalFilteredPages) {
         _currentPage = _totalFilteredPages;
@@ -219,7 +920,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
 
   void _changePage(int page) {
     if (page < 1 || page > _totalFilteredPages) return;
-    
+
     setState(() {
       _currentPage = page;
     });
@@ -229,7 +930,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
   Widget _buildPaginationControls() {
     // Hanya tampilkan pagination jika filtered data lebih dari items per page
     if (_totalFilteredItems <= _itemsPerPage) return const SizedBox();
-    
+
     return Container(
       margin: const EdgeInsets.only(top: 16),
       child: Column(
@@ -243,7 +944,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          
+
           // Tombol pagination
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -260,46 +961,49 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                disabledColor: Colors.grey,
+                color: _currentPage > 1 ? _primaryRed : Colors.grey,
               ),
-              
+
               const SizedBox(width: 8),
-              
+
               // Number buttons - hanya tampilkan jika lebih dari 1 halaman
               if (_totalFilteredPages > 1)
                 Wrap(
                   spacing: 4,
                   children: [
                     // First page (tampilkan jika halaman aktif > 3)
-                    if (_currentPage > 3)
-                      _buildPageButton(1),
-                    
+                    if (_currentPage > 3) _buildPageButton(1),
+
                     // Dots (tampilkan jika halaman aktif > 4)
                     if (_currentPage > 4)
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Text('...', style: TextStyle(color: Colors.grey)),
+                        child:
+                            Text('...', style: TextStyle(color: Colors.grey)),
                       ),
-                    
+
                     // Pages around current page
-                    for (int i = max(1, _currentPage - 2); i <= min(_totalFilteredPages, _currentPage + 2); i++)
+                    for (int i = _max(1, _currentPage - 2);
+                        i <= _min(_totalFilteredPages, _currentPage + 2);
+                        i++)
                       _buildPageButton(i),
-                    
+
                     // Dots (tampilkan jika halaman aktif < totalPages - 3)
                     if (_currentPage < _totalFilteredPages - 3)
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Text('...', style: TextStyle(color: Colors.grey)),
+                        child:
+                            Text('...', style: TextStyle(color: Colors.grey)),
                       ),
-                    
+
                     // Last page (tampilkan jika halaman aktif < totalPages - 2)
                     if (_currentPage < _totalFilteredPages - 2)
                       _buildPageButton(_totalFilteredPages),
                   ],
                 ),
-              
+
               const SizedBox(width: 8),
-              
+
               // Tombol Next
               IconButton(
                 onPressed: _currentPage < _totalFilteredPages
@@ -307,12 +1011,14 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
                     : null,
                 icon: const Icon(Icons.chevron_right),
                 style: IconButton.styleFrom(
-                  backgroundColor: _primaryRed.withValues(alpha:0.1),
+                  backgroundColor: _primaryRed.withValues(alpha: 0.1),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                disabledColor: Colors.grey,
+                color: _currentPage < _totalFilteredPages
+                    ? _primaryRed
+                    : Colors.grey,
               ),
             ],
           ),
@@ -320,7 +1026,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
       ),
     );
   }
-  
+
   Widget _buildPageButton(int page) {
     final isCurrent = page == _currentPage;
     return GestureDetector(
@@ -348,9 +1054,9 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
       ),
     );
   }
-  
-  int max(int a, int b) => a > b ? a : b;
-  int min(int a, int b) => a < b ? a : b;
+
+  int _max(int a, int b) => a > b ? a : b;
+  int _min(int a, int b) => a < b ? a : b;
 
   // =================== SKELETON LOADING WIDGETS ===================
   Widget _buildSkeletonLoading() {
@@ -416,7 +1122,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Skeleton Biodata Section
             _skeletonSectionTitle(),
             _skeletonCard(
@@ -436,7 +1142,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Skeleton Statistik Section
             _skeletonSectionTitle(),
             _skeletonCard(
@@ -460,7 +1166,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Skeleton Siswa Section
             _skeletonSectionTitle(),
             _skeletonCard(
@@ -644,6 +1350,20 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
             fontWeight: FontWeight.w700,
           ),
         ),
+        actions: [
+          // Tombol Update Kuota
+          IconButton(
+            icon: const Icon(Icons.edit, color: Colors.white),
+            onPressed: _showUpdateKuotaDialog,
+            tooltip: 'Update Kuota',
+          ),
+          // Tombol Hapus Industri
+          IconButton(
+            icon: const Icon(Icons.delete, color: Colors.white),
+            onPressed: _showDeleteConfirmationDialog,
+            tooltip: 'Hapus Industri',
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _loadIndustriData,
@@ -703,9 +1423,10 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
                 height: 70,
                 width: 70,
                 decoration: BoxDecoration(
-                  color: _primaryRed.withValues(alpha:0.1),
+                  color: _primaryRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _primaryRed.withValues(alpha:0.3), width: 2),
+                  border:
+                      Border.all(color: _primaryRed.withValues(alpha: 0.3), width: 2),
                 ),
                 child: const Icon(
                   Icons.apartment,
@@ -763,7 +1484,8 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
                 });
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: isSelected ? _primaryRed : Colors.grey[100],
                   borderRadius: BorderRadius.circular(20),
@@ -798,7 +1520,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
           const Divider(height: 20),
           _infoRow('Email', _industriData?['email'] ?? '-'),
           const Divider(height: 20),
-          _infoRow('PIC', _industriData?['pic'] ?? '-'),
+          _infoRow('Pembimbing Industri', _industriData?['pic'] ?? '-'),
           const Divider(height: 20),
           _infoRow('Telp PIC', _industriData?['pic_telp'] ?? '-'),
         ],
@@ -887,9 +1609,9 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha:0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.orange.withValues(alpha:0.3)),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -916,9 +1638,9 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha:0.05),
+        color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha:0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -949,7 +1671,7 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
 
   Widget _siswaListWidget() {
     final currentData = _currentPageData;
-    
+
     if (currentData.isEmpty) {
       return _card(
         Center(
@@ -958,17 +1680,16 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
             child: Column(
               children: [
                 Icon(
-                  _selectedFilter == 'Semua' 
-                    ? Icons.people_outline 
-                    : Icons.filter_alt_outlined,
-                  size: 60, 
-                  color: Colors.grey[400]
-                ),
+                    _selectedFilter == 'Semua'
+                        ? Icons.people_outline
+                        : Icons.filter_alt_outlined,
+                    size: 60,
+                    color: Colors.grey[400]),
                 const SizedBox(height: 16),
                 Text(
-                  _selectedFilter == 'Semua' 
-                    ? 'Belum ada siswa yang mengajukan PKL di industri ini'
-                    : 'Tidak ada siswa dengan status "$_selectedFilter"',
+                  _selectedFilter == 'Semua'
+                      ? 'Belum ada siswa yang mengajukan PKL di industri ini'
+                      : 'Tidak ada siswa dengan status "$_selectedFilter"',
                   style: const TextStyle(color: Colors.grey),
                   textAlign: TextAlign.center,
                 ),
@@ -1015,12 +1736,13 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
         }
 
         return Container(
-          margin: EdgeInsets.only(bottom: index < currentData.length - 1 ? 12 : 0),
+          margin:
+              EdgeInsets.only(bottom: index < currentData.length - 1 ? 12 : 0),
           child: _card(
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: statusColor.withValues(alpha:0.1),
+                  backgroundColor: statusColor.withValues(alpha: 0.1),
                   child: Icon(
                     Icons.person,
                     color: statusColor,
@@ -1052,9 +1774,9 @@ class _IndustriDetailScreenState extends State<IndustriDetailScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha:0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withValues(alpha:0.3)),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
