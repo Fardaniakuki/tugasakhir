@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dashboard_page.dart';
 import 'masalah_ijin_page.dart';
-import 'pengaturan_page.dart';
 import 'upload_page.dart';
 import 'permasalahan_siswa_page.dart'; // IMPORT PAGE BARU
+import 'penilaian_page.dart'; // IMPORT HALAMAN PENILAIAN`
 
 class PembimbingMainScreen extends StatefulWidget {
   const PembimbingMainScreen({super.key});
@@ -40,7 +40,7 @@ class _PembimbingMainScreen extends State<PembimbingMainScreen> {
       _buildUploadPage(),       // index 1
       _buildMasalahIjinPage(),  // index 2
       _buildPermasalahanPage(), // index 3 (HALAMAN BARU)
-      _buildPengaturanPage(),   // index 4
+      _buildPenilaianPage(),   // index 4
     ];
   }
 
@@ -129,12 +129,12 @@ class _PembimbingMainScreen extends State<PembimbingMainScreen> {
   }
 
   // Builder untuk halaman Pengaturan dengan caching sederhana
-  Widget _buildPengaturanPage() {
+  Widget _buildPenilaianPage() {
     return _buildCachedPage(
       index: 4,
       builder: () {
-        return const PengaturanPage(
-          key: ValueKey('pengaturan_page'),
+        return const PenilaianPage(
+          key: ValueKey('penilaian_page'),
         );
       },
     );
@@ -303,8 +303,8 @@ class __PembimbingBottomBarState extends State<_PembimbingBottomBar> {
           _buildTabItem(
             index: 4,
             icon: Icons.settings_outlined,
-            activeIcon: Icons.settings,
-            label: 'Pengaturan',
+            activeIcon: Icons.assignment,
+            label: 'Penilaian',
           ),
         ],
       ),

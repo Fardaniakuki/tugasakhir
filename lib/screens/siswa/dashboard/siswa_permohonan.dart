@@ -527,7 +527,7 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
                     fontStyle: FontStyle.italic)),
             if (isPending)
               Row(children: [
-                _buildActionButton(Icons.edit_outlined, 'Edit', RekapTheme.blue,
+                _buildActionButton(Icons.edit_outlined, 'Ubah', RekapTheme.blue,
                     () => _showEditIzinBottomSheet(data)),
                 const SizedBox(width: 8),
                 _buildActionButton(Icons.delete_outline, 'Hapus',
@@ -574,7 +574,7 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content:
-              Text('Hanya izin dengan status "Menunggu" yang dapat diedit'),
+              Text('Hanya izin dengan status "Menunggu" yang dapat diubah'),
           backgroundColor: RekapTheme.orange,
         ),
       );
@@ -607,7 +607,7 @@ class _SiswaSiaContentState extends State<SiswaSiaContent> {
                 child: Row(children: [
                   Icon(Icons.edit_rounded, color: RekapTheme.blue, size: 24),
                   SizedBox(width: 12),
-                  Text('Edit Pengajuan Izin',
+                  Text('Ubah Pengajuan Izin',
                       style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,

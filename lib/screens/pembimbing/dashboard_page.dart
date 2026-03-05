@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../login/login_screen.dart';
 import 'industri_detail_screen.dart';
+import 'pengaturan_page.dart';
 
 class PembimbingDashboard extends StatefulWidget {
   const PembimbingDashboard({super.key});
@@ -80,15 +81,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
     });
   }
 
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('access_token');
-    await prefs.remove('user_name');
-    await prefs.remove('user_role');
-    await prefs.remove('nama');
-    _clearAllCache();
-    _redirectToLogin();
-  }
 
   Future<void> _loadAllData() async {
     setState(() => _isLoading = true);
@@ -455,8 +447,16 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                   color: _textPrimary)),
           Row(children: [
             const SizedBox(width: 12),
-            PopupMenuButton<String>(
-              icon: Container(
+            // Icon profile langsung mengarah ke pengaturan_page
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const PengaturanPage()),
+                );
+              },
+              child: Container(
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
@@ -467,25 +467,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
                           width: 1.5)),
                   child:
                       Icon(Icons.person_outline, color: _primaryRed, size: 22)),
-              onSelected: (value) => value == 'logout'
-                  ? _showLogoutConfirmation()
-                  : _showSnackBar('Fitur profil belum tersedia'),
-              itemBuilder: (context) => [
-                const PopupMenuItem<String>(
-                    value: 'profile',
-                    child: Row(children: [
-                      Icon(Icons.person, size: 20),
-                      SizedBox(width: 8),
-                      Text('Profil')
-                    ])),
-                const PopupMenuItem<String>(
-                    value: 'logout',
-                    child: Row(children: [
-                      Icon(Icons.logout, size: 20, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('Logout', style: TextStyle(color: Colors.red))
-                    ])),
-              ],
             ),
           ]),
         ]),
@@ -499,26 +480,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
     );
   }
 
-  void _showLogoutConfirmation() {
-    showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-              title: const Text('Konfirmasi Logout'),
-              content: const Text('Apakah Anda yakin ingin logout?'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Batal')),
-                TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _logout();
-                    },
-                    child: const Text('Logout',
-                        style: TextStyle(color: Colors.red))),
-              ],
-            ));
-  }
 
   Widget _topCard() {
     return Padding(
@@ -1131,7 +1092,6 @@ class _PembimbingDashboardState extends State<PembimbingDashboard> {
       ),
     );
   }
-
 
   String _formatDate(String dateString) {
     if (dateString.isEmpty) return '-';

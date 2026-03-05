@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'dashboard/koordinator_dashboard.dart';
 import 'dashboard/koordinator_jadwal.dart';
 import 'dashboard/koordinator_data.dart';
-import 'dashboard/koordinator_pengaturan.dart';
 import 'dashboard/koordinator_perizinan_screen.dart';
 import 'dashboard/koordinator_generate_surat.dart'; // IMPORT HALAMAN BARU
+import 'dashboard/koordinator_review_penilaian.dart'; // IMPORT HALAMAN REVIEW PENILAIAN
 
 class KoordinatorMain extends StatefulWidget {
   const KoordinatorMain({super.key});
@@ -15,11 +15,11 @@ class KoordinatorMain extends StatefulWidget {
 
 class _KoordinatorMainState extends State<KoordinatorMain> {
   int _currentIndex = 0;
-  
+
   // Cache untuk menyimpan widget halaman
   final Map<int, Widget> _pageCache = {};
   final Map<int, bool> _pageLoaded = {};
-  
+
   // Controller untuk mempertahankan scroll position
   final List<ScrollController> _scrollControllers = [
     ScrollController(),
@@ -39,15 +39,15 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
   @override
   void initState() {
     super.initState();
-    
+
     // Inisialisasi page builders (SEKARANG 6 HALAMAN)
     _pageBuilders = [
-      _buildDashboardPage(),      // index 0
-      _buildJadwalPage(),         // index 1
-      _buildDataPage(),           // index 2
-      _buildPerizinanPage(),      // index 3
-      _buildGenerateSuratPage(),  // index 4 - GANTI PENGATURAN DENGAN GENERATE SURAT
-      _buildPengaturanPage(),     // index 5 - PENGATURAN PINDAH KE SINI
+      _buildDashboardPage(), // index 0
+      _buildJadwalPage(), // index 1
+      _buildDataPage(), // index 2
+      _buildPerizinanPage(), // index 3
+      _buildGenerateSuratPage(), // index 4 - GANTI PENGATURAN DENGAN GENERATE SURAT
+      _buildReviewPenilaianPage(), // index 5 - PENGATURAN PINDAH KE SINI
     ];
   }
 
@@ -122,13 +122,14 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     );
   }
 
-  // Builder untuk halaman Pengaturan (SEKARANG DI INDEX 5)
-  Widget _buildPengaturanPage() {
+// Tambahkan method:
+  Widget _buildReviewPenilaianPage() {
     return _buildCachedPage(
       index: 5,
       builder: () {
-        return const KoordinatorPengaturan(
-          key: ValueKey('pengaturan_page'),
+        return KoordinatorReviewPenilaian(
+          key: const ValueKey('review_penilaian_page'),
+          scrollController: _scrollControllers[5],
         );
       },
     );
@@ -181,7 +182,7 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
               children: _pageBuilders,
             ),
           ),
-          
+
           // Bottom Navigation Bar - posisi absolute di bawah
           Positioned(
             left: 0,
@@ -204,7 +205,7 @@ class _KoordinatorMainState extends State<KoordinatorMain> {
     if (_pageLoaded.containsKey(pageIndex)) {
       _pageCache.remove(pageIndex);
       _pageLoaded[pageIndex] = false;
-      
+
       if (_currentIndex == pageIndex) {
         setState(() {});
       }
@@ -246,7 +247,7 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -299,13 +300,12 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
             activeIcon: Icons.description,
             label: 'Buat Surat',
           ),
-
-          // Menu 6: Pengaturan
+// Menu 5: Review Penilaian
           _buildTabItem(
             index: 5,
-            icon: Icons.settings_outlined,
-            activeIcon: Icons.settings,
-            label: 'Pengaturan',
+            icon: Icons.rate_review_outlined,
+            activeIcon: Icons.rate_review_rounded,
+            label: 'Nilai',
           ),
         ],
       ),
@@ -320,7 +320,7 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
   }) {
     final bool isActive = widget.currentIndex == index;
     final activeColor = widget.primaryColor;
-    
+
     return Expanded(
       child: GestureDetector(
         onTap: () => widget.onTabSelected(index),
@@ -334,9 +334,9 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: isActive 
-                    ? activeColor.withValues(alpha:0.1)
-                    : Colors.transparent,
+                  color: isActive
+                      ? activeColor.withValues(alpha: 0.1)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -346,7 +346,7 @@ class __KoordinatorBottomBarState extends State<_KoordinatorBottomBar> {
                 ),
               ),
               const SizedBox(height: 4),
-              
+
               // Label
               Text(
                 label,

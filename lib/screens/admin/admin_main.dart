@@ -149,7 +149,8 @@ class _AdminMainState extends State<AdminMain> {
               ),
               _buildAddTile(Icons.person, 'Tambah Murid', 'Siswa'),
               _buildAddTile(Icons.school, 'Tambah Guru', 'Guru'),
-              _buildAddTile(Icons.category, 'Tambah Program Keahlian', 'Program Keahlian'),
+              _buildAddTile(Icons.category, 'Tambah Program Keahlian',
+                  'Program Keahlian'),
               _buildAddTile(Icons.business, 'Tambah Industri', 'Industri'),
               _buildAddTile(Icons.class_, 'Tambah Kelas', 'Kelas'),
               const SizedBox(height: 20),
@@ -329,7 +330,8 @@ class _AdminMainState extends State<AdminMain> {
                   'Unggah Excel',
                   style: TextStyle(fontWeight: FontWeight.w500),
                 ),
-                subtitle: const Text('Unggah file Excel untuk mengunggah data guru'),
+                subtitle:
+                    const Text('Unggah file Excel untuk mengunggah data guru'),
                 onTap: () {
                   Navigator.pop(context);
                   _showExcelImportDialog('guru');
@@ -821,7 +823,8 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                ...guideItems.map((item) => _buildGuideItem(item['label']!, item['value']!)),
+                ...guideItems.map(
+                    (item) => _buildGuideItem(item['label']!, item['value']!)),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: () {
@@ -1392,183 +1395,187 @@ class _ExcelImportPageState extends State<ExcelImportPage> {
       _showSnackbar('Gagal memilih file: $e');
     }
   }
-Future<void> _uploadFile() async {
-  if (_selectedFile == null) return;
 
-  print('📤 MEMULAI PROSES UPLOAD FILE - Tipe: ${widget.tipe}');
-  print('📁 File: ${_selectedFile!.name} (${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB)');
-  print('🔑 Token tersedia: ${_authToken != null ? "Ya" : "Tidak"}');
+  Future<void> _uploadFile() async {
+    if (_selectedFile == null) return;
 
-  setState(() {
-    _isLoading = true;
-    _statusMessage = 'Sedang mengupload file...';
-    _isSuccess = false;
-  });
+    print('📤 MEMULAI PROSES UPLOAD FILE - Tipe: ${widget.tipe}');
+    print(
+        '📁 File: ${_selectedFile!.name} (${(_selectedFile!.size / 1024).toStringAsFixed(1)} KB)');
+    print('🔑 Token tersedia: ${_authToken != null ? "Ya" : "Tidak"}');
 
-  try {
-    final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(
-        _selectedFile!.path!,
-        filename: _selectedFile!.name,
-      ),
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Sedang mengupload file...';
+      _isSuccess = false;
     });
 
-    final apiUrl = _getPreviewApiUrl();
-    print('🌐 URL API Preview: $apiUrl');
-    print('📤 Mengirim request ke server...');
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          _selectedFile!.path!,
+          filename: _selectedFile!.name,
+        ),
+      });
 
-    final response = await _dio.post(
-      apiUrl,
-      data: formData,
-      options: Options(headers: {
-        'Authorization': 'Bearer $_authToken',
-      }),
-    );
+      final apiUrl = _getPreviewApiUrl();
+      print('🌐 URL API Preview: $apiUrl');
+      print('📤 Mengirim request ke server...');
 
-    print('📥 Response status: ${response.statusCode}');
-    print('📦 Response data: ${response.data}');
+      final response = await _dio.post(
+        apiUrl,
+        data: formData,
+        options: Options(headers: {
+          'Authorization': 'Bearer $_authToken',
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      final data = response.data;
-      if (data['success'] == true) {
-        final summary = data['summary'];
-        print('✅ UPLOAD BERHASIL!');
-        print('📊 Ringkasan:');
-        print('   - Total baris: ${summary['total_rows']}');
-        print('   - Data valid: ${summary['valid_count']}');
-        print('   - Data error: ${summary['error_count']}');
-        print('   - Session ID: ${data['session_id']}');
-        
-        if (widget.tipe == 'guru') {
-          print('👨‍🏫 PREVIEW DATA GURU:');
-          final validRows = data['valid_rows'] ?? [];
-          for (var i = 0; i < validRows.length; i++) {
-            final guru = validRows[i];
-            print('   Guru #${i + 1}: ${guru['nama_lengkap']} (NIP: ${guru['nip']}, Kode: ${guru['kode_guru']})');
+      print('📥 Response status: ${response.statusCode}');
+      print('📦 Response data: ${response.data}');
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data['success'] == true) {
+          final summary = data['summary'];
+          print('✅ UPLOAD BERHASIL!');
+          print('📊 Ringkasan:');
+          print('   - Total baris: ${summary['total_rows']}');
+          print('   - Data valid: ${summary['valid_count']}');
+          print('   - Data error: ${summary['error_count']}');
+          print('   - Session ID: ${data['session_id']}');
+
+          if (widget.tipe == 'guru') {
+            print('👨‍🏫 PREVIEW DATA GURU:');
+            final validRows = data['valid_rows'] ?? [];
+            for (var i = 0; i < validRows.length; i++) {
+              final guru = validRows[i];
+              print(
+                  '   Guru #${i + 1}: ${guru['nama_lengkap']} (NIP: ${guru['nip']}, Kode: ${guru['kode_guru']})');
+            }
           }
-        }
 
-        setState(() {
-          _previewData = data;
-          _sessionId = data['session_id'];
-          _statusMessage = 'File berhasil diupload! Pratinjau data siap.';
-          _isSuccess = true;
-        });
+          setState(() {
+            _previewData = data;
+            _sessionId = data['session_id'];
+            _statusMessage = 'File berhasil diupload! Pratinjau data siap.';
+            _isSuccess = true;
+          });
+        } else {
+          print('❌ UPLOAD GAGAL: ${data['message']}');
+          setState(() {
+            _statusMessage = data['message'] ?? 'Gagal memproses file';
+            _isSuccess = false;
+          });
+        }
       } else {
-        print('❌ UPLOAD GAGAL: ${data['message']}');
+        print('❌ ERROR HTTP ${response.statusCode}');
         setState(() {
-          _statusMessage = data['message'] ?? 'Gagal memproses file';
+          _statusMessage = 'Error ${response.statusCode}';
           _isSuccess = false;
         });
       }
-    } else {
-      print('❌ ERROR HTTP ${response.statusCode}');
+    } on DioException catch (e) {
+      print('🚨 DIO EXCEPTION:');
+      print('   - Message: ${e.message}');
+      print('   - Type: ${e.type}');
+      print('   - Response: ${e.response?.data}');
+      print('   - Status Code: ${e.response?.statusCode}');
+
       setState(() {
-        _statusMessage = 'Error ${response.statusCode}';
+        _statusMessage =
+            e.response?.data?['message'] ?? e.message ?? 'Gagal upload';
         _isSuccess = false;
       });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+      print('🏁 Proses upload selesai');
     }
-  } on DioException catch (e) {
-    print('🚨 DIO EXCEPTION:');
-    print('   - Message: ${e.message}');
-    print('   - Type: ${e.type}');
-    print('   - Response: ${e.response?.data}');
-    print('   - Status Code: ${e.response?.statusCode}');
-    
-    setState(() {
-      _statusMessage =
-          e.response?.data?['message'] ?? e.message ?? 'Gagal upload';
-      _isSuccess = false;
-    });
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
-    print('🏁 Proses upload selesai');
   }
-}
 
-Future<void> _importData() async {
-  if (_sessionId == null) return;
+  Future<void> _importData() async {
+    if (_sessionId == null) return;
 
-  print('🚀 MEMULAI PROSES IMPORT DATA - Tipe: ${widget.tipe}');
-  print('🆔 Session ID: $_sessionId');
+    print('🚀 MEMULAI PROSES IMPORT DATA - Tipe: ${widget.tipe}');
+    print('🆔 Session ID: $_sessionId');
 
-  setState(() {
-    _isLoading = true;
-    _statusMessage = 'Sedang mengimport data...';
-  });
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Sedang mengimport data...';
+    });
 
-  try {
-    final apiUrl = _getImportApiUrl();
-    print('🌐 URL API Import: $apiUrl');
+    try {
+      final apiUrl = _getImportApiUrl();
+      print('🌐 URL API Import: $apiUrl');
 
-    final response = await _dio.post(
-      apiUrl,
-      data: {'session_id': _sessionId},
-      options: Options(headers: {
-        'Authorization': 'Bearer $_authToken',
-      }),
-    );
+      final response = await _dio.post(
+        apiUrl,
+        data: {'session_id': _sessionId},
+        options: Options(headers: {
+          'Authorization': 'Bearer $_authToken',
+        }),
+      );
 
-    print('📥 Response import status: ${response.statusCode}');
-    print('📦 Response import data: ${response.data}');
+      print('📥 Response import status: ${response.statusCode}');
+      print('📦 Response import data: ${response.data}');
 
-    if (response.statusCode == 200) {
-      final data = response.data;
-      if (data['success'] == true) {
-        print('✅ IMPORT BERHASIL!');
-        print('📊 Detail Import:');
-        
-        if (widget.tipe == 'guru') {
-          print('👨‍🏫 DATA GURU BERHASIL DIIMPOR:');
-          final insertedCount = data['inserted_count'] ?? 
-              _previewData?['summary']?['valid_count'] ?? 0;
-          print('   - Jumlah guru diimpor: $insertedCount');
-          
-          // Coba ambil detail dari response jika ada
-          if (data['data'] != null) {
-            final importedData = data['data'];
-            print('   - Data yang diimpor: $importedData');
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data['success'] == true) {
+          print('✅ IMPORT BERHASIL!');
+          print('📊 Detail Import:');
+
+          if (widget.tipe == 'guru') {
+            print('👨‍🏫 DATA GURU BERHASIL DIIMPOR:');
+            final insertedCount = data['inserted_count'] ??
+                _previewData?['summary']?['valid_count'] ??
+                0;
+            print('   - Jumlah guru diimpor: $insertedCount');
+
+            // Coba ambil detail dari response jika ada
+            if (data['data'] != null) {
+              final importedData = data['data'];
+              print('   - Data yang diimpor: $importedData');
+            }
           }
+
+          // Tampilkan popup sukses
+          await _showSuccessPopup(
+            'Data ${_getEntityName()} berhasil diimport!',
+            '${_previewData!['summary']['valid_count']} data ${_getEntityName().toLowerCase()} telah ditambahkan.',
+          );
+
+          print('📱 Menampilkan popup sukses');
+          widget.onImportSuccess?.call();
+
+          if (mounted) {
+            print('👋 Menutup halaman import');
+            Navigator.pop(context);
+          }
+        } else {
+          print('❌ IMPORT GAGAL: ${data['message']}');
+          setState(() {
+            _statusMessage = data['message'] ?? 'Gagal import data';
+            _isSuccess = false;
+            _isLoading = false;
+          });
         }
-
-        // Tampilkan popup sukses
-        await _showSuccessPopup(
-          'Data ${_getEntityName()} berhasil diimport!',
-          '${_previewData!['summary']['valid_count']} data ${_getEntityName().toLowerCase()} telah ditambahkan.',
-        );
-
-        print('📱 Menampilkan popup sukses');
-        widget.onImportSuccess?.call();
-
-        if (mounted) {
-          print('👋 Menutup halaman import');
-          Navigator.pop(context);
-        }
-      } else {
-        print('❌ IMPORT GAGAL: ${data['message']}');
-        setState(() {
-          _statusMessage = data['message'] ?? 'Gagal import data';
-          _isSuccess = false;
-          _isLoading = false;
-        });
       }
+    } on DioException catch (e) {
+      print('🚨 DIO EXCEPTION SAAT IMPORT:');
+      print('   - Message: ${e.message}');
+      print('   - Type: ${e.type}');
+      print('   - Response: ${e.response?.data}');
+      print('   - Status Code: ${e.response?.statusCode}');
+
+      setState(() {
+        _statusMessage = e.response?.data?['message'] ?? 'Gagal import data';
+        _isSuccess = false;
+        _isLoading = false;
+      });
     }
-  } on DioException catch (e) {
-    print('🚨 DIO EXCEPTION SAAT IMPORT:');
-    print('   - Message: ${e.message}');
-    print('   - Type: ${e.type}');
-    print('   - Response: ${e.response?.data}');
-    print('   - Status Code: ${e.response?.statusCode}');
-    
-    setState(() {
-      _statusMessage = e.response?.data?['message'] ?? 'Gagal import data';
-      _isSuccess = false;
-      _isLoading = false;
-    });
   }
-}
 
   Future<void> _showSuccessPopup(String title, String message) async {
     await showDialog(

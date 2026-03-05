@@ -419,7 +419,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
       if (token == null) return;
       final baseUrl = _getBaseUrl();
       final response = await http.get(
-        Uri.parse('$baseUrl/api/izin/wali-kelas'),
+        Uri.parse('$baseUrl/api/izin/pembimbing'),
         headers: {
           'accept': 'application/json',
           'Authorization': 'Bearer $token'

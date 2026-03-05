@@ -25,16 +25,17 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   String? selectedRole;
   bool isPasswordVisible = false;
   bool isAdminMode = false;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  
+
   // Tambahkan variabel untuk menyimpan data sekolah
   Map<String, dynamic>? _sekolahData;
   bool _isLoadingSekolah = false;
-  
+
   // Animation controller untuk efek geter
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
@@ -58,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    
+
     // Inisialisasi animasi geter
     _shakeController = AnimationController(
       vsync: this,
@@ -70,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         curve: Curves.elasticIn,
       ),
     );
-    
+
     _checkLoginStatus();
     _loadSekolahData(); // Panggil fungsi untuk load data sekolah
 
@@ -83,17 +84,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   // Fungsi untuk mengambil data sekolah
   Future<void> _loadSekolahData() async {
     if (!mounted) return;
-    
+
     setState(() {
       _isLoadingSekolah = true;
     });
 
     try {
       await dotenv.load(fileName: '.env');
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      
-      debugPrint('🔍 Mencoba mengambil data sekolah dari: $baseUrl/api/sekolah');
-      
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+
+      debugPrint(
+          '🔍 Mencoba mengambil data sekolah dari: $baseUrl/api/sekolah');
+
       final response = await http.get(
         Uri.parse('$baseUrl/api/sekolah'),
         headers: {'Content-Type': 'application/json'},
@@ -106,13 +109,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         debugPrint('✅ Data sekolah berhasil diambil');
         debugPrint('🏫 Nama Sekolah: ${data['data']?['nama_sekolah']}');
         debugPrint('🖼️ Logo URL: ${data['data']?['logo_url']}');
-        
+
         setState(() {
           _sekolahData = data['data'];
           _isLoadingSekolah = false;
         });
       } else if (mounted) {
-        debugPrint('⚠️ Gagal mengambil data sekolah. Status: ${response.statusCode}');
+        debugPrint(
+            '⚠️ Gagal mengambil data sekolah. Status: ${response.statusCode}');
         if (response.body.isNotEmpty) {
           debugPrint('Response body: ${response.body}');
         }
@@ -147,13 +151,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     setState(() {
       if (selectedRole == 'Siswa') {
         _isNameValid = value.length >= 3;
-        _nameErrorText = !_isNameValid && value.isNotEmpty 
-            ? 'Nama lengkap minimal 3 karakter' 
+        _nameErrorText = !_isNameValid && value.isNotEmpty
+            ? 'Nama lengkap minimal 3 karakter'
             : null;
       } else if (selectedRole == 'Guru' && isAdminMode) {
         _isNameValid = value.isNotEmpty;
-        _nameErrorText = !_isNameValid && value.isNotEmpty 
-            ? 'Nama tidak boleh kosong' 
+        _nameErrorText = !_isNameValid && value.isNotEmpty
+            ? 'Nama tidak boleh kosong'
             : null;
       } else {
         _isGuruCodeValid = value.isNotEmpty;
@@ -165,8 +169,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final value = passwordController.text.trim();
     setState(() {
       _isPasswordValid = value.length >= 6;
-      _passwordErrorText = !_isPasswordValid && value.isNotEmpty 
-          ? 'Kata sandi minimal 6 karakter' 
+      _passwordErrorText = !_isPasswordValid && value.isNotEmpty
+          ? 'Kata sandi minimal 6 karakter'
           : null;
     });
   }
@@ -175,8 +179,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final value = nisnController.text.trim();
     setState(() {
       _isNisnValid = value.length == 10 && _isNumeric(value);
-      _nisnErrorText = !_isNisnValid && value.isNotEmpty 
-          ? 'NISN harus 10 digit angka' 
+      _nisnErrorText = !_isNisnValid && value.isNotEmpty
+          ? 'NISN harus 10 digit angka'
           : null;
     });
   }
@@ -185,8 +189,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     final value = guruController.text.trim();
     setState(() {
       _isGuruCodeValid = value.isNotEmpty && _isNumeric(value);
-      _guruCodeErrorText = !_isGuruCodeValid && value.isNotEmpty 
-          ? 'Kode guru harus berupa angka' 
+      _guruCodeErrorText = !_isGuruCodeValid && value.isNotEmpty
+          ? 'Kode guru harus berupa angka'
           : null;
     });
   }
@@ -251,7 +255,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     passwordController.removeListener(_validatePassword);
     nisnController.removeListener(_validateNisn);
     guruController.removeListener(_validateGuruCode);
-    
+
     _shakeController.dispose();
 
     nameController.dispose();
@@ -261,7 +265,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
-  Future<Map<String, dynamic>?> _fetchGuruProfile(SharedPreferences prefs) async {
+  Future<Map<String, dynamic>?> _fetchGuruProfile(
+      SharedPreferences prefs) async {
     try {
       final token = prefs.getString('access_token');
       if (token == null) return null;
@@ -269,8 +274,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final userId = prefs.getInt('user_id');
       final kodeGuru = prefs.getString('kode_guru');
 
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
-      
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+
       if (userId != null) {
         final searchTerm = kodeGuru ?? '';
         final url = '$baseUrl/api/guru?search=$searchTerm&limit=10';
@@ -285,7 +291,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
-          if (data['success'] == true && data['data'] != null && data['data'] is Map) {
+          if (data['success'] == true &&
+              data['data'] != null &&
+              data['data'] is Map) {
             final dataMap = data['data'] as Map<String, dynamic>;
             if (dataMap['data'] != null && dataMap['data'] is List) {
               final guruList = dataMap['data'] as List;
@@ -346,7 +354,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             if (role == 'Kepala Konsentrasi Keahlian') {
               roleToSave = 'kaprog';
             }
-            
+
             final roleLower = roleToSave.toLowerCase();
             await prefs.setString('user_role', roleLower);
             await _saveAllUserData(prefs, combinedData, roleToSave);
@@ -417,7 +425,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         await prefs.setBool('is_kaprog', userData['is_kaprog'] == true);
       }
       if (userData['is_koordinator'] != null) {
-        await prefs.setBool('is_koordinator', userData['is_koordinator'] == true);
+        await prefs.setBool(
+            'is_koordinator', userData['is_koordinator'] == true);
       }
     } catch (e) {
       // Error handling
@@ -477,7 +486,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       if (errorMessage.isNotEmpty) {
         return errorMessage;
       }
-      
+
       if (endpoint == '/auth/siswa/login') {
         return 'Nama lengkap atau NISN salah';
       } else if (endpoint == '/auth/guru/login') {
@@ -485,7 +494,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       } else if (endpoint == '/auth/login') {
         return 'Username atau password salah';
       }
-      
+
       return 'Login gagal';
     } catch (e) {
       if (endpoint == '/auth/siswa/login') {
@@ -503,17 +512,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   void _showErrorNotification(String message) {
     // Jalankan animasi geter
     _shakeController.forward(from: 0);
-    
+
     // Jalankan geter pada HP
     _triggerVibration();
-    
+
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).clearSnackBars();
-    
+
     final isSiswa = selectedRole == 'Siswa';
-    final accentColor = isSiswa ? const Color(0xFF8A0000) : const Color(0xFF3B060A);
-    
+    final accentColor =
+        isSiswa ? const Color(0xFF8A0000) : const Color(0xFF3B060A);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -521,7 +531,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha:0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -578,7 +588,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   Future<void> loginToAPI(String endpoint, Map<String, dynamic> body) async {
     await dotenv.load(fileName: '.env');
 
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+    final baseUrl =
+        dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
     final url = Uri.parse('$baseUrl$endpoint');
 
     try {
@@ -633,7 +644,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
         if (endpoint == '/auth/guru/login' && !isAdminMode) {
           final userName = (user['nama'] ?? 'Guru').toString();
-          final capitalized = userName.isNotEmpty ? '${userName[0].toUpperCase()}${userName.substring(1)}' : 'Guru';
+          final capitalized = userName.isNotEmpty
+              ? '${userName[0].toUpperCase()}${userName.substring(1)}'
+              : 'Guru';
           await _showRoleSelectionDialog(context, user, prefs, capitalized);
         } else {
           Widget targetPage;
@@ -653,7 +666,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         }
       } else {
         if (!mounted) return;
-        
+
         setState(() {
           if (selectedRole == 'Siswa') {
             _isNameValid = false;
@@ -672,15 +685,17 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             _passwordErrorText = 'Password yang Anda masukkan salah';
           }
         });
-        
-        final errorMessage = _getUserFriendlyError(endpoint, response.statusCode, response.body);
+
+        final errorMessage =
+            _getUserFriendlyError(endpoint, response.statusCode, response.body);
         _showErrorNotification(errorMessage);
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       String errorMessage;
-      if (e.toString().contains('SocketException') || e.toString().contains('Connection refused')) {
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection refused')) {
         errorMessage = 'Tidak dapat terhubung ke server';
       } else if (e.toString().contains('Timeout')) {
         errorMessage = 'Koneksi timeout, periksa jaringan Anda';
@@ -693,7 +708,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           errorMessage = 'Kode guru atau password salah';
         }
       }
-      
+
       _showErrorNotification(errorMessage);
     }
   }
@@ -708,7 +723,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         nisn = user['NISN'].toString();
       }
 
-      final String nama = user['nama_lengkap'] ?? user['nama'] ?? user['full_name'] ?? 'Siswa';
+      final String nama =
+          user['nama_lengkap'] ?? user['nama'] ?? user['full_name'] ?? 'Siswa';
       final String kelasId = (user['kelas_id'] ?? '').toString();
 
       await prefs.setString('user_name', nama);
@@ -733,7 +749,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       final token = prefs.getString('access_token');
       if (token == null) return;
 
-      final baseUrl = dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+      final baseUrl =
+          dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
       final response = await http.get(
         Uri.parse('$baseUrl/api/kelas/$kelasId'),
         headers: {
@@ -764,7 +781,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       _nisnErrorText = null;
       _guruCodeErrorText = null;
     });
-    
+
     if (_formKey.currentState!.validate()) {
       if (selectedRole == 'Siswa') {
         loginToAPI('/auth/siswa/login', {
@@ -843,23 +860,64 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               fit: BoxFit.cover,
             ),
           ),
-          // Logo Sekolah - Diambil dari API
+// ========== LOGO SEKOLAH + MASKOT INO ==========
           Positioned(
             top: screenHeight * 0.15,
             left: 0,
             right: 0,
             child: Center(
-              child: Container(
-                width: screenWidth * 0.38,
-                height: screenWidth * 0.38,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(screenWidth * 0.19),
-                  child: _buildSchoolLogo(screenWidth),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Logo Sekolah (SMKN2) - dengan lingkaran putih
+                  Container(
+                    width: screenWidth * 0.3,
+                    height: screenWidth * 0.3,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(screenWidth * 0.15),
+                      child: _buildSchoolLogo(screenWidth),
+                    ),
+                  ),
+
+                  // Spacer kecil antara logo dan maskot
+                  const SizedBox(width: 15),
+
+                  // Maskot INO (di kanan) - TANPA LINGKARAN PUTIH
+                  SizedBox(
+                    width: screenWidth * 0.4,
+                    height: screenWidth * 0.4,
+                    // HAPUS BoxDecoration dengan shape circle
+                    // LANGSUNG ClipRRect tanpa background putih
+                    child: ClipRRect(
+                      borderRadius:
+                          BorderRadius.circular(15), // Sudut sedikit melengkung
+                      child: Image.asset(
+                        'assets/images/ino.webp', // Maskot INO
+                        fit: BoxFit.contain, // contain agar tidak terpotong
+                        errorBuilder: (context, error, stackTrace) {
+                          debugPrint('❌ Gagal memuat maskot INO: $error');
+                          return Container(
+                            color:
+                                const Color(0xFF3B060A).withValues(alpha: 0.1),
+                            child: Center(
+                              child: Icon(
+                                Icons.emoji_emotions,
+                                size: screenWidth * 0.15,
+                                color: const Color(0xFF3B060A)
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -878,7 +936,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     borderRadius: BorderRadius.circular(25),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha:0.25),
+                        color: Colors.black.withValues(alpha: 0.25),
                         blurRadius: 3,
                         offset: const Offset(0, 4),
                       ),
@@ -934,7 +992,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     borderRadius: BorderRadius.circular(25),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha:0.25),
+                        color: Colors.black.withValues(alpha: 0.25),
                         blurRadius: 3,
                         offset: const Offset(0, 4),
                       ),
@@ -1005,13 +1063,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       );
     }
 
-    if (_sekolahData != null && 
-        _sekolahData!['logo_url'] != null && 
+    if (_sekolahData != null &&
+        _sekolahData!['logo_url'] != null &&
         _sekolahData!['logo_url'].toString().isNotEmpty) {
-      
       debugPrint('🖼️ Menampilkan logo dari URL: ${_sekolahData!['logo_url']}');
       debugPrint('📋 Data diambil dari API sekolah (Admin)');
-      
+
       return Image.network(
         _sekolahData!['logo_url'],
         fit: BoxFit.cover,
@@ -1020,17 +1077,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             debugPrint('✅ Logo berhasil dimuat dari server');
             return child;
           }
-          debugPrint('⏳ Memuat logo dari server... ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
+          debugPrint(
+              '⏳ Memuat logo dari server... ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
           return Container(
             color: Colors.grey[300],
             child: Center(
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded / 
-                      loadingProgress.expectedTotalBytes!
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
                     : null,
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF3B060A)),
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(Color(0xFF3B060A)),
               ),
             ),
           );
@@ -1058,7 +1117,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     debugPrint('⚠️ Tidak ada logo_url dari server, menggunakan logo lokal');
     debugPrint('📁 Menggunakan logo dari: assets/images/smkn2.webp');
-    
+
     return Image.asset(
       'assets/images/smkn2.webp',
       fit: BoxFit.cover,
@@ -1133,7 +1192,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 margin: const EdgeInsets.only(bottom: 20),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(60),
-                                  child: _buildLoginScreenLogo(isSiswa, accentColor),
+                                  child: _buildLoginScreenLogo(
+                                      isSiswa, accentColor),
                                 ),
                               ),
                               const SizedBox(height: 20),
@@ -1149,7 +1209,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha:0.05),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.05),
                                       blurRadius: 10,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1256,10 +1317,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                       Container(
                                         width: double.infinity,
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(15),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha:0.15),
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.15),
                                               blurRadius: 6,
                                               offset: const Offset(0, 3),
                                             ),
@@ -1293,7 +1356,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                       Container(
                                         width: double.infinity,
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                           border: Border.all(
                                             color: accentColor,
                                             width: 1.5,
@@ -1367,13 +1431,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       );
     }
 
-    if (_sekolahData != null && 
-        _sekolahData!['logo_url'] != null && 
+    if (_sekolahData != null &&
+        _sekolahData!['logo_url'] != null &&
         _sekolahData!['logo_url'].toString().isNotEmpty) {
-      
-      debugPrint('🖼️ Menampilkan logo dari URL (halaman login): ${_sekolahData!['logo_url']}');
+      debugPrint(
+          '🖼️ Menampilkan logo dari URL (halaman login): ${_sekolahData!['logo_url']}');
       debugPrint('📋 Data diambil dari API sekolah (Admin)');
-      
+
       return Image.network(
         _sekolahData!['logo_url'],
         fit: BoxFit.cover,
@@ -1382,15 +1446,16 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             debugPrint('✅ Logo berhasil dimuat dari server (halaman login)');
             return child;
           }
-          debugPrint('⏳ Memuat logo dari server (halaman login)... ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
+          debugPrint(
+              '⏳ Memuat logo dari server (halaman login)... ${loadingProgress.cumulativeBytesLoaded}/${loadingProgress.expectedTotalBytes}');
           return Container(
             color: Colors.grey[300],
             child: Center(
               child: CircularProgressIndicator(
                 strokeWidth: 2,
                 value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded / 
-                      loadingProgress.expectedTotalBytes!
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
                     : null,
                 valueColor: AlwaysStoppedAnimation<Color>(accentColor),
               ),
@@ -1426,9 +1491,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       );
     }
 
-    debugPrint('⚠️ Tidak ada logo_url dari server, menggunakan logo lokal (halaman login)');
+    debugPrint(
+        '⚠️ Tidak ada logo_url dari server, menggunakan logo lokal (halaman login)');
     debugPrint('📁 Menggunakan logo dari: assets/images/smkn2.webp');
-    
+
     return Image.asset(
       'assets/images/smkn2.webp',
       fit: BoxFit.cover,
@@ -1478,9 +1544,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         TextFormField(
           controller: controller,
           keyboardType: isNisn ? TextInputType.number : TextInputType.text,
-          inputFormatters: isNisn
-              ? [FilteringTextInputFormatter.digitsOnly]
-              : null,
+          inputFormatters:
+              isNisn ? [FilteringTextInputFormatter.digitsOnly] : null,
           style: const TextStyle(color: Colors.black),
           maxLength: isNisn ? 10 : null,
           obscureText: isPassword && !isPasswordVisible,
@@ -1498,9 +1563,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: errorText != null 
-                    ? Colors.red[300]! 
-                    : Colors.grey[300]!,
+                color: errorText != null ? Colors.red[300]! : Colors.grey[300]!,
                 width: errorText != null ? 1.5 : 1,
               ),
             ),
@@ -1603,9 +1666,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: errorText != null 
-                    ? Colors.red[300]! 
-                    : Colors.grey[300]!,
+                color: errorText != null ? Colors.red[300]! : Colors.grey[300]!,
                 width: errorText != null ? 1.5 : 1,
               ),
             ),

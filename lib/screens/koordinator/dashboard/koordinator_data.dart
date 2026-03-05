@@ -264,19 +264,19 @@ class _KoordinatorDataState extends State<KoordinatorData>
           'email': 'smkn2singosari@yahoo.co.id',
           'website': 'www.smkn2singosari.sch.id',
           'logo_url':
-              'https://upload.wikimedia.org/wikipedia/commons/7/74/Coat_of_arms_of_East_Java.svg',
+              'https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Coat_of_arms_of_East_Java.svg/960px-Coat_of_arms_of_East_Java.svg.png',
         },
         'penandatangan': {
           'instansi': 'SMK Negeri 2 Singosari',
           'jabatan': 'Kepala SMK Negeri 2 Singosari',
           'nama': 'SUMIJAH, S.Pd., M.Si.',
-          'nip': '19700210 199802 2 009',
-          'pangkat': 'Pembina Tk. I'
+          'nip': '19700210 199802 2009',
+          'pangkat': 'Pembina Utama Muda (IV/c)'
         },
         'assignees': [
           {
             'instansi': 'SMK Negeri 2 Singosari',
-            'jabatan': 'Guru Pembimbing PKL',
+            'jabatan': 'Guru',
             'nama': _selectedGuru!['nama'],
             'nip': '',
           }
@@ -285,7 +285,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
           {
             'label': 'Keperluan',
             'separator': ':',
-            'value': 'Pengantaran Siswa Praktik Kerja Lapangan (PKL)'
+            'value': 'Pengantaran Siswa Praktik Kerja Lapangan \n (PKL)'
           },
           {
             'label': 'Hari / Tanggal',
@@ -1089,7 +1089,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
           'kab_kota': 'Kab. Malang',
           'kode_pos': '65153',
           'logo_url':
-              'https://upload.wikimedia.org/wikipedia/commons/7/74/Coat_of_arms_of_East_Java.svg',
+              'https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/Coat_of_arms_of_East_Java.svg/960px-Coat_of_arms_of_East_Java.svg.png',
           'provinsi': 'Jawa Timur',
           'telefon': '(0341) 458823'
         },
@@ -2263,7 +2263,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
         controller: _tabController,
         children: [
           // TAB 1: SURAT TUGAS
-          Padding(
+          SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
@@ -2379,6 +2379,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                             ),
                           )
                         : _buildGuruDropdown(),
+                        const SizedBox(height: 90),
               ],
             ),
           ),
@@ -2541,7 +2542,7 @@ class _KoordinatorDataState extends State<KoordinatorData>
                                     ),
                                   ),
                                 ),
-                              const SizedBox(height: 40),
+                              const SizedBox(height: 80),
                             ],
                           ),
               ],

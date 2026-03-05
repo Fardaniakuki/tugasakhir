@@ -1861,7 +1861,7 @@ class _KoordinatorDashboardState extends State<KoordinatorDashboard> {
     }
 
     return SizedBox(
-      height: 235,
+      height: 255,
       child: Column(
         children: [
           Expanded(
