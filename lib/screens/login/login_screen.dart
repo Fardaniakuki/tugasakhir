@@ -359,6 +359,16 @@ class _LoginScreenState extends State<LoginScreen>
             await prefs.setString('user_role', roleLower);
             await _saveAllUserData(prefs, combinedData, roleToSave);
 
+            // === TAMBAHKAN INI UNTUK MENYIMPAN DATA PEMBIMBING LANGSUNG ===
+            if (combinedData['nip'] != null) {
+              await prefs.setString('user_nip', combinedData['nip'].toString());
+            }
+            if (combinedData['jabatan'] != null) {
+              await prefs.setString(
+                  'user_jabatan', combinedData['jabatan'].toString());
+            }
+            // ============================================================
+
             if (!mounted) return;
 
             Widget targetPage;
@@ -407,9 +417,15 @@ class _LoginScreenState extends State<LoginScreen>
         await prefs.setString('kode_guru', userData['kode_guru'].toString());
       }
 
+      // === TAMBAHKAN INI UNTUK DATA PEMBIMBING ===
       if (userData['nip'] != null) {
         await prefs.setString('user_nip', userData['nip'].toString());
       }
+
+      if (userData['jabatan'] != null) {
+        await prefs.setString('user_jabatan', userData['jabatan'].toString());
+      }
+      // ============================================
 
       if (userData['no_telp'] != null) {
         await prefs.setString('user_phone', userData['no_telp'].toString());
@@ -629,9 +645,15 @@ class _LoginScreenState extends State<LoginScreen>
           }
         }
 
+        // === TAMBAHKAN INI UNTUK DATA PEMBIMBING ===
         if (user['nip'] != null) {
           await prefs.setString('user_nip', user['nip'].toString());
         }
+
+        if (user['jabatan'] != null) {
+          await prefs.setString('user_jabatan', user['jabatan'].toString());
+        }
+        // ============================================
 
         if (selectedRole == 'Siswa') {
           await prefs.setString('user_role', 'Siswa');

@@ -11,7 +11,7 @@ class KelolaPerizinanTabScreen extends StatefulWidget {
   
   const KelolaPerizinanTabScreen({
     super.key,
-    this.scrollController,
+    this.scrollController, required String token, required String baseUrl,
   });
 
   @override

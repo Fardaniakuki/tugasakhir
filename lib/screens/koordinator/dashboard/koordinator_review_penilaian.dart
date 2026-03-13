@@ -1,4 +1,4 @@
-// ignore_for_file: curly_braces_in_flow_control_structures
+// ignore_for_file: curly_braces_in_flow_control_structures, empty_catches
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,22 +12,31 @@ import '../../login/login_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
-// Untuk web
+// Tambahkan ini di bagian atas file bersama import lainnya
+import '../../../utils/pimpinan_storage.dart';
 
+// Untuk web
 class SiswaSelection {
   final int applicationId;
   final String nama;
   final String kelas;
   final String jurusan;
   final String industri;
+  final int? industriId;
   final String nisn;
   final double rataRata;
   final String tanggalSelesai;
 
-  // Tambahkan field untuk menyimpan data detail nilai
+  // Field untuk data PIC Industri
+  String? picNama;
+  String? picNip;
+  String? picJabatan; // TAMBAHKAN FIELD INI
+
+  // Field untuk data detail
   List<Map<String, dynamic>>? formItems;
   List<Map<String, dynamic>>? nilaiItems;
   Map<String, dynamic>? detailData;
+  Map<String, dynamic>? industriData;
 
   bool isSelected;
 
@@ -37,12 +46,17 @@ class SiswaSelection {
     required this.kelas,
     required this.jurusan,
     required this.industri,
+    this.industriId,
     required this.nisn,
     required this.rataRata,
     required this.tanggalSelesai,
     this.formItems,
     this.nilaiItems,
     this.detailData,
+    this.industriData,
+    this.picNama,
+    this.picNip,
+    this.picJabatan, // TAMBAHKAN DI SINI
     this.isSelected = false,
   });
 }
@@ -211,7 +225,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
     }
 
     try {
-      _showSnackBar('Memulai proses generate sertifikat...');
+      _showSnackBar('Memulai proses membuat sertifikat...');
 
       // Prepare all certificates data
       final List<Map<String, dynamic>> certificatesData = [];
@@ -232,6 +246,17 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                   detailData['form_items'] ?? []);
               siswa.nilaiItems =
                   List<Map<String, dynamic>>.from(detailData['items'] ?? []);
+
+              // Ambil data industri untuk mendapatkan PIC
+              final industriId = detailData['industri_id'];
+              if (industriId != null) {
+                final industriData = await _fetchIndustriData(industriId);
+                if (industriData != null) {
+                  siswa.industriData = industriData;
+                  siswa.picNama = industriData['pic'];
+                  siswa.picNip = industriData['pic_telp'] ?? '-';
+                }
+              }
             }
           }
 
@@ -263,7 +288,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       }
 
       if (certificatesData.isEmpty) {
-        _showSnackBar('Tidak ada sertifikat yang berhasil digenerate',
+        _showSnackBar('Tidak ada sertifikat yang berhasil dibuat',
             isError: true);
         return;
       }
@@ -301,7 +326,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          title: const Text('Membuat File ZIP'),
+          title: const Text('Membuat Berkas ZIP'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -403,13 +428,13 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       final shouldOpen = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('✅ Download Selesai'),
+          title: const Text('Unduhan Selesai'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'File ZIP berhasil dibuat!',
+                'Berkas ZIP berhasil dibuat!',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
@@ -451,14 +476,6 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Lokasi: ${saveDir.path}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade600,
-                ),
-              ),
             ],
           ),
           actions: [
@@ -469,7 +486,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
             ElevatedButton.icon(
               onPressed: () => Navigator.pop(context, true),
               icon: const Icon(Icons.folder_open_rounded, size: 18),
-              label: const Text('Buka File'),
+              label: const Text('Buka Berkas'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryColor,
                 foregroundColor: Colors.white,
@@ -497,7 +514,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       } else {
         // Jika user memilih tutup, tetap tampilkan notifikasi
         _showSnackBar(
-          'File ZIP tersimpan di folder Downloads',
+          'Berkas ZIP tersimpan di folder undah',
           duration: const Duration(seconds: 3),
         );
       }
@@ -713,6 +730,9 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       final rataRata =
           double.tryParse(review['rata_rata']?.toString() ?? '0') ?? 0;
 
+      // AMBIL INDUSTRI_ID DARI DATA REVIEW
+      final industriId = review['industri_id'];
+
       if (selectedMap.containsKey(appId)) {
         final existing = selectedMap[appId]!;
         _selectedSiswa.add(SiswaSelection(
@@ -721,12 +741,17 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
           kelas: existing.kelas,
           jurusan: existing.jurusan,
           industri: existing.industri,
+          industriId: existing.industriId ?? industriId,
           nisn: existing.nisn,
           rataRata: existing.rataRata,
           tanggalSelesai: existing.tanggalSelesai,
           formItems: existing.formItems,
           nilaiItems: existing.nilaiItems,
           detailData: existing.detailData,
+          industriData: existing.industriData,
+          picNama: existing.picNama,
+          picNip: existing.picNip,
+          picJabatan: existing.picJabatan, // TAMBAHKAN INI
           isSelected: true,
         ));
       } else {
@@ -736,15 +761,26 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
           kelas: review['kelas_nama'] ?? '',
           jurusan: review['jurusan_nama'] ?? '',
           industri: review['industri_nama'] ?? '',
-          nisn: review['nisn'] ?? '0123456789',
+          industriId: industriId,
+          nisn: review['siswa_nisn'] ?? '0123456789',
           rataRata: rataRata,
           tanggalSelesai: review['finalized_at'] ?? '',
           formItems: null,
           nilaiItems: null,
           detailData: null,
+          industriData: null,
+          picNama: null,
+          picNip: null,
+          picJabatan: null, // TAMBAHKAN INI
           isSelected: false,
         ));
       }
+    }
+
+    // Debug print
+    print('📋 _selectedSiswa setelah update:');
+    for (var s in _selectedSiswa) {
+      print('   - ${s.nama}: industriId = ${s.industriId}');
     }
   }
 
@@ -763,7 +799,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
   }
 
   void _applyFilters() {
-    // Konversi _selectedKelasNama ke _selectedKelasId
+    // Konversi _selectedKelasNama ke _selectedKelasId (jika ada)
     if (_selectedKelasNama != null) {
       // Cari di data review untuk mendapatkan kelas_id
       final reviewWithKelas = _reviewList.firstWhere(
@@ -773,11 +809,15 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       if (reviewWithKelas.isNotEmpty) {
         _selectedKelasId = reviewWithKelas['kelas_id'];
       }
+    } else {
+      _selectedKelasId = null;
     }
 
     setState(() {
       _showFilters = false;
     });
+
+    // Fetch ulang dengan filter baru
     _fetchReviewList(reset: true);
   }
 
@@ -885,6 +925,18 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       return;
     }
 
+    // DEBUG: Lihat data siswa yang dipilih
+    print('\n========== DEBUG DATA SISWA TERPILIH ==========');
+    for (var siswa in selectedList) {
+      print('Siswa: ${siswa.nama}');
+      print('  - industriId: ${siswa.industriId}');
+      print('  - industri: ${siswa.industri}');
+      print('  - applicationId: ${siswa.applicationId}');
+      print('  - nisn: ${siswa.nisn}');
+      print('  - rataRata: ${siswa.rataRata}');
+    }
+    print('===============================================\n');
+
     final downloadMethod = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -908,23 +960,18 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
               ),
             ),
             const SizedBox(height: 20),
-
-            // Metode ZIP
             _buildModernMethodOption(
               icon: Icons.archive_rounded,
               title: 'Arsip ZIP',
               description: 'Semua sertifikat digabung dalam satu berkas ZIP',
               value: 'zip',
             ),
-
             const SizedBox(height: 16),
-
-            // Metode Browser
             _buildModernMethodOption(
               icon: Icons.open_in_browser_rounded,
-              title: 'Buka dibrowser',
+              title: 'Buka di Peramban',
               description:
-                  'Setiap sertifikat terbuka otomatis di tab baru browser',
+                  'Setiap sertifikat terbuka otomatis di tab baru peramban',
               value: 'browser',
             ),
           ],
@@ -943,36 +990,19 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                     foregroundColor: const Color(0xFF757575),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: Colors.grey.shade300,
+                        width: 1.2,
+                      ),
                     ),
+                    backgroundColor: Colors.white,
+                    elevation: 0,
                   ),
                   child: const Text(
                     'Batal',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context, 'zip'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF641E20),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
-                  child: const Text(
-                    'Lanjutkan',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
                       fontSize: 15,
                     ),
                   ),
@@ -986,7 +1016,6 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
 
     if (downloadMethod == null) return;
 
-    // Tampilkan konfirmasi
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1130,50 +1159,116 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
     int success = 0;
     int failed = 0;
 
-    if (downloadMethod == 'zip') {
-      // Metode ZIP
-      await _generateAndZipCertificates(selectedList, context);
-    } else if (downloadMethod == 'browser') {
-      // Metode browser
-      for (var i = 0; i < selectedList.length; i++) {
-        final siswa = selectedList[i];
-        _updateProgressDialog(context, i + 1, selectedList.length, siswa.nama);
+    // Ambil data untuk semua siswa
+    for (var i = 0; i < selectedList.length; i++) {
+      final siswa = selectedList[i];
+      _updateProgressDialog(context, i + 1, selectedList.length, siswa.nama);
 
-        try {
-          final detailData = await _fetchSiswaDetailData(siswa.applicationId);
-          if (detailData != null) {
-            siswa.detailData = detailData;
-            siswa.formItems =
-                List<Map<String, dynamic>>.from(detailData['form_items'] ?? []);
-            siswa.nilaiItems =
-                List<Map<String, dynamic>>.from(detailData['items'] ?? []);
+      try {
+        print(
+            '\n🔍 ===== MEMPROSES SISWA ${i + 1}/${selectedList.length}: ${siswa.nama} =====');
 
+        // Fetch detail data dari API penilaian/review/{applicationId}
+        print(
+            '📡 Fetching detail data untuk applicationId: ${siswa.applicationId}');
+        final detailData = await _fetchSiswaDetailData(siswa.applicationId);
+
+        if (detailData != null) {
+          print('✅ Detail data berhasil diambil');
+          siswa.detailData = detailData;
+          siswa.formItems =
+              List<Map<String, dynamic>>.from(detailData['form_items'] ?? []);
+          siswa.nilaiItems =
+              List<Map<String, dynamic>>.from(detailData['items'] ?? []);
+
+          print('📊 Form items: ${siswa.formItems?.length ?? 0}');
+          print('📊 Nilai items: ${siswa.nilaiItems?.length ?? 0}');
+
+          // AMBIL INDUSTRI_ID DARI OBJEK SISWA (YANG SUDAH DISIMPAN DARI REVIEW LIST)
+          print('🏢 industri_id dari objek siswa: ${siswa.industriId}');
+
+          if (siswa.industriId != null) {
+            // Fetch data industri menggunakan industri_id dari objek siswa
+            print('📡 Fetching data industri untuk ID: ${siswa.industriId}');
+            final industriData = await _fetchIndustriData(siswa.industriId!);
+
+            if (industriData != null) {
+              siswa.industriData = industriData;
+
+              // Ambil PIC name
+              siswa.picNama = industriData['pic'];
+              if (siswa.picNama == null || siswa.picNama!.isEmpty) {
+                siswa.picNama = industriData['nama'] ?? '-';
+              }
+
+              // Ambil NIP - coba beberapa field
+              siswa.picNip = industriData['nip'] ??
+                  industriData['nip_pimpinan'] ??
+                  industriData['no_telp'] ??
+                  '-';
+
+              print('✅ Data PIC untuk ${siswa.nama}:');
+              print('   - Nama PIC: ${siswa.picNama}');
+              print('   - NIP/No: ${siswa.picNip}');
+              print('   - Raw industriData: ${jsonEncode(industriData)}');
+            } else {
+              print(
+                  '❌ Gagal fetch data industri untuk id: ${siswa.industriId}');
+            }
+          } else {
+            print('❌ industri_id null di objek siswa');
+          }
+        } else {
+          print(
+              '❌ Gagal fetch detailData untuk application: ${siswa.applicationId}');
+        }
+
+        // Generate sertifikat
+        if (siswa.formItems != null && siswa.formItems!.isNotEmpty) {
+          if (downloadMethod == 'zip') {
+            // Untuk ZIP, kita kumpulkan dulu (akan diproses setelah loop)
+            success++;
+          } else {
+            // Untuk browser, langsung generate satu per satu
+            print('📄 Generating certificate for ${siswa.nama}...');
             final fileUrl = await _generateCertificateAndGetUrl(siswa);
             if (fileUrl != null) {
-              await _downloadToChrome(fileUrl, 'sertifikat_${siswa.nama}.pdf');
+              print('✅ Certificate generated, downloading...');
+              await _downloadToChrome(
+                  fileUrl, 'sertifikat_${siswa.nama.replaceAll(' ', '_')}.pdf');
               await Future.delayed(const Duration(seconds: 1));
               success++;
             } else {
+              print('❌ Gagal generate certificate');
               failed++;
             }
-          } else {
-            failed++;
           }
-        } catch (e) {
-          print('Error generating for ${siswa.nama}: $e');
+        } else {
+          print('❌ Form items kosong untuk ${siswa.nama}');
           failed++;
         }
+      } catch (e) {
+        print('❌ Error processing ${siswa.nama}: $e');
+        failed++;
       }
     }
 
-    if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
+    if (downloadMethod == 'zip') {
+      // Generate ZIP
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context); // Tutup progress dialog
+      }
+      await _generateAndZipCertificates(selectedList, context);
+    } else {
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
 
-    _showSnackBar(
-      'Selesai: $success berhasil, $failed gagal',
-      isError: failed > 0,
-    );
+      _showSnackBar(
+        'Selesai: $success berhasil, $failed gagal',
+        isError: failed > 0,
+      );
+    }
 
     setState(() {
       _isSelectionMode = false;
@@ -1288,6 +1383,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       final nomorSertifikat =
           '420/${now.day}${now.month}${now.year}/101.6.9.19/${now.year}';
 
+      // Ambil deskripsi dari form items (maksimal 4 kompetensi)
       final String desc1 = siswa.formItems!.isNotEmpty
           ? siswa.formItems![0]['tujuan_pembelajaran'] ?? 'Kompetensi 1'
           : 'Kompetensi 1';
@@ -1301,6 +1397,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
           ? siswa.formItems![3]['tujuan_pembelajaran'] ?? 'Kompetensi 4'
           : 'Kompetensi 4';
 
+      // Hitung skor dari nilai items
       int skor1 = 0, skor2 = 0, skor3 = 0, skor4 = 0;
 
       for (var i = 0; i < siswa.formItems!.length; i++) {
@@ -1321,13 +1418,11 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
         else if (i == 3) skor4 = skor;
       }
 
-      // FORMAT YANG BENAR: Mengambil tanggal mulai dari data PKL
-      // Asumsikan data tanggal mulai ada di siswa.detailData
+      // FORMAT TANGGAL
       String tanggalMulai = '';
       String tanggalSelesai = '';
 
       if (siswa.detailData != null) {
-        // Coba ambil dari berbagai kemungkinan field
         tanggalMulai = siswa.detailData!['tanggal_mulai'] ??
             siswa.detailData!['start_date'] ??
             siswa.detailData!['mulai'] ??
@@ -1339,15 +1434,12 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
             siswa.tanggalSelesai;
       }
 
-      // Jika tidak ada, gunakan format default (6 bulan sebelum tanggal selesai)
       if (tanggalMulai.isEmpty) {
-        // Parse tanggal selesai
         try {
           if (siswa.tanggalSelesai.isNotEmpty) {
             final dateSelesai =
                 DateTime.parse(siswa.tanggalSelesai.split(' ')[0]);
-            final dateMulai =
-                dateSelesai.subtract(const Duration(days: 180)); // 6 bulan
+            final dateMulai = dateSelesai.subtract(const Duration(days: 180));
             tanggalMulai = _formatDate(dateMulai);
           } else {
             tanggalMulai =
@@ -1358,27 +1450,145 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
               _formatDate(DateTime.now().subtract(const Duration(days: 180)));
         }
       } else {
-        // Format tanggal mulai jika sudah ada
         try {
           final dateMulai = DateTime.parse(tanggalMulai);
           tanggalMulai = _formatDate(dateMulai);
         } catch (e) {
-          // Jika gagal parse, biarkan apa adanya
+          print('⚠️ Gagal parse tanggalMulai: $e');
         }
       }
 
-      // Format tanggal selesai
       if (tanggalSelesai.isNotEmpty) {
         try {
           final dateSelesai = DateTime.parse(tanggalSelesai.split(' ')[0]);
           tanggalSelesai = _formatDate(dateSelesai);
         } catch (e) {
-          // Jika gagal parse, gunakan format asli
+          print('⚠️ Gagal parse tanggalSelesai: $e');
         }
       } else {
         tanggalSelesai = formattedDate;
       }
 
+      // ===== DATA INDUSTRI (PIMPINAN + PEMBIMBING INDUSTRI) =====
+      print('\n📋 ===== DATA INDUSTRI UNTUK ${siswa.nama} =====');
+
+      String namaPimpinan = '';
+      String nipPimpinan = '';
+      String jabatanPimpinan = '';
+
+      String namaPembimbingIndustri = '';
+      String nipPembimbingIndustri = '';
+      String jabatanPembimbingIndustri = '';
+      // Tambahkan ini
+      print('🔍 CEK SHAREDPREFERENCES UNTUK APLIKASI ${siswa.applicationId}:');
+      final prefs = await SharedPreferences.getInstance();
+      prefs.getKeys().forEach((key) {
+        if (key.startsWith('industri_')) {
+          print('   - Key: $key');
+        }
+      });
+
+      // AMBIL HANYA DARI SHAREDPREFERENCES (INPUT PEMBIMBING)
+      print('📡 Mencari data industri di SharedPreferences...');
+      final industriData =
+          await PimpinanStorage.ambilDataIndustri(siswa.applicationId);
+
+      if (industriData != null) {
+        // Data Pimpinan Industri
+        namaPimpinan = industriData['pimpinan']?['nama'] ?? '';
+        nipPimpinan = industriData['pimpinan']?['nip'] ?? '-';
+        jabatanPimpinan = industriData['pimpinan']?['jabatan'] ?? '';
+
+        // Data Pembimbing Industri
+        namaPembimbingIndustri =
+            industriData['pembimbing_industri']?['nama'] ?? '';
+        nipPembimbingIndustri =
+            industriData['pembimbing_industri']?['nip'] ?? '-';
+        jabatanPembimbingIndustri =
+            industriData['pembimbing_industri']?['jabatan'] ?? '';
+
+        print('✅ Data industri ditemukan di SharedPreferences:');
+        print('   - Pimpinan: $namaPimpinan ($jabatanPimpinan)');
+        print(
+            '   - Pembimbing Industri: $namaPembimbingIndustri ($jabatanPembimbingIndustri)');
+        print('   - Waktu simpan: ${industriData['waktu_simpan']}');
+      } else {
+        // Jika tidak ada data di SharedPreferences
+        print('❌ TIDAK ADA DATA INDUSTRI DI SHAREDPREFERENCES!');
+        print(
+            '❌ Pembimbing belum menginput data untuk aplikasi ID: ${siswa.applicationId}');
+
+        // Throw exception agar proses generate gagal
+        throw Exception(
+            'Data pimpinan dan pembimbing industri belum diinput oleh pembimbing');
+      }
+
+      // ===== DATA PEMBIMBING SEKOLAH (KOORDINATOR) =====
+      print('\n📋 ===== DATA PEMBIMBING SEKOLAH =====');
+
+      String namaPembimbingSekolah = '';
+      String nipPembimbingSekolah = '';
+      String jabatanPembimbingSekolah = '';
+
+      // Coba ambil data guru berdasarkan user_id
+      final userId = prefs.getInt('user_id');
+      if (userId != null) {
+        try {
+          final guruResponse = await http.get(
+            Uri.parse(
+                '${dotenv.env['API_BASE_URL']}/api/guru?user_id=$userId&limit=1'),
+            headers: {
+              'accept': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          );
+
+          if (guruResponse.statusCode == 200) {
+            final guruData = jsonDecode(guruResponse.body);
+            if (guruData['success'] == true &&
+                guruData['data']['data'] != null &&
+                guruData['data']['data'].isNotEmpty) {
+              final guru = guruData['data']['data'][0];
+              namaPembimbingSekolah = guru['nama'] ?? '';
+              nipPembimbingSekolah = guru['nip'] ?? '';
+
+              // Tentukan jabatan berdasarkan role
+              if (guru['is_koordinator'] == true) {
+                jabatanPembimbingSekolah = 'Koordinator PKL';
+              } else if (guru['is_pembimbing'] == true) {
+                jabatanPembimbingSekolah = 'Guru Pembimbing PKL';
+              } else if (guru['is_wali_kelas'] == true) {
+                jabatanPembimbingSekolah = 'Wali Kelas';
+              } else {
+                jabatanPembimbingSekolah = 'Guru';
+              }
+
+              print('✅ Data guru ditemukan:');
+              print('   - Nama: $namaPembimbingSekolah');
+              print('   - NIP: $nipPembimbingSekolah');
+              print('   - Jabatan: $jabatanPembimbingSekolah');
+            }
+          }
+        } catch (e) {
+          print('❌ Error fetching guru data: $e');
+        }
+      }
+
+      // Jika data guru tidak ditemukan, pakai dari SharedPreferences
+      if (namaPembimbingSekolah.isEmpty) {
+        print('⚠️ Menggunakan data dari SharedPreferences');
+        namaPembimbingSekolah =
+            prefs.getString('user_name') ?? 'Guru Pembimbing PKL';
+        nipPembimbingSekolah = prefs.getString('user_nip') ?? '-';
+        jabatanPembimbingSekolah =
+            prefs.getString('user_jabatan') ?? 'Guru Pembimbing PKL';
+
+        print('   - Nama: $namaPembimbingSekolah');
+        print('   - NIP: $nipPembimbingSekolah');
+        print('   - Jabatan: $jabatanPembimbingSekolah');
+      }
+
+      // ===== GABUNGKAN SEMUA DATA UNTUK API =====
       final Map<String, dynamic> requestBody = {
         'nomor_sertifikat': nomorSertifikat,
         'siswa': {
@@ -1386,8 +1596,8 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
           'nisn': siswa.nisn,
         },
         'nama_industri': siswa.industri,
-        'tanggal_mulai': tanggalMulai, // Gunakan tanggal mulai yang benar
-        'tanggal_selesai': tanggalSelesai, // Gunakan tanggal selesai yang benar
+        'tanggal_mulai': tanggalMulai,
+        'tanggal_selesai': tanggalSelesai,
         'hasil_pkl': hasilPKL,
         'tanggal_terbit': formattedDate,
         'nilai': {
@@ -1400,8 +1610,27 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
           'aspek_4': skor4,
           'desc_4': desc4,
         },
+        // Data Pimpinan Industri
+        'nama_pimpinan': namaPimpinan,
+        'nip_pimpinan': nipPimpinan,
+        'jabatan_pimpinan': jabatanPimpinan,
+
+        // Data Pembimbing Industri
+        'nama_pembimbing': namaPembimbingIndustri,
+        'nip_pembimbing': nipPembimbingIndustri,
+        'jabatan_pembimbing': jabatanPembimbingIndustri,
+
+        // Data Pembimbing Sekolah (Koordinator)
+        'nama_pembimbing_sekolah': namaPembimbingSekolah,
+        'nip_pembimbing_sekolah': nipPembimbingSekolah,
+        'jabatan_pembimbing_sekolah': jabatanPembimbingSekolah,
       };
 
+      print('\n📤 ===== REQUEST BODY FINAL =====');
+      print(jsonEncode(requestBody));
+      print('===============================\n');
+
+      // Kirim request ke API sertifikat
       final response = await http.post(
         Uri.parse('${dotenv.env['SERTIF']}/api/v1/letters/sertifikat/$jurusan'),
         headers: {
@@ -1414,12 +1643,15 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        print('✅ Sertifikat berhasil dibuat: ${data['file_url']}');
         return data['file_url'];
       } else {
-        throw Exception('Gagal generate sertifikat');
+        print('❌ Error response: ${response.statusCode}');
+        print('❌ Response body: ${response.body}');
+        throw Exception('Gagal membuat sertifikat: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error generating certificate: $e');
+      print('❌ Error generating certificate: $e');
       return null;
     }
   }
@@ -1446,10 +1678,70 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+
+        // Pastikan data industri_id tersedia
+        print('✅ Detail data untuk application $applicationId:');
+        print('   - industri_id: ${data['industri_id']}');
+        print('   - form_items: ${data['form_items']?.length ?? 0}');
+        print('   - items: ${data['items']?.length ?? 0}');
+
+        return data;
       }
     } catch (e) {
       print('Error fetching detail for application $applicationId: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _fetchIndustriData(int industriId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    if (token == null) {
+      print('❌ Token tidak tersedia untuk fetch industri');
+      _redirectToLogin();
+      return null;
+    }
+
+    try {
+      final url = '${dotenv.env['API_BASE_URL']}/api/industri/$industriId';
+      print('📡 Fetching industri data from: $url');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      print('📡 Industri Response status: ${response.statusCode}');
+      print('📡 Industri Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+
+        // API mengembalikan struktur: { "success": true, "data": { ... } }
+        if (responseData['success'] == true && responseData['data'] != null) {
+          final industriData = responseData['data'] as Map<String, dynamic>;
+
+          print('✅ Data industri ditemukan:');
+          print('   - Nama: ${industriData['nama']}');
+          print('   - PIC: ${industriData['pic']}');
+          print('   - Jabatan: ${industriData['jabatan']}'); // CEK INI
+          print('   - No Telp: ${industriData['no_telp']}');
+          print('   - Email: ${industriData['email']}');
+
+          return industriData;
+        } else {
+          print('❌ Response success false atau data null');
+        }
+      } else {
+        print('❌ Gagal fetch industri: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error fetching industri data for id $industriId: $e');
     }
     return null;
   }
@@ -1919,7 +2211,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
     );
   }
 
-  // ==================== TAB REVIEW PENILAIAN ====================
+// ==================== TAB REVIEW PENILAIAN ====================
   Widget _buildReviewTab() {
     return RefreshIndicator(
       onRefresh: () => _fetchReviewList(reset: true),
@@ -1931,6 +2223,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
+                  // Search bar dan tombol select
                   Row(
                     children: [
                       Expanded(
@@ -2013,12 +2306,10 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                       ),
                     ],
                   ),
-// Di bagian _buildReviewTab(), bagian filter:
 
+                  // FILTER SECTION
                   if (_showFilters) ...[
                     const SizedBox(height: 12),
-
-                    // Container filter yang lebih sederhana
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -2037,8 +2328,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize:
-                            MainAxisSize.min, // Penting: agar tidak overflow
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           // Header dengan jumlah filter aktif
                           Row(
@@ -2089,7 +2379,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
 
                           const SizedBox(height: 16),
 
-                          // Dropdown Kelas - dibuat lebih sederhana
+                          // Dropdown Kelas
                           Container(
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
@@ -2100,7 +2390,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                               ),
                             ),
                             child: DropdownButtonFormField<String?>(
-                              initialValue: _selectedKelasNama,
+                              value: _selectedKelasNama,
                               decoration: InputDecoration(
                                 labelText: 'Kelas',
                                 labelStyle: TextStyle(
@@ -2126,7 +2416,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                                 color: _primaryColor,
                               ),
                               dropdownColor: Colors.white,
-                              isExpanded: true, // Penting: agar tidak overflow
+                              isExpanded: true,
                               items: [
                                 DropdownMenuItem<String?>(
                                   value: null,
@@ -2139,7 +2429,6 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
-                                        // Expanded untuk teks
                                         child: Text(
                                           'Semua Kelas',
                                           style: TextStyle(
@@ -2167,7 +2456,6 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                                         ),
                                         const SizedBox(width: 8),
                                         Expanded(
-                                          // Expanded untuk teks
                                           child: Text(
                                             namaKelas,
                                             overflow: TextOverflow.ellipsis,
@@ -2180,7 +2468,23 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                                 }),
                               ],
                               onChanged: (value) {
-                                _onKelasSelected(value);
+                                setState(() {
+                                  _selectedKelasNama = value;
+                                  if (value != null) {
+                                    // Filter industri berdasarkan kelas yang dipilih
+                                    final selectedKelas = _kelasList.firstWhere(
+                                      (k) => k['nama'] == value,
+                                      orElse: () => {'industri': []},
+                                    );
+                                    _industriList =
+                                        List<Map<String, dynamic>>.from(
+                                            selectedKelas['industri'] ?? []);
+                                  } else {
+                                    // Jika semua kelas, tampilkan semua industri
+                                    _industriList =
+                                        _getUniqueIndustriesFromData();
+                                  }
+                                });
                                 _applyFilters();
                               },
                             ),
@@ -2188,7 +2492,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
 
                           const SizedBox(height: 12),
 
-                          // Dropdown Industri - dibuat lebih sederhana
+                          // Dropdown Industri - BISA DIPILIH TANPA MEMILIH KELAS
                           Container(
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
@@ -2199,7 +2503,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                               ),
                             ),
                             child: DropdownButtonFormField<int?>(
-                              initialValue: _selectedIndustriId,
+                              value: _selectedIndustriId,
                               decoration: InputDecoration(
                                 labelText: 'Industri/DUDI',
                                 labelStyle: TextStyle(
@@ -2225,24 +2529,19 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                                 color: _primaryColor,
                               ),
                               dropdownColor: Colors.white,
-                              isExpanded: true, // Penting: agar tidak overflow
+                              isExpanded: true,
                               items: [
-                                DropdownMenuItem<int?>(
+                                const DropdownMenuItem<int?>(
                                   value: null,
                                   child: Row(
                                     children: [
-                                      Icon(
-                                        Icons.clear_all_rounded,
-                                        size: 16,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                      const SizedBox(width: 8),
+                                      Icon(Icons.clear_all_rounded,
+                                          size: 16, color: Colors.grey),
+                                      SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           'Semua Industri',
-                                          style: TextStyle(
-                                            color: Colors.grey.shade700,
-                                          ),
+                                          style: TextStyle(color: Colors.grey),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
@@ -2271,7 +2570,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                                             maxLines: 1,
                                           ),
                                         ),
-                                        // Badge jumlah (opsional, kecil)
+                                        // Badge jumlah
                                         if (_reviewList
                                             .where((r) =>
                                                 r['industri_id'] == i['id'])
@@ -2306,14 +2605,8 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                               onChanged: (value) {
                                 setState(() {
                                   _selectedIndustriId = value;
-                                  if (value != null) {
-                                    _industriList.firstWhere(
-                                      (i) => i['id'] == value,
-                                      orElse: () => {'nama': ''},
-                                    );
-                                  } else {}
                                 });
-                                _applyFilters();
+                                _applyFilters(); // LANGSUNG FILTER SAAT INDUSTRI DIPILIH
                               },
                             ),
                           ),
@@ -2374,6 +2667,8 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                       ),
                     ),
                   ],
+
+                  // SELECTION MODE INFO
                   if (_isSelectionMode) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -2430,6 +2725,8 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
               ),
             ),
           ),
+
+          // LIST VIEW
           _isLoadingReview && _reviewList.isEmpty
               ? SliverFillRemaining(
                   child: Center(
@@ -2506,28 +2803,22 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                         childCount: _filteredReviewList.length,
                       ),
                     ),
-// Tambahkan SizedBox setelah SliverList
+
+          // LOADING MORE INDICATOR
+          if (_isLoadingMoreReview)
+            SliverToBoxAdapter(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                child: Center(
+                  child: CircularProgressIndicator(color: _primaryColor),
+                ),
+              ),
+            ),
+
+          // BOTTOM SPACING
           const SliverToBoxAdapter(
             child: SizedBox(height: 80),
           ),
-          if (_isLoadingMoreReview)
-            SliverToBoxAdapter(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: CircularProgressIndicator(color: _primaryColor),
-                ),
-              ),
-            ),
-          if (_isLoadingMoreReview)
-            SliverToBoxAdapter(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: CircularProgressIndicator(color: _primaryColor),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -3400,9 +3691,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
   }
 }
 
-extension on Directory? {
-  Null get path => null;
-}
+extension on Directory? {}
 
 // ==================== HALAMAN DETAIL REVIEW ====================
 class ReviewDetailScreen extends StatefulWidget {
@@ -3443,6 +3732,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     _fetchDetailData();
   }
 
+  // ==================== FUNGSI FORMAT TANGGAL ====================
   String _formatDateIndonesian(String? dateString) {
     if (dateString == null || dateString.isEmpty) return '-';
 
@@ -3468,6 +3758,57 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     }
   }
 
+  String _getPredikatFromSkor(int skor) {
+    if (skor >= 86) return 'Sangat Baik';
+    if (skor >= 75) return 'Baik';
+    return 'Kurang'; // < 75
+  }
+
+  String _getSoftSkillDescription(int skor) {
+    final predikat = _getPredikatFromSkor(skor);
+    if (predikat == 'Sangat Baik') {
+      return 'Peserta didik mampu menerapkan soft skill yang dimiliki dengan menunjukkan integritas (jujur, disiplin, komitmen, dan tanggung jawab), memiliki etos kerja, menunjukkan kemandirian, menunjukkan kerja sama, dan menunjukkan kepedulian sosial dan lingkungan dengan predikat sangat baik.';
+    } else if (predikat == 'Baik') {
+      return 'Peserta didik mampu menerapkan soft skill yang dimiliki dengan menunjukkan integritas (jujur, disiplin, komitmen, dan tanggung jawab), memiliki etos kerja, menunjukkan kemandirian, menunjukkan kerja sama, dan menunjukkan kepedulian sosial dan lingkungan dengan predikat baik.';
+    } else {
+      return 'Peserta didik mampu menerapkan soft skill yang dimiliki dengan menunjukkan integritas (jujur, disiplin, komitmen, dan tanggung jawab), memiliki etos kerja, menunjukkan kemandirian, menunjukkan kerja sama, dan menunjukkan kepedulian sosial dan lingkungan dengan predikat kurang.';
+    }
+  }
+
+  String _getNormaK3LHDescription(int skor) {
+    final predikat = _getPredikatFromSkor(skor);
+    if (predikat == 'Sangat Baik') {
+      return 'Peserta didik mampu menerapkan norma, Prosedur Operasional Standar (POS), dan Kesehatan, Keselamatan Kerja, dan Lingkungan Hidup (K3LH) yang ditunjukkan dengan menggunakan APD dengan tertib dan benar, serta melaksanakan pekerjaan sesuai POS dengan predikat sangat baik.';
+    } else if (predikat == 'Baik') {
+      return 'Peserta didik mampu menerapkan norma, Prosedur Operasional Standar (POS), dan Kesehatan, Keselamatan Kerja, dan Lingkungan Hidup (K3LH) yang ditunjukkan dengan menggunakan APD dengan tertib dan benar, serta melaksanakan pekerjaan sesuai POS dengan predikat baik.';
+    } else {
+      return 'Peserta didik mampu menerapkan norma, Prosedur Operasional Standar (POS), dan Kesehatan, Keselamatan Kerja, dan Lingkungan Hidup (K3LH) yang ditunjukkan dengan menggunakan APD dengan tertib dan benar, serta melaksanakan pekerjaan sesuai POS dengan predikat kurang.';
+    }
+  }
+
+  String _getKompetensiTeknisDescription(int skor) {
+    final predikat = _getPredikatFromSkor(skor);
+    if (predikat == 'Sangat Baik') {
+      return 'Peserta didik mampu menerapkan kompetensi teknis yang sudah dipelajari di sekolah dan/atau baru dipelajari di dunia kerja (tempat PKL) dengan predikat sangat baik.';
+    } else if (predikat == 'Baik') {
+      return 'Peserta didik mampu menerapkan kompetensi teknis yang sudah dipelajari di sekolah dan/atau baru dipelajari di dunia kerja (tempat PKL) dengan predikat baik.';
+    } else {
+      return 'Peserta didik mampu menerapkan kompetensi teknis yang sudah dipelajari di sekolah dan/atau baru dipelajari di dunia kerja (tempat PKL) dengan predikat kurang.';
+    }
+  }
+
+  String _getAlurBisnisDescription(int skor) {
+    final predikat = _getPredikatFromSkor(skor);
+    if (predikat == 'Sangat Baik') {
+      return 'Peserta didik mampu memahami alur bisnis dunia kerja tempat PKL dan wawasan wirausaha dengan predikat sangat baik.';
+    } else if (predikat == 'Baik') {
+      return 'Peserta didik mampu memahami alur bisnis dunia kerja tempat PKL dan wawasan wirausaha dengan predikat baik.';
+    } else {
+      return 'Peserta didik mampu memahami alur bisnis dunia kerja tempat PKL dan wawasan wirausaha dengan predikat kurang.';
+    }
+  }
+
+  // ==================== FUNGSI FETCH DATA ====================
   Future<void> _fetchDetailData() async {
     setState(() => _isLoading = true);
 
@@ -3515,6 +3856,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     }
   }
 
+  // ==================== FUNGSI UTILITY ====================
   void _redirectToLogin() {
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -3589,6 +3931,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
     return '${date.day} ${months[date.month - 1]} ${date.year}';
   }
 
+  // ==================== FUNGSI DOWNLOAD & GENERATE SERTIFIKAT ====================
   Future<void> _downloadFile(String fileUrl, String filename) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('access_token');
@@ -3693,12 +4036,11 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
         else if (i == 3) skor4 = skor;
       }
 
-      // FORMAT YANG BENAR: Mengambil tanggal mulai dari data PKL
+      // FORMAT TANGGAL
       String tanggalMulai = '';
       String tanggalSelesai = '';
 
       if (_detailData != null) {
-        // Coba ambil dari berbagai kemungkinan field
         tanggalMulai = _detailData!['tanggal_mulai'] ??
             _detailData!['start_date'] ??
             _detailData!['mulai'] ??
@@ -3711,14 +4053,11 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
             '';
       }
 
-      // Jika tidak ada, gunakan format default (6 bulan sebelum tanggal selesai)
       if (tanggalMulai.isEmpty) {
-        // Parse tanggal selesai
         try {
           if (tanggalSelesai.isNotEmpty) {
             final dateSelesai = DateTime.parse(tanggalSelesai.split(' ')[0]);
-            final dateMulai =
-                dateSelesai.subtract(const Duration(days: 180)); // 6 bulan
+            final dateMulai = dateSelesai.subtract(const Duration(days: 180));
             tanggalMulai = _formatDate(dateMulai);
           } else {
             tanggalMulai =
@@ -3729,27 +4068,133 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
               _formatDate(DateTime.now().subtract(const Duration(days: 180)));
         }
       } else {
-        // Format tanggal mulai jika sudah ada
         try {
           final dateMulai = DateTime.parse(tanggalMulai);
           tanggalMulai = _formatDate(dateMulai);
-        } catch (e) {
-          // Jika gagal parse, biarkan apa adanya
-        }
+        } catch (e) {}
       }
 
-      // Format tanggal selesai
       if (tanggalSelesai.isNotEmpty) {
         try {
           final dateSelesai = DateTime.parse(tanggalSelesai.split(' ')[0]);
           tanggalSelesai = _formatDate(dateSelesai);
-        } catch (e) {
-          // Jika gagal parse, gunakan format asli
-        }
+        } catch (e) {}
       } else {
         tanggalSelesai = formattedDate;
       }
 
+      // ===== DATA INDUSTRI (PIMPINAN + PEMBIMBING INDUSTRI) =====
+      print(
+          '\n📋 ===== DATA INDUSTRI UNTUK ${_siswaData['siswa_username']} =====');
+
+      String namaPimpinan = '';
+      String nipPimpinan = '';
+      String jabatanPimpinan = '';
+
+      String namaPembimbingIndustri = '';
+      String nipPembimbingIndustri = '';
+      String jabatanPembimbingIndustri = '';
+
+      // AMBIL DARI SHAREDPREFERENCES
+      print('📡 Mencari data industri di SharedPreferences...');
+      final industriData =
+          await PimpinanStorage.ambilDataIndustri(widget.applicationId);
+
+      if (industriData != null) {
+        // Data Pimpinan Industri
+        namaPimpinan = industriData['pimpinan']?['nama'] ?? '';
+        nipPimpinan = industriData['pimpinan']?['nip'] ?? '-';
+        jabatanPimpinan = industriData['pimpinan']?['jabatan'] ?? '';
+
+        // Data Pembimbing Industri
+        namaPembimbingIndustri =
+            industriData['pembimbing_industri']?['nama'] ?? '';
+        nipPembimbingIndustri =
+            industriData['pembimbing_industri']?['nip'] ?? '-';
+        jabatanPembimbingIndustri =
+            industriData['pembimbing_industri']?['jabatan'] ?? '';
+
+        print('✅ Data industri ditemukan di SharedPreferences:');
+        print('   - Pimpinan: $namaPimpinan ($jabatanPimpinan)');
+        print(
+            '   - Pembimbing Industri: $namaPembimbingIndustri ($jabatanPembimbingIndustri)');
+      } else {
+        print('❌ TIDAK ADA DATA INDUSTRI DI SHAREDPREFERENCES!');
+        print(
+            '❌ Pembimbing belum menginput data untuk aplikasi ID: ${widget.applicationId}');
+
+        _showSnackBar('Data pimpinan dan pembimbing industri belum diinput',
+            isError: true);
+        setState(() => _isGeneratingCertificate = false);
+        return;
+      }
+
+      // ===== DATA PEMBIMBING SEKOLAH (KOORDINATOR) =====
+      print('\n📋 ===== DATA PEMBIMBING SEKOLAH =====');
+
+      String namaPembimbingSekolah = '';
+      String nipPembimbingSekolah = '';
+      String jabatanPembimbingSekolah = '';
+
+      // Coba ambil data guru berdasarkan user_id
+      final userId = prefs.getInt('user_id');
+      if (userId != null) {
+        try {
+          final guruResponse = await http.get(
+            Uri.parse(
+                '${dotenv.env['API_BASE_URL']}/api/guru?user_id=$userId&limit=1'),
+            headers: {
+              'accept': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          );
+
+          if (guruResponse.statusCode == 200) {
+            final guruData = jsonDecode(guruResponse.body);
+            if (guruData['success'] == true &&
+                guruData['data']['data'] != null &&
+                guruData['data']['data'].isNotEmpty) {
+              final guru = guruData['data']['data'][0];
+              namaPembimbingSekolah = guru['nama'] ?? '';
+              nipPembimbingSekolah = guru['nip'] ?? '';
+
+              // Tentukan jabatan berdasarkan role
+              if (guru['is_koordinator'] == true) {
+                jabatanPembimbingSekolah = 'Koordinator PKL';
+              } else if (guru['is_pembimbing'] == true) {
+                jabatanPembimbingSekolah = 'Guru Pembimbing PKL';
+              } else if (guru['is_wali_kelas'] == true) {
+                jabatanPembimbingSekolah = 'Wali Kelas';
+              } else {
+                jabatanPembimbingSekolah = 'Guru';
+              }
+
+              print('✅ Data guru ditemukan:');
+              print('   - Nama: $namaPembimbingSekolah');
+              print('   - NIP: $nipPembimbingSekolah');
+              print('   - Jabatan: $jabatanPembimbingSekolah');
+            }
+          }
+        } catch (e) {
+          print('❌ Error fetching guru data: $e');
+        }
+      }
+
+      // Jika data guru tidak ditemukan, pakai dari SharedPreferences
+      if (namaPembimbingSekolah.isEmpty) {
+        print('⚠️ Menggunakan data dari SharedPreferences');
+        namaPembimbingSekolah =
+            prefs.getString('user_name') ?? 'Guru Pembimbing PKL';
+        nipPembimbingSekolah = prefs.getString('user_nip') ?? '-';
+        jabatanPembimbingSekolah =
+            prefs.getString('user_jabatan') ?? 'Guru Pembimbing PKL';
+
+        print('   - Nama: $namaPembimbingSekolah');
+        print('   - NIP: $nipPembimbingSekolah');
+        print('   - Jabatan: $jabatanPembimbingSekolah');
+      }
+
+      // ===== GABUNGKAN SEMUA DATA UNTUK API =====
       final Map<String, dynamic> requestBody = {
         'nomor_sertifikat': nomorSertifikat,
         'siswa': {
@@ -3757,8 +4202,8 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           'nisn': _siswaData['nisn'] ?? '0123456789',
         },
         'nama_industri': _siswaData['industri_nama'] ?? '',
-        'tanggal_mulai': tanggalMulai, // Gunakan tanggal mulai yang benar
-        'tanggal_selesai': tanggalSelesai, // Gunakan tanggal selesai yang benar
+        'tanggal_mulai': tanggalMulai,
+        'tanggal_selesai': tanggalSelesai,
         'hasil_pkl': hasilPKL,
         'tanggal_terbit': formattedDate,
         'nilai': {
@@ -3771,8 +4216,27 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
           'aspek_4': skor4,
           'desc_4': desc4,
         },
+        // Data Pimpinan Industri
+        'nama_pimpinan': namaPimpinan,
+        'nip_pimpinan': nipPimpinan,
+        'jabatan_pimpinan': jabatanPimpinan,
+
+        // Data Pembimbing Industri
+        'nama_pembimbing': namaPembimbingIndustri,
+        'nip_pembimbing': nipPembimbingIndustri,
+        'jabatan_pembimbing': jabatanPembimbingIndustri,
+
+        // Data Pembimbing Sekolah (Koordinator)
+        'nama_pembimbing_sekolah': namaPembimbingSekolah,
+        'nip_pembimbing_sekolah': nipPembimbingSekolah,
+        'jabatan_pembimbing_sekolah': jabatanPembimbingSekolah,
       };
 
+      print('\n📤 ===== REQUEST BODY FINAL =====');
+      print(jsonEncode(requestBody));
+      print('===============================\n');
+
+      // Kirim request ke API sertifikat
       final response = await http.post(
         Uri.parse('${dotenv.env['SERTIF']}/api/v1/letters/sertifikat/$jurusan'),
         headers: {
@@ -3785,23 +4249,24 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _showSnackBar('Sertifikat berhasil digenerate');
+        _showSnackBar('Sertifikat berhasil dibuat');
         await _downloadFile(data['file_url'], data['filename']);
       } else if (response.statusCode == 400) {
         final error = jsonDecode(response.body);
         _showSnackBar('Error: ${error['detail'] ?? 'Jurusan tidak valid'}',
             isError: true);
       } else {
-        throw Exception('Gagal generate sertifikat');
+        throw Exception('Gagal membuat sertifikat: ${response.statusCode}');
       }
     } catch (e) {
       print('Error generating certificate: $e');
-      _showSnackBar('Gagal generate sertifikat', isError: true);
+      _showSnackBar('Gagal membuat sertifikat', isError: true);
     } finally {
       if (mounted) setState(() => _isGeneratingCertificate = false);
     }
   }
 
+  // ==================== BUILD WIDGET ====================
   @override
   Widget build(BuildContext context) {
     final String siswaUsername = _siswaData['siswa_username'] ?? '-';
@@ -3844,6 +4309,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ===== CARD INFORMASI SISWA =====
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -3981,6 +4447,8 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
+
+                      // ===== CARD FORM PENILAIAN =====
                       if (formNama != '-')
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -4032,6 +4500,8 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                           ),
                         ),
                       if (formNama != '-') const SizedBox(height: 20),
+
+                      // ===== DETAIL NILAI KOMPETENSI DENGAN DESKRIPSI DI BAWAHNYA =====
                       if (_formItems.isNotEmpty) ...[
                         const Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4),
@@ -4044,6 +4514,8 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
+
+                        // LOOPING UNTUK SETIAP KOMPETENSI
                         ...List.generate(_formItems.length, (index) {
                           final formItem = _formItems[index];
                           final nomor = index + 1;
@@ -4054,28 +4526,50 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                           );
 
                           final int skor = nilaiItem['skor'] ?? 0;
-                          final String deskripsi =
-                              nilaiItem['deskripsi'] ?? '-';
+                          final String predikat = _getPredikatFromSkor(skor);
+
+                          // Fungsi untuk mendapatkan deskripsi berdasarkan nomor kompetensi
+                          String getDeskripsiKompetensi(
+                              int nomorKompetensi, int skor) {
+                            if (nomorKompetensi == 1) {
+                              return _getSoftSkillDescription(skor);
+                            } else if (nomorKompetensi == 2) {
+                              return _getNormaK3LHDescription(skor);
+                            } else if (nomorKompetensi == 3) {
+                              return _getKompetensiTeknisDescription(skor);
+                            } else if (nomorKompetensi == 4) {
+                              return _getAlurBisnisDescription(skor);
+                            }
+                            return '';
+                          }
 
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
+                            margin: const EdgeInsets.only(bottom: 16),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: _borderSoft),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withValues(alpha: 0.05),
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Header Kompetensi
                                 Row(
                                   children: [
                                     Container(
-                                      width: 28,
-                                      height: 28,
+                                      width: 32,
+                                      height: 32,
                                       decoration: BoxDecoration(
                                         color: _primaryColor,
-                                        borderRadius: BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Center(
                                         child: Text(
@@ -4083,32 +4577,35 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.w700,
-                                            fontSize: 14,
+                                            fontSize: 16,
                                           ),
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 10),
+                                    const SizedBox(width: 12),
                                     Expanded(
                                       child: Text(
                                         'Kompetensi $nomor',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w700,
-                                          fontSize: 15,
+                                          fontSize: 16,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
+
+                                // Tujuan Pembelajaran
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
                                     color: _backgroundLight,
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: _borderSoft),
                                   ),
                                   child: Text(
-                                    formItem['tujuan_pembelajaran'] ?? '',
+                                    formItem['tujuan_pembelajaran'] ?? '-',
                                     style: TextStyle(
                                       color: Colors.grey[800],
                                       fontSize: 13,
@@ -4117,6 +4614,8 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
+
+                                // Nilai dan Predikat
                                 Row(
                                   children: [
                                     Expanded(
@@ -4149,10 +4648,11 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                               skor.toString(),
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w700,
-                                                fontSize: 16,
+                                                fontSize: 18,
                                                 color: _getScoreColor(
                                                     skor.toDouble()),
                                               ),
+                                              textAlign: TextAlign.center,
                                             ),
                                           ),
                                         ],
@@ -4187,12 +4687,13 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                                   color: _borderSoft),
                                             ),
                                             child: Text(
-                                              deskripsi,
+                                              predikat,
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: 14,
                                                 color: _primaryColor,
                                               ),
+                                              textAlign: TextAlign.center,
                                             ),
                                           ),
                                         ],
@@ -4200,12 +4701,67 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                     ),
                                   ],
                                 ),
+                                const SizedBox(height: 16),
+
+                                // ===== DESKRIPSI CAPAIAN (DITEMPATKAN DI BAWAH SETIAP KOMPETENSI) =====
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        _primaryColor.withValues(alpha: 0.03),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: _primaryColor.withValues(
+                                            alpha: 0.2)),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.description_rounded,
+                                        size: 16,
+                                        color: _primaryColor.withValues(
+                                            alpha: 0.7),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Deskripsi Capaian:',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: _primaryColor,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              getDeskripsiKompetensi(
+                                                  nomor, skor),
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[800],
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                           );
                         }),
                         const SizedBox(height: 16),
                       ],
+
+                      // ===== CATATAN AKHIR =====
                       if (catatanAkhir != '-')
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -4252,6 +4808,8 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                           ),
                         ),
                       if (catatanAkhir != '-') const SizedBox(height: 16),
+
+                      // ===== RINGKASAN TOTAL SKOR =====
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -4353,6 +4911,320 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
+
+// ===== TAMBAHKAN INI =====
+// ===== DATA PIMPINAN & PEMBIMBING INDUSTRI =====
+                      FutureBuilder<Map<String, dynamic>?>(
+                        future: PimpinanStorage.ambilDataIndustri(
+                            widget.applicationId),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+
+                          final industriData = snapshot.data;
+                          if (industriData == null) {
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(16),
+                                border:
+                                    Border.all(color: Colors.orange.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded,
+                                      color: Colors.orange.shade700),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'Data pimpinan dan pembimbing industri belum diinput',
+                                      style: TextStyle(
+                                        color: Colors.orange.shade800,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          final pimpinan = industriData['pimpinan'] ?? {};
+                          final pembimbing =
+                              industriData['pembimbing_industri'] ?? {};
+
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: _borderSoft),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: _primaryColor.withValues(
+                                            alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(Icons.business_center,
+                                          color: _primaryColor, size: 20),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    const Text(
+                                      'Data Industri',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Pimpinan Industri
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _backgroundLight,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: _borderSoft),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.person,
+                                              size: 16, color: _primaryColor),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Pimpinan Industri',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              color: _primaryColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 1,
+                                            child: Text('Nama',
+                                                style: TextStyle(
+                                                    color: _neutralColor,
+                                                    fontSize: 12)),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              pimpinan['nama'] ?? '-',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 1,
+                                            child: Text('NIP',
+                                                style: TextStyle(
+                                                    color: _neutralColor,
+                                                    fontSize: 12)),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              pimpinan['nip']?.isNotEmpty ==
+                                                      true
+                                                  ? pimpinan['nip']
+                                                  : '-',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 1,
+                                            child: Text('Jabatan',
+                                                style: TextStyle(
+                                                    color: _neutralColor,
+                                                    fontSize: 12)),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              pimpinan['jabatan'] ?? '-',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                // Pembimbing Industri
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: _backgroundLight,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: _borderSoft),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.people,
+                                              size: 16,
+                                              color: Colors.green.shade700),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Pembimbing Industri',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                              color: Colors.green.shade700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 1,
+                                            child: Text('Nama',
+                                                style: TextStyle(
+                                                    color: _neutralColor,
+                                                    fontSize: 12)),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              pembimbing['nama'] ?? '-',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 1,
+                                            child: Text('NIP',
+                                                style: TextStyle(
+                                                    color: _neutralColor,
+                                                    fontSize: 12)),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              pembimbing['nip']?.isNotEmpty ==
+                                                      true
+                                                  ? pembimbing['nip']
+                                                  : '-',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 1,
+                                            child: Text('Jabatan',
+                                                style: TextStyle(
+                                                    color: _neutralColor,
+                                                    fontSize: 12)),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              pembimbing['jabatan'] ?? '-',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 13),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.access_time,
+                                          size: 14,
+                                          color: Colors.blue.shade700),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          'Disimpan: ${_formatDateIndonesian(industriData['waktu_simpan'])}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.blue.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ===== TOMBOL BUAT SERTIFIKAT =====
                       Container(
                         width: double.infinity,
                         margin: const EdgeInsets.only(bottom: 20),
@@ -4631,7 +5503,7 @@ class _FormDetailScreenState extends State<FormDetailScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          _isEditMode ? 'Edit Form Penilaian' : 'Buat Form Penilaian',
+          _isEditMode ? 'Ubah Form Penilaian' : 'Buat Form Penilaian',
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         shape: const RoundedRectangleBorder(

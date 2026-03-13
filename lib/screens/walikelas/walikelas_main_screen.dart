@@ -1,9 +1,13 @@
 // walikelas_main_screen.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Import halaman-halaman
 import 'wali_kelas_dashboard.dart';
 import 'kelola_perizinan_screen.dart';
+import 'kelola_rekap_nilai_screen.dart'; // BARU: Import halaman rekap nilai
+import '../login/login_screen.dart';
 
 class WalikelasMainScreen extends StatefulWidget {
   const WalikelasMainScreen({super.key});
@@ -14,6 +18,8 @@ class WalikelasMainScreen extends StatefulWidget {
 
 class _WalikelasMainScreenState extends State<WalikelasMainScreen> {
   int _currentIndex = 0;
+  bool _isCheckingToken = true;
+  String? _accessToken;
   
   // Cache untuk menyimpan widget halaman
   final Map<int, Widget> _pageCache = {};
@@ -21,24 +27,70 @@ class _WalikelasMainScreenState extends State<WalikelasMainScreen> {
   
   // Controller untuk mempertahankan scroll position
   final List<ScrollController> _scrollControllers = [
-    ScrollController(),
-    ScrollController(),
+    ScrollController(), // Dashboard
+    ScrollController(), // Perizinan (SIA)
+    ScrollController(), // Rekap Nilai (BARU)
   ];
 
   late final List<Widget> _pageBuilders;
 
   // WARNA UNTUK WALI KELAS
-  final Color _primaryColor = const Color(0xFF6B1B1B); // WARNA WALI KELAS
+  final Color _primaryColor = const Color(0xFF6B1B1B);
 
   @override
   void initState() {
     super.initState();
-    
-    // Inisialisasi page builders
+    _checkTokenAndInit();
+  }
+
+  Future<void> _checkTokenAndInit() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    if (token == null || token.isEmpty) {
+      _redirectToLogin();
+      return;
+    }
+
+    setState(() {
+      _accessToken = token;
+      _isCheckingToken = false;
+    });
+
+    // Inisialisasi page builders setelah token valid
     _pageBuilders = [
       _buildDashboardPage(),
       _buildSiaPage(),
+      _buildRekapNilaiPage(), // BARU: Halaman rekap nilai
     ];
+  }
+
+  Future<String?> _getToken() async {
+    if (_accessToken != null) return _accessToken;
+    
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+    
+    setState(() {
+      _accessToken = token;
+    });
+    
+    return token;
+  }
+
+  String _getBaseUrl() {
+    return dotenv.env['API_BASE_URL'] ?? 'https://api.gedanggoreng.com';
+  }
+
+  void _redirectToLogin() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (Route<dynamic> route) => false,
+        );
+      }
+    });
   }
 
   @override
@@ -54,20 +106,79 @@ class _WalikelasMainScreenState extends State<WalikelasMainScreen> {
   Widget _buildDashboardPage() {
     return _buildCachedPage(
       index: 0,
-      builder: () => WaliKelasDashboard(
-        key: const ValueKey('dashboard_page'),
-        scrollController: _scrollControllers[0],
+      builder: () => FutureBuilder<String?>(
+        future: _getToken(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildLoadingScreen();
+          }
+          
+          if (!snapshot.hasData || snapshot.data == null) {
+            _redirectToLogin();
+            return const SizedBox.shrink();
+          }
+
+          return WaliKelasDashboard(
+            key: const ValueKey('dashboard_page'),
+            scrollController: _scrollControllers[0],
+            token: snapshot.data!,
+            baseUrl: _getBaseUrl(),
+          );
+        },
       ),
     );
   }
 
-  // Builder untuk halaman SIA
+  // Builder untuk halaman SIA (Perizinan)
   Widget _buildSiaPage() {
     return _buildCachedPage(
       index: 1,
-      builder: () => KelolaPerizinanTabScreen(
-        key: const ValueKey('sia_page'),
-        scrollController: _scrollControllers[1],
+      builder: () => FutureBuilder<String?>(
+        future: _getToken(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildLoadingScreen();
+          }
+          
+          if (!snapshot.hasData || snapshot.data == null) {
+            _redirectToLogin();
+            return const SizedBox.shrink();
+          }
+
+          return KelolaPerizinanTabScreen(
+            key: const ValueKey('sia_page'),
+            scrollController: _scrollControllers[1],
+            token: snapshot.data!,
+            baseUrl: _getBaseUrl(),
+          );
+        },
+      ),
+    );
+  }
+
+  // BARU: Builder untuk halaman Rekap Nilai
+  Widget _buildRekapNilaiPage() {
+    return _buildCachedPage(
+      index: 2,
+      builder: () => FutureBuilder<String?>(
+        future: _getToken(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildLoadingScreen();
+          }
+          
+          if (!snapshot.hasData || snapshot.data == null) {
+            _redirectToLogin();
+            return const SizedBox.shrink();
+          }
+
+          return KelolaRekapNilaiScreen(
+            key: const ValueKey('rekap_nilai_page'),
+            scrollController: _scrollControllers[2],
+            token: snapshot.data!,
+            baseUrl: _getBaseUrl(),
+          );
+        },
       ),
     );
   }
@@ -100,6 +211,30 @@ class _WalikelasMainScreenState extends State<WalikelasMainScreen> {
     return _pageCache[index]!;
   }
 
+  Widget _buildLoadingScreen() {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: _primaryColor,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Memeriksa sesi...',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _onTabSelected(int index) {
     setState(() {
       _currentIndex = index;
@@ -108,11 +243,15 @@ class _WalikelasMainScreenState extends State<WalikelasMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isCheckingToken) {
+      return _buildLoadingScreen();
+    }
+
     return Scaffold(
-      backgroundColor: Colors.white, // Background utama putih
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Halaman konten - mengisi seluruh layar
+          // Halaman konten
           Positioned.fill(
             child: IndexedStack(
               index: _currentIndex,
@@ -120,7 +259,7 @@ class _WalikelasMainScreenState extends State<WalikelasMainScreen> {
             ),
           ),
           
-          // Bottom Navigation Bar - posisi absolute di bawah
+          // Bottom Navigation Bar
           Positioned(
             left: 0,
             right: 0,
@@ -150,7 +289,6 @@ class _WalikelasMainScreenState extends State<WalikelasMainScreen> {
 }
 
 // ============== BOTTOM NAVIGATION BAR ==============
-
 class _WalikelasBottomBar extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTabSelected;
@@ -185,11 +323,6 @@ class __WalikelasBottomBarState extends State<_WalikelasBottomBar> {
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
-          const BoxShadow(
-            color: Colors.black,
-            offset: Offset(0, 0),
-            blurRadius: 0,
-          ),
         ],
       ),
       child: Row(
@@ -203,12 +336,20 @@ class __WalikelasBottomBarState extends State<_WalikelasBottomBar> {
             label: 'Beranda',
           ),
 
-          // Menu 2: SIA
+          // Menu 2: SIA (Perizinan)
           _buildTabItem(
             index: 1,
             icon: Icons.assignment_outlined,
             activeIcon: Icons.assignment,
-            label: 'Permasalahan',
+            label: 'Perizinan',
+          ),
+
+          // BARU: Menu 3: Rekap Nilai
+          _buildTabItem(
+            index: 2,
+            icon: Icons.assessment_outlined,
+            activeIcon: Icons.assessment,
+            label: 'Rekap Nilai',
           ),
         ],
       ),

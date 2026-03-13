@@ -10,7 +10,7 @@ import 'walikelaspengaturan.dart';
 class WaliKelasDashboard extends StatefulWidget {
   final ScrollController scrollController;
 
-  const WaliKelasDashboard({super.key, required this.scrollController});
+  const WaliKelasDashboard({super.key, required this.scrollController, required String token, required String baseUrl});
 
   @override
   State<WaliKelasDashboard> createState() => _WaliKelasDashboardState();
@@ -618,7 +618,7 @@ class _WaliKelasDashboardState extends State<WaliKelasDashboard> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const KelolaPerizinanTabScreen(),
+        builder: (context) => const KelolaPerizinanTabScreen(token: '', baseUrl: '',),
       ),
     );
   }

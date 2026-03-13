@@ -1,11 +1,12 @@
-// lib/screens/kaprog/kaprog_main_screen.dart (update)
+// lib/screens/kaprog/kaprog_main_screen.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Import halaman-halaman
 import 'kaprog_dashboard.dart';
 import 'bukti_pkl_screen.dart';
 import 'kelola_perizinan_screen.dart';
-import 'group_review_screen.dart'; // IMPORT HALAMAN BARU
+import 'review_penilaian_screen.dart';
 
 class KaprogMainScreen extends StatefulWidget {
   const KaprogMainScreen({super.key});
@@ -17,6 +18,10 @@ class KaprogMainScreen extends StatefulWidget {
 class _KaprogMainScreenState extends State<KaprogMainScreen> {
   int _currentIndex = 0;
   
+  // Token dan baseUrl
+  String? _token;
+  final String _baseUrl = 'https://api.gedanggoreng.com';
+  
   // Cache untuk menyimpan widget halaman
   final Map<int, Widget> _pageCache = {};
   final Map<int, bool> _pageLoaded = {};
@@ -26,10 +31,10 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
     ScrollController(),
     ScrollController(),
     ScrollController(),
-    ScrollController(), // Tambah untuk halaman ke-4
+    ScrollController(),
   ];
 
-  late final List<Widget> _pageBuilders;
+  late List<Widget> _pageBuilders;
 
   // WARNA UNTUK KAPROG
   final Color _primaryColor = const Color(0xFF6B1B1B);
@@ -37,26 +42,46 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
   @override
   void initState() {
     super.initState();
-    
-    // Inisialisasi page builders (SEKARANG 4 HALAMAN)
-    _pageBuilders = [
-      _buildDashboardPage(),
-      _buildGroupReviewPage(),    // HALAMAN BARU (index 1)
-      _buildBuktiPklPage(),       // (index 2)
-      _buildPerizinanPage(),       // (index 3)
-    ];
+    _loadToken();
+  }
+
+  Future<void> _loadToken() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Coba ambil token dengan berbagai kemungkinan key
+      final String? token = prefs.getString('access_token') ?? 
+                     prefs.getString('token') ?? 
+                     prefs.getString('auth_token');
+      
+      print('📦 Token dari SharedPreferences: ${token != null ? "ADA" : "TIDAK ADA"}');
+      
+      setState(() {
+        _token = token;
+      });
+      
+      // Inisialisasi page builders setelah token didapat
+      _pageBuilders = [
+        _buildDashboardPage(),
+        _buildReviewPenilaianPage(),
+        _buildBuktiPklPage(),
+        _buildPerizinanPage(),
+      ];
+    } catch (e) {
+      print('❌ Error loading token: $e');
+      setState(() {
+        _token = null;
+      });
+    }
   }
 
   @override
   void dispose() {
-    // Dispose semua scroll controller
     for (var controller in _scrollControllers) {
       controller.dispose();
     }
     super.dispose();
   }
 
-  // Builder untuk halaman Dashboard
   Widget _buildDashboardPage() {
     return _buildCachedPage(
       index: 0,
@@ -67,18 +92,32 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
     );
   }
 
-  // Builder untuk halaman Group Review (BARU)
-  Widget _buildGroupReviewPage() {
+  Widget _buildReviewPenilaianPage() {
+    // Jika token belum ada, tampilkan loading
+    if (_token == null || _token!.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Memuat token...'),
+          ],
+        ),
+      );
+    }
+    
     return _buildCachedPage(
       index: 1,
-      builder: () => GroupReviewScreen(
-        key: const ValueKey('group_review_page'),
+      builder: () => ReviewPenilaianScreen(
+        key: const ValueKey('review_penilaian_page'),
         scrollController: _scrollControllers[1],
+        token: _token!,
+        baseUrl: _baseUrl,
       ),
     );
   }
 
-  // Builder untuk halaman Bukti PKL
   Widget _buildBuktiPklPage() {
     return _buildCachedPage(
       index: 2,
@@ -89,7 +128,6 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
     );
   }
 
-  // Builder untuk halaman Perizinan
   Widget _buildPerizinanPage() {
     return _buildCachedPage(
       index: 3,
@@ -100,12 +138,10 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
     );
   }
 
-  // Fungsi untuk caching halaman sederhana
   Widget _buildCachedPage({
     required int index,
     required Widget Function() builder,
   }) {
-    // Jika halaman belum pernah dibuat
     if (!_pageLoaded.containsKey(index) || !_pageLoaded[index]!) {
       return FutureBuilder<void>(
         future: Future.delayed(Duration.zero, () {
@@ -136,11 +172,35 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Jika token belum ada, tampilkan loading
+    if (_token == null) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Memuat data pengguna...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Pastikan _pageBuilders sudah diinisialisasi
+    if (_pageBuilders.isEmpty) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Halaman konten
           Positioned.fill(
             child: IndexedStack(
               index: _currentIndex,
@@ -148,7 +208,6 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
             ),
           ),
           
-          // Bottom Navigation Bar
           Positioned(
             left: 0,
             right: 0,
@@ -164,7 +223,6 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
     );
   }
 
-  // Method untuk refresh halaman tertentu
   void refreshPage(int pageIndex) {
     if (_pageLoaded.containsKey(pageIndex)) {
       _pageCache.remove(pageIndex);
@@ -177,7 +235,6 @@ class _KaprogMainScreenState extends State<KaprogMainScreen> {
   }
 }
 
-// ============== BOTTOM NAVIGATION BAR (SEKARANG 4 MENU) ==============
 class _KaprogBottomBar extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTabSelected;
@@ -217,31 +274,24 @@ class __KaprogBottomBarState extends State<_KaprogBottomBar> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          // Menu 1: Dashboard
           _buildTabItem(
             index: 0,
             icon: Icons.dashboard_outlined,
             activeIcon: Icons.dashboard,
             label: 'Beranda',
           ),
-
-          // Menu 2: Group Review (BARU)
           _buildTabItem(
             index: 1,
-            icon: Icons.group_work_outlined,
-            activeIcon: Icons.group_work,
-            label: 'Tinjau Grup',
+            icon: Icons.assignment_turned_in_outlined,
+            activeIcon: Icons.assignment_turned_in,
+            label: 'Tinjau Nilai',
           ),
-
-          // Menu 3: Bukti PKL
           _buildTabItem(
             index: 2,
             icon: Icons.fact_check_outlined,
             activeIcon: Icons.fact_check,
             label: 'Bukti PKL',
           ),
-
-          // Menu 4: Perizinan
           _buildTabItem(
             index: 3,
             icon: Icons.assignment_outlined,
@@ -270,7 +320,6 @@ class __KaprogBottomBarState extends State<_KaprogBottomBar> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Icon dengan efek animasi
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.all(6),
@@ -287,8 +336,6 @@ class __KaprogBottomBarState extends State<_KaprogBottomBar> {
                 ),
               ),
               const SizedBox(height: 4),
-              
-              // Label
               Text(
                 label,
                 style: TextStyle(

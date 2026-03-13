@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -6,6 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:open_file/open_file.dart';
+import '../../utils/pimpinan_storage.dart';
 import '../login/login_screen.dart';
 
 class PenilaianPage extends StatefulWidget {
@@ -784,8 +786,8 @@ class _PenilaianPageState extends State<PenilaianPage> {
     );
   }
 }
-// ==================== HALAMAN DETAIL PENILAIAN ====================
 
+// ==================== HALAMAN DETAIL PENILAIAN ====================
 class PenilaianDetailScreen extends StatefulWidget {
   final Map<String, dynamic> siswaData;
   final int applicationId;
@@ -806,6 +808,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isGeneratingAssessment = false;
+  bool _hasIndustriData = false;
   List<Map<String, dynamic>> _formItems = [];
   List<Map<String, dynamic>> _nilaiItems = [];
   final TextEditingController _catatanController = TextEditingController();
@@ -814,6 +817,57 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
   // Controllers untuk setiap item nilai
   final List<TextEditingController> _skorControllers = [];
   final List<TextEditingController> _deskripsiControllers = [];
+
+  // ==================== FUNGSI HELPER DESKRIPSI ====================
+  String _getPredikatFromSkor(int skor) {
+    if (skor >= 86) return 'Sangat Baik';
+    if (skor >= 75) return 'Baik';
+    return 'Kurang';
+  }
+
+  String _getSoftSkillDescription(int skor) {
+    final predikat = _getPredikatFromSkor(skor);
+    if (predikat == 'Sangat Baik') {
+      return 'Peserta didik mampu menerapkan soft skill yang dimiliki dengan menunjukkan integritas (jujur, disiplin, komitmen, dan tanggung jawab), memiliki etos kerja, menunjukkan kemandirian, menunjukkan kerja sama, dan menunjukkan kepedulian sosial dan lingkungan dengan predikat sangat baik.';
+    } else if (predikat == 'Baik') {
+      return 'Peserta didik mampu menerapkan soft skill yang dimiliki dengan menunjukkan integritas (jujur, disiplin, komitmen, dan tanggung jawab), memiliki etos kerja, menunjukkan kemandirian, menunjukkan kerja sama, dan menunjukkan kepedulian sosial dan lingkungan dengan predikat baik.';
+    } else {
+      return 'Peserta didik mampu menerapkan soft skill yang dimiliki dengan menunjukkan integritas (jujur, disiplin, komitmen, dan tanggung jawab), memiliki etos kerja, menunjukkan kemandirian, menunjukkan kerja sama, dan menunjukkan kepedulian sosial dan lingkungan dengan predikat kurang.';
+    }
+  }
+
+  String _getNormaK3LHDescription(int skor) {
+    final predikat = _getPredikatFromSkor(skor);
+    if (predikat == 'Sangat Baik') {
+      return 'Peserta didik mampu menerapkan norma, Prosedur Operasional Standar (POS), dan Kesehatan, Keselamatan Kerja, dan Lingkungan Hidup (K3LH) yang ditunjukkan dengan menggunakan APD dengan tertib dan benar, serta melaksanakan pekerjaan sesuai POS dengan predikat sangat baik.';
+    } else if (predikat == 'Baik') {
+      return 'Peserta didik mampu menerapkan norma, Prosedur Operasional Standar (POS), dan Kesehatan, Keselamatan Kerja, dan Lingkungan Hidup (K3LH) yang ditunjukkan dengan menggunakan APD dengan tertib dan benar, serta melaksanakan pekerjaan sesuai POS dengan predikat baik.';
+    } else {
+      return 'Peserta didik mampu menerapkan norma, Prosedur Operasional Standar (POS), dan Kesehatan, Keselamatan Kerja, dan Lingkungan Hidup (K3LH) yang ditunjukkan dengan menggunakan APD dengan tertib dan benar, serta melaksanakan pekerjaan sesuai POS dengan predikat kurang.';
+    }
+  }
+
+  String _getKompetensiTeknisDescription(int skor) {
+    final predikat = _getPredikatFromSkor(skor);
+    if (predikat == 'Sangat Baik') {
+      return 'Peserta didik mampu menerapkan kompetensi teknis yang sudah dipelajari di sekolah dan/atau baru dipelajari di dunia kerja (tempat PKL) dengan predikat sangat baik.';
+    } else if (predikat == 'Baik') {
+      return 'Peserta didik mampu menerapkan kompetensi teknis yang sudah dipelajari di sekolah dan/atau baru dipelajari di dunia kerja (tempat PKL) dengan predikat baik.';
+    } else {
+      return 'Peserta didik mampu menerapkan kompetensi teknis yang sudah dipelajari di sekolah dan/atau baru dipelajari di dunia kerja (tempat PKL) dengan predikat kurang.';
+    }
+  }
+
+  String _getAlurBisnisDescription(int skor) {
+    final predikat = _getPredikatFromSkor(skor);
+    if (predikat == 'Sangat Baik') {
+      return 'Peserta didik mampu memahami alur bisnis dunia kerja tempat PKL dan wawasan wirausaha dengan predikat sangat baik.';
+    } else if (predikat == 'Baik') {
+      return 'Peserta didik mampu memahami alur bisnis dunia kerja tempat PKL dan wawasan wirausaha dengan predikat baik.';
+    } else {
+      return 'Peserta didik mampu memahami alur bisnis dunia kerja tempat PKL dan wawasan wirausaha dengan predikat kurang.';
+    }
+  }
 
   // Fungsi untuk mendapatkan predikat berdasarkan nilai (OTOMATIS, TANPA DROPDOWN)
   String _getPredikatFromNilai(int nilai) {
@@ -824,7 +878,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     } else if (nilai >= 60 && nilai <= 74) {
       return 'Cukup';
     } else {
-      return 'Perlu Peningkatan';
+      return 'Cukup';
     }
   }
 
@@ -833,7 +887,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     if (average >= 90) return 'Amat Baik';
     if (average >= 80) return 'Baik';
     if (average >= 70) return 'Cukup';
-    return 'Perlu Peningkatan';
+    return 'Cukup';
   }
 
   final Color _primaryColor = const Color(0xFF6B1B1B);
@@ -885,6 +939,8 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+
+        // Data penilaian
         setState(() {
           _formItems =
               List<Map<String, dynamic>>.from(data['form_items'] ?? []);
@@ -896,8 +952,27 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
           _catatanController.text = data['catatan_akhir'] ?? '';
 
           _initializeControllers();
+        });
+
+        // CEK DATA INDUSTRI (PIMPINAN & PEMBIMBING)
+        final industriData =
+            await PimpinanStorage.ambilDataIndustri(widget.applicationId);
+
+        setState(() {
+          _hasIndustriData = industriData != null;
           _isLoading = false;
         });
+
+        // Debug print
+        if (_hasIndustriData) {
+          print('✅ Data industri ditemukan:');
+          print('   - Pimpinan: ${industriData!['pimpinan']?['nama']}');
+          print(
+              '   - Pembimbing: ${industriData['pembimbing_industri']?['nama']}');
+        } else {
+          print(
+              '⚠️ Belum ada data industri untuk aplikasi ${widget.applicationId}');
+        }
       } else if (response.statusCode == 401) {
         _redirectToLogin();
       } else {
@@ -906,10 +981,950 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     } catch (e) {
       print('Error fetching penilaian data: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _hasIndustriData = false;
+        });
         _showSnackBar('Gagal memuat data penilaian', isError: true);
       }
     }
+  }
+
+  Future<void> _cekDataDanSelesaikan() async {
+    if (!_validateInputs()) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      // CEK APAKAH DATA PIMPINAN & PEMBIMBING SUDAH ADA
+      final existingData =
+          await PimpinanStorage.ambilDataIndustri(widget.applicationId);
+
+      if (existingData == null) {
+        // Jika BELUM ada data
+        setState(() => _isSaving = false);
+
+        // Tampilkan dialog peringatan
+        final bool? inputData = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Data Belum Lengkap'),
+            content: const Text(
+                'Anda harus mengisi data pimpinan dan pembimbing industri terlebih dahulu sebelum menyelesaikan penilaian.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _primaryColor,
+                ),
+                child: const Text('Input Sekarang'),
+              ),
+            ],
+          ),
+        );
+
+        if (inputData == true) {
+          // Arahkan ke input data
+          await _simpanDataIndustriLengkap();
+          // Setelah input, coba lagi (rekursif)
+          _cekDataDanSelesaikan();
+        }
+        return;
+      }
+
+      // Jika SUDAH ada data, langsung finalisasi
+      await _selesaiKan();
+    } catch (e) {
+      print('Error: $e');
+      _showSnackBar('Terjadi kesalahan', isError: true);
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<bool> _tampilkanDialogInputData() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Data Industri Belum Lengkap'),
+        content: const Text(
+            'Anda harus mengisi data pimpinan dan pembimbing industri sebelum menyelesaikan penilaian.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primaryColor,
+            ),
+            child: const Text('Input Data Sekarang'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      // Panggil method input data yang sudah ada
+      await _simpanDataIndustriLengkap();
+      return true;
+    }
+
+    return false;
+  }
+
+  // Tambahkan method ini di dalam class _PenilaianDetailScreenState
+  Future<void> _tampilkanRingkasanData({
+    required Map<String, String> pimpinan,
+    required Map<String, String> pembimbing,
+  }) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            const SizedBox(width: 8),
+            const Text('Berhasil Disimpan'),
+          ],
+        ),
+        content: Container(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Info siswa
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.person, size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Siswa: ${widget.siswaData['siswa_username'] ?? '-'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Data Pimpinan
+              const Text(
+                '✓ Pimpinan Industri:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.person_outline,
+                            size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Nama: ${pimpinan['nama']}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.badge_outlined,
+                            size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'NIP: ${pimpinan['nip']?.isEmpty ?? true ? '-' : pimpinan['nip']}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.work_outline,
+                            size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Jabatan: ${pimpinan['jabatan']}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Data Pembimbing Industri
+              const Text(
+                '✓ Pembimbing Industri:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.person_outline,
+                            size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Nama: ${pembimbing['nama']}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.badge_outlined,
+                            size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'NIP: ${pembimbing['nip']?.isEmpty ?? true ? '-' : pembimbing['nip']}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.work_outline,
+                            size: 16, color: Colors.grey),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Jabatan: ${pembimbing['jabatan']}',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _simpanDataIndustriLengkap() async {
+    // Tahap 1: Input Pimpinan Industri
+    final pimpinan = await _dialogInputPimpinan();
+    if (pimpinan == null) return;
+
+    // Tahap 2: Input Pembimbing Industri
+    final pembimbing = await _dialogInputPembimbingIndustri();
+    if (pembimbing == null) return;
+
+    // Simpan ke SharedPreferences
+    await PimpinanStorage.simpanDataIndustri(
+      applicationId: widget.applicationId,
+      namaPimpinan: pimpinan['nama'] ?? '',
+      nipPimpinan: pimpinan['nip'] ?? '',
+      jabatanPimpinan: pimpinan['jabatan'] ?? '',
+      namaPembimbingIndustri: pembimbing['nama'] ?? '',
+      nipPembimbingIndustri: pembimbing['nip'] ?? '',
+      jabatanPembimbingIndustri: pembimbing['jabatan'] ?? '',
+      dataSiswa: widget.siswaData,
+    );
+
+    // Update state
+    setState(() {
+      _hasIndustriData = true;
+    });
+
+    // Tampilkan ringkasan data
+    await _tampilkanRingkasanData(
+      pimpinan: pimpinan,
+      pembimbing: pembimbing,
+    );
+
+    _showSnackBar('Data pimpinan dan pembimbing industri tersimpan',
+        backgroundColor: Colors.green);
+  }
+
+// Dialog 1: Input Pimpinan Industri
+  Future<Map<String, String>?> _dialogInputPimpinan() async {
+    final namaCtrl = TextEditingController();
+    final nipCtrl = TextEditingController();
+    final jabatanCtrl = TextEditingController();
+
+    return showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          width: double.maxFinite,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: _primaryColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.business_center,
+                          color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pimpinan Industri',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Masukkan data pimpinan perusahaan',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Nama dengan garis bawah
+                      const Text(
+                        'Nama Pimpinan',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF6B1B1B),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: namaCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan nama pimpinan',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.person_outline,
+                                color: _primaryColor),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // NIP dengan garis bawah (HANYA ANGKA)
+                      const Text(
+                        'NIP (Opsional)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF6B1B1B),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: nipCtrl,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan NIP pimpinan',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.badge_outlined,
+                                color: _primaryColor),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Jabatan dengan garis bawah
+                      const Text(
+                        'Jabatan',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF6B1B1B),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: jabatanCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan jabatan pimpinan',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon:
+                                Icon(Icons.work_outline, color: _primaryColor),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Garis pemisah horizontal
+                      Divider(
+                        color: Colors.grey.shade200,
+                        thickness: 1,
+                        height: 1,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Info
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _primaryColor.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: _primaryColor.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 18, color: _primaryColor),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Data ini akan digunakan untuk sertifikat PKL',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Footer
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(28),
+                    bottomRight: Radius.circular(28),
+                  ),
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade200, width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Batal'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (namaCtrl.text.trim().isEmpty ||
+                              jabatanCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Nama dan jabatan harus diisi')),
+                            );
+                            return;
+                          }
+                          Navigator.pop(context, {
+                            'nama': namaCtrl.text.trim(),
+                            'nip': nipCtrl.text.trim(),
+                            'jabatan': jabatanCtrl.text.trim(),
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Lanjut'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Tambahkan method helper untuk TextField yang konsisten
+  Widget _buildModernTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    required bool isRequired,
+    Color accentColor = const Color(0xFF6B1B1B),
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
+              ),
+            ),
+            if (isRequired) ...[
+              const SizedBox(width: 4),
+              Text(
+                '*',
+                style: TextStyle(
+                  color: Colors.red.shade700,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+              prefixIcon: Icon(icon, color: accentColor, size: 20),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+// Dialog 2: Input Pembimbing Industri
+  Future<Map<String, String>?> _dialogInputPembimbingIndustri() async {
+    final namaCtrl = TextEditingController();
+    final nipCtrl = TextEditingController();
+    final jabatanCtrl = TextEditingController();
+
+    return showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          width: double.maxFinite,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.9,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade700, Colors.green.shade600],
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(28),
+                    topRight: Radius.circular(28),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.people_alt,
+                          color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pembimbing Industri',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Masukkan data pembimbing lapangan',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Nama dengan garis bawah
+                      const Text(
+                        'Nama Pembimbing',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: namaCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan nama pembimbing',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.person_outline,
+                                color: Colors.green.shade700),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // NIP dengan garis bawah (HANYA ANGKA)
+                      const Text(
+                        'NIP (Opsional)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: nipCtrl,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan NIP pembimbing',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.badge_outlined,
+                                color: Colors.green.shade700),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Jabatan dengan garis bawah
+                      const Text(
+                        'Jabatan',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: jabatanCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Masukkan jabatan pembimbing',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.work_outline,
+                                color: Colors.green.shade700),
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Garis pemisah horizontal
+                      Divider(
+                        color: Colors.grey.shade200,
+                        thickness: 1,
+                        height: 1,
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Info
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                size: 18, color: Colors.green.shade700),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Data pembimbing yang akan ditandatangani di sertifikat',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Footer dengan garis atas
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(28),
+                    bottomRight: Radius.circular(28),
+                  ),
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade200, width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Batal'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (namaCtrl.text.trim().isEmpty ||
+                              jabatanCtrl.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Nama dan jabatan harus diisi')),
+                            );
+                            return;
+                          }
+                          Navigator.pop(context, {
+                            'nama': namaCtrl.text.trim(),
+                            'nip': nipCtrl.text.trim(),
+                            'jabatan': jabatanCtrl.text.trim(),
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text('Simpan'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _initializeControllers() {
@@ -927,7 +1942,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
       final skorController = TextEditingController(
         text: existingItem['skor']?.toString() ?? '',
       );
-      
+
       _skorControllers.add(skorController);
 
       // Untuk deskripsi, jika ada data existing gunakan itu, jika tidak kosongkan dulu
@@ -945,11 +1960,14 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     );
   }
 
-  void _showSnackBar(String message, {bool isError = false}) {
+// Cari fungsi _showSnackBar di bagian atas (sekitar baris 100-110)
+  void _showSnackBar(String message,
+      {bool isError = false, Color? backgroundColor}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : _primaryColor,
+        backgroundColor:
+            backgroundColor ?? (isError ? Colors.red : _primaryColor),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -969,7 +1987,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
         _showSnackBar('Nilai harus berupa angka', isError: true);
         return false;
       }
-      
+
       if (skor < 0 || skor > 100) {
         _showSnackBar('Nilai harus antara 0 - 100', isError: true);
         return false;
@@ -981,26 +1999,26 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
   // Fungsi untuk memformat input nilai (mencegah lebih dari 3 digit dan range 0-100)
   String _formatNilaiInput(String value) {
     if (value.isEmpty) return '';
-    
+
     // Hanya ambil angka
     final String filtered = value.replaceAll(RegExp(r'[^0-9]'), '');
-    
+
     if (filtered.isEmpty) return '';
-    
+
     // Konversi ke integer
     int? number = int.tryParse(filtered);
     if (number == null) return '';
-    
+
     // Batasi maksimal 100
     if (number > 100) {
       number = 100;
     }
-    
+
     // Batasi minimal 0
     if (number < 0) {
       number = 0;
     }
-    
+
     return number.toString();
   }
 
@@ -1050,18 +2068,18 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
         setState(() {
           _status = data['status'] ?? 'draft';
         });
-        _showSnackBar('Draft berhasil disimpan');
-        
+        _showSnackBar('Berhasil disimpan');
+
         await _fetchPenilaianData();
         Navigator.pop(context, true);
       } else if (response.statusCode == 409) {
-        _showSnackBar('Tidak bisa menyimpan draft karena sudah final', isError: true);
+        _showSnackBar('Tidak bisa menyimpan karena sudah final', isError: true);
       } else {
-        throw Exception('Gagal menyimpan draft: ${response.statusCode}');
+        throw Exception('Gagal menyimpan : ${response.statusCode}');
       }
     } catch (e) {
       print('Error saving draft: $e');
-      _showSnackBar('Gagal menyimpan draft', isError: true);
+      _showSnackBar('Gagal menyimpan ', isError: true);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -1131,7 +2149,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
         'catatan_akhir': _catatanController.text,
         'items': items,
       };
-      
+
       final draftResponse = await http.put(
         Uri.parse(
             '${dotenv.env['API_BASE_URL']}/api/penilaian/applications/${widget.applicationId}/draft'),
@@ -1225,6 +2243,76 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     }
 
     try {
+      // Ambil nama pembimbing dari shared preferences (yang login)
+      final namaPembimbing = prefs.getString('user_name') ?? 'Guru Mapel PKL';
+
+      // Ambil NIP pembimbing dari API guru
+      String nipPembimbing = '-';
+      String jabatanPembimbing = 'Guru Pembimbing PKL';
+
+      try {
+        // Cari data guru berdasarkan user yang login
+        final userId = prefs.getInt('user_id');
+        if (userId != null) {
+          final guruResponse = await http.get(
+            Uri.parse(
+                '${dotenv.env['API_BASE_URL']}/api/guru?user_id=$userId&limit=1'),
+            headers: {
+              'accept': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          );
+
+          if (guruResponse.statusCode == 200) {
+            final guruData = jsonDecode(guruResponse.body);
+            if (guruData['success'] == true &&
+                guruData['data']['data'].isNotEmpty) {
+              final guru = guruData['data']['data'][0];
+              nipPembimbing = guru['nip'] ?? '-';
+              // Bisa juga ambil jabatan jika ada di data guru
+              jabatanPembimbing = guru['jabatan'] ?? 'Guru Pembimbing PKL';
+            }
+          }
+        }
+      } catch (e) {
+        print('Error fetching guru data: $e');
+      }
+
+      // Ambil nama industri siswa
+      final String industriSiswa = widget.siswaData['industri_nama'] ?? '';
+      String namaInstruktur = '';
+      String jabatanInstruktur = '';
+      String nipInstruktur = '';
+
+      // Cari PIC dari industri siswa
+      if (industriSiswa.isNotEmpty) {
+        // Ambil data industri
+        final industriList = await _fetchIndustriData();
+
+        // Cari industri yang sesuai
+        final matchedIndustri = industriList.firstWhere(
+          (industri) =>
+              industri['nama']?.toString().toLowerCase() ==
+              industriSiswa.toLowerCase(),
+          orElse: () => {},
+        );
+
+        if (matchedIndustri.isNotEmpty) {
+          namaInstruktur = matchedIndustri['pic'] ?? '';
+          jabatanInstruktur =
+              matchedIndustri['jabatan'] ?? 'Pembimbing Industri';
+          nipInstruktur =
+              matchedIndustri['nip'] ?? matchedIndustri['pic_telp'] ?? '-';
+        }
+      }
+
+      // Jika masih kosong, gunakan default
+      if (namaInstruktur.isEmpty) {
+        namaInstruktur = 'Instruktur PKL';
+        jabatanInstruktur = 'Pembimbing Industri';
+        nipInstruktur = '-';
+      }
+
       final now = DateTime.now();
       final formattedDate = _formatDateIndonesian(now);
 
@@ -1248,13 +2336,17 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
           'nisn': widget.siswaData['nisn'] ?? '0012345678',
           'kelas': widget.siswaData['kelas_nama'] ?? '',
           'konsentrasi_keahlian':
-              widget.siswaData['konsentrasi'] ?? 'Desain Komunikasi Visual',
+              widget.siswaData['konsentrasi'] ?? 'Rekayasa Perangkat Lunak',
           'tempat_pkl': widget.siswaData['industri_nama'] ?? '',
           'tanggal_mulai': _formatDateIndonesian(
               DateTime.now().subtract(const Duration(days: 180))),
           'tanggal_selesai': formattedDate,
-          'nama_instruktur': 'Bapak / Ibu Pimpinan',
-          'nama_pembimbing': 'Guru Mapel PKL',
+          'nama_instruktur': namaInstruktur,
+          'jabatan_instruktur': jabatanInstruktur,
+          'nip_instruktur': nipInstruktur,
+          'nama_pembimbing': namaPembimbing,
+          'jabatan_pembimbing': jabatanPembimbing,
+          'nip_pembimbing': nipPembimbing,
         },
         'nilai': {
           'skor_1': int.tryParse(_skorControllers[0].text) ?? 0,
@@ -1266,8 +2358,8 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
           'skor_4': int.tryParse(_skorControllers[3].text) ?? 0,
           'desc_4': _deskripsiControllers[3].text,
         },
-        'sakit': 2,
-        'izin': 1,
+        'sakit': 0,
+        'izin': 0,
         'alpa': 0,
         'tempat_tanggal': 'Singosari, $formattedDate',
       };
@@ -1287,13 +2379,539 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
         _showSnackBar('Form penilaian berhasil dibuat');
         await _downloadFile(data['file_url'], data['filename']);
       } else {
-        throw Exception('Gagal generate form penilaian');
+        throw Exception('Gagal cetak formulir penilaian');
       }
     } catch (e) {
       print('Error generating assessment: $e');
-      _showSnackBar('Gagal generate form penilaian', isError: true);
+      _showSnackBar('Gagal cetak formulir penilaian', isError: true);
     } finally {
       if (mounted) setState(() => _isGeneratingAssessment = false);
+    }
+  }
+
+  Future<Map<String, String>?> _showInputNamesDialog() async {
+    final TextEditingController instrukturController = TextEditingController();
+    final TextEditingController pembimbingController = TextEditingController();
+    List<Map<String, dynamic>> industriList = [];
+    bool isLoadingIndustri = true;
+    String? selectedIndustri;
+
+    // Ambil nama industri siswa
+    final String industriSiswa = widget.siswaData['industri_nama'] ?? '';
+
+    // Ambil nama pembimbing dari SharedPreferences untuk default
+    final prefs = await SharedPreferences.getInstance();
+    final defaultPembimbing = prefs.getString('user_name') ?? '';
+
+    // Ambil data industri
+    industriList = await _fetchIndustriData();
+    isLoadingIndustri = false;
+
+    // Cari industri yang sesuai dengan industri siswa
+    if (industriSiswa.isNotEmpty) {
+      final matchedIndustri = industriList.firstWhere(
+        (industri) =>
+            industri['nama']?.toString().toLowerCase() ==
+            industriSiswa.toLowerCase(),
+        orElse: () => {},
+      );
+
+      if (matchedIndustri.isNotEmpty) {
+        selectedIndustri = matchedIndustri['nama'];
+        // Otomatis isi nama instruktur dengan PIC
+        instrukturController.text = matchedIndustri['pic'] ?? '';
+      }
+    }
+
+    return showDialog<Map<String, String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            Icons.edit_document,
+                            color: _primaryColor,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cetak Formulir Penilaian',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: _primaryColor,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Konfirmasi data penandatangan',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Info Industri
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: _primaryColor.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: _primaryColor.withValues(alpha: 0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.business, color: _primaryColor, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Industri',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                Text(
+                                  industriSiswa.isNotEmpty
+                                      ? industriSiswa
+                                      : 'Tidak diketahui',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: _primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Input Nama Instruktur
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.person_outline_rounded,
+                              size: 18,
+                              color: _primaryColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Nama Instruktur (PIC Industri)',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                            if (instrukturController.text.isNotEmpty)
+                              Container(
+                                margin: const EdgeInsets.only(left: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _selesaiColor.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  'Otomatis',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: _selesaiColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        if (isLoadingIndustri)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: _borderSoft),
+                            ),
+                            child: TextField(
+                              controller: instrukturController,
+                              readOnly: instrukturController.text.isNotEmpty,
+                              style: TextStyle(
+                                color: instrukturController.text.isNotEmpty
+                                    ? _primaryColor
+                                    : Colors.black,
+                                fontWeight: instrukturController.text.isNotEmpty
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Masukkan nama instruktur',
+                                hintStyle: TextStyle(color: Colors.grey[400]),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 14,
+                                ),
+                                suffixIcon: instrukturController.text.isNotEmpty
+                                    ? Icon(
+                                        Icons.check_circle,
+                                        color: _selesaiColor,
+                                        size: 20,
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          ),
+                        if (!isLoadingIndustri && industriList.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Wrap(
+                              spacing: 8,
+                              children: [
+                                if (instrukturController.text.isEmpty)
+                                  ...industriList
+                                      .where((i) =>
+                                          i['pic'] != null &&
+                                          i['pic'].toString().isNotEmpty)
+                                      .take(3)
+                                      .map((industri) {
+                                    return ActionChip(
+                                      label: Text(
+                                        industri['pic'],
+                                        style: const TextStyle(fontSize: 11),
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          instrukturController.text =
+                                              industri['pic'].toString();
+                                        });
+                                      },
+                                      backgroundColor: Colors.grey[100],
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                    );
+                                  }).toList(),
+                                if (instrukturController.text.isNotEmpty)
+                                  ActionChip(
+                                    label: const Text('Ganti'),
+                                    onPressed: () {
+                                      setState(() {
+                                        instrukturController.clear();
+                                      });
+                                    },
+                                    backgroundColor: Colors.grey[100],
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Input Nama Pembimbing
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.school_rounded,
+                              size: 18,
+                              color: _primaryColor,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Nama Pembimbing Sekolah',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _borderSoft),
+                          ),
+                          child: TextField(
+                            controller: pembimbingController
+                              ..text = defaultPembimbing,
+                            decoration: InputDecoration(
+                              hintText: 'Masukkan nama pembimbing',
+                              hintStyle: TextStyle(color: Colors.grey[400]),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // Buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(color: Colors.grey[300]!),
+                              ),
+                            ),
+                            child: Text(
+                              'Batal',
+                              style: TextStyle(
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // Validasi
+                              if (instrukturController.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                        'Nama instruktur harus diisi'),
+                                    backgroundColor: _errorColor,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (pembimbingController.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                        'Nama pembimbing harus diisi'),
+                                    backgroundColor: _errorColor,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              Navigator.pop(context, {
+                                'instruktur': instrukturController.text.trim(),
+                                'pembimbing': pembimbingController.text.trim(),
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: const Text(
+                              'Cetak',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+// Tambahkan fungsi dialog input instruktur
+  Future<String> _showInputInstrukturDialog() async {
+    final TextEditingController controller = TextEditingController();
+    String result = '';
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Input Nama Instruktur'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Masukkan nama instruktur/ pembimbing industri:',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  hintText: '',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: _primaryColor, width: 2),
+                  ),
+                ),
+                autofocus: true,
+              ),
+            ],
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Batal'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim().isNotEmpty) {
+                  result = controller.text.trim();
+                  Navigator.pop(context);
+                } else {
+                  _showSnackBar('Nama instruktur tidak boleh kosong',
+                      isError: true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Simpan'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchIndustriData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('access_token');
+
+    if (token == null) {
+      _redirectToLogin();
+      return [];
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('${dotenv.env['API_BASE_URL']}/api/industri?limit=100'),
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<Map<String, dynamic>>.from(data['data']['data'] ?? []);
+      } else {
+        print('Gagal mengambil data industri: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('Error fetching industri data: $e');
+      return [];
     }
   }
 
@@ -1307,7 +2925,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     }
 
     try {
-      _showSnackBar('Mengunduh file...');
+      _showSnackBar('Mengunduh berkas...');
 
       final response = await http.get(
         Uri.parse('${dotenv.env['SERTIF']}$fileUrl'),
@@ -1325,11 +2943,11 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
         _showSnackBar('File berhasil diunduh: $filename');
         await OpenFile.open(file.path);
       } else {
-        throw Exception('Gagal mengunduh file');
+        throw Exception('Gagal mengunduh berkas');
       }
     } catch (e) {
       print('Error downloading file: $e');
-      _showSnackBar('Gagal mengunduh file', isError: true);
+      _showSnackBar('Gagal mengunduh berkas', isError: true);
     }
   }
 
@@ -1377,6 +2995,20 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     return name[0].toUpperCase();
   }
 
+  // Fungsi untuk mendapatkan deskripsi berdasarkan nomor kompetensi
+  String _getDeskripsiKompetensi(int nomorKompetensi, int skor) {
+    if (nomorKompetensi == 1) {
+      return _getSoftSkillDescription(skor);
+    } else if (nomorKompetensi == 2) {
+      return _getNormaK3LHDescription(skor);
+    } else if (nomorKompetensi == 3) {
+      return _getKompetensiTeknisDescription(skor);
+    } else if (nomorKompetensi == 4) {
+      return _getAlurBisnisDescription(skor);
+    }
+    return '';
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isSelesai = _status == 'sudah_dinilai' || widget.readOnly;
@@ -1412,7 +3044,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                     children: [
                       Icon(Icons.assignment, size: 20),
                       SizedBox(width: 8),
-                      Text('Generate Form Penilaian'),
+                      Text('Cetak Formulir Penilaian'),
                     ],
                   ),
                 ),
@@ -1622,15 +3254,16 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Form Penilaian Items - DENGAN PEMBATASAN NILAI 0-100
+                        // Form Penilaian Items - DENGAN DESKRIPSI DI BAWAHNYA
                         ...List.generate(_formItems.length, (index) {
                           final formItem = _formItems[index];
                           final nomor = index + 1;
-                          
+
                           // Mendapatkan error state untuk field ini
                           String? errorText;
                           if (_skorControllers[index].text.isNotEmpty) {
-                            final skor = int.tryParse(_skorControllers[index].text);
+                            final skor =
+                                int.tryParse(_skorControllers[index].text);
                             if (skor == null) {
                               errorText = 'Harus angka';
                             } else if (skor < 0 || skor > 100) {
@@ -1638,14 +3271,17 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                             }
                           }
 
+                          final int skorValue =
+                              int.tryParse(_skorControllers[index].text) ?? 0;
+
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
+                            margin: const EdgeInsets.only(bottom: 16),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: errorText != null 
+                                color: errorText != null
                                     ? _errorColor.withValues(alpha: 0.3)
                                     : _borderSoft,
                                 width: errorText != null ? 1.5 : 1,
@@ -1661,6 +3297,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // Header Kompetensi
                                 Row(
                                   children: [
                                     Container(
@@ -1694,6 +3331,8 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 12),
+
+                                // Tujuan Pembelajaran
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
@@ -1710,6 +3349,8 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
+
+                                // Nilai dan Predikat
                                 IntrinsicHeight(
                                   child: Row(
                                     crossAxisAlignment:
@@ -1736,10 +3377,11 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                                 controller:
                                                     _skorControllers[index],
                                                 keyboardType:
-                                                    const TextInputType.numberWithOptions(
-                                                      signed: false,
-                                                      decimal: false,
-                                                    ),
+                                                    const TextInputType
+                                                        .numberWithOptions(
+                                                  signed: false,
+                                                  decimal: false,
+                                                ),
                                                 enabled: !isSelesai,
                                                 readOnly: isSelesai,
                                                 textAlign: TextAlign.center,
@@ -1770,8 +3412,8 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                                         BorderRadius.circular(
                                                             10),
                                                     borderSide: BorderSide(
-                                                        color: errorText != null 
-                                                            ? _errorColor 
+                                                        color: errorText != null
+                                                            ? _errorColor
                                                             : _borderSoft),
                                                   ),
                                                   focusedBorder:
@@ -1780,8 +3422,8 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                                         BorderRadius.circular(
                                                             10),
                                                     borderSide: BorderSide(
-                                                        color: errorText != null 
-                                                            ? _errorColor 
+                                                        color: errorText != null
+                                                            ? _errorColor
                                                             : _primaryColor,
                                                         width: 2),
                                                   ),
@@ -1797,32 +3439,57 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                                 ),
                                                 onChanged: (value) {
                                                   // FORMAT DAN BATASI NILAI 0-100
-                                                  final String formattedValue = _formatNilaiInput(value);
-                                                  
+                                                  final String formattedValue =
+                                                      _formatNilaiInput(value);
+
                                                   // Update controller jika berbeda
-                                                  if (_skorControllers[index].text != formattedValue) {
-                                                    _skorControllers[index].text = formattedValue;
+                                                  if (_skorControllers[index]
+                                                          .text !=
+                                                      formattedValue) {
+                                                    _skorControllers[index]
+                                                        .text = formattedValue;
                                                     // Pindahkan kursor ke akhir
-                                                    _skorControllers[index].selection = TextSelection.fromPosition(
-                                                      TextPosition(offset: formattedValue.length),
+                                                    _skorControllers[index]
+                                                            .selection =
+                                                        TextSelection
+                                                            .fromPosition(
+                                                      TextPosition(
+                                                          offset: formattedValue
+                                                              .length),
                                                     );
                                                   }
-                                                  
+
                                                   // UPDATE OTOMATIS DESKRIPSI
-                                                  if (formattedValue.isNotEmpty) {
-                                                    final skor = int.tryParse(formattedValue);
-                                                    if (skor != null && skor >= 0 && skor <= 100) {
-                                                      final predikat = _getPredikatFromNilai(skor);
-                                                      if (_deskripsiControllers[index].text != predikat) {
-                                                        _deskripsiControllers[index].text = predikat;
+                                                  if (formattedValue
+                                                      .isNotEmpty) {
+                                                    final skor = int.tryParse(
+                                                        formattedValue);
+                                                    if (skor != null &&
+                                                        skor >= 0 &&
+                                                        skor <= 100) {
+                                                      final predikat =
+                                                          _getPredikatFromNilai(
+                                                              skor);
+                                                      if (_deskripsiControllers[
+                                                                  index]
+                                                              .text !=
+                                                          predikat) {
+                                                        _deskripsiControllers[
+                                                                index]
+                                                            .text = predikat;
                                                       }
                                                     }
                                                   } else {
-                                                    if (_deskripsiControllers[index].text.isNotEmpty) {
-                                                      _deskripsiControllers[index].text = '';
+                                                    if (_deskripsiControllers[
+                                                            index]
+                                                        .text
+                                                        .isNotEmpty) {
+                                                      _deskripsiControllers[
+                                                              index]
+                                                          .text = '';
                                                     }
                                                   }
-                                                  
+
                                                   // Trigger rebuild
                                                   setState(() {});
                                                 },
@@ -1832,7 +3499,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                         ),
                                       ),
                                       const SizedBox(width: 16),
-                                      
+
                                       // Kolom Predikat (READ ONLY, OTOMATIS TERISI)
                                       Expanded(
                                         flex: 4,
@@ -1851,19 +3518,26 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                             Container(
                                               width: double.infinity,
                                               height: 52,
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 12, vertical: 12),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 12),
                                               decoration: BoxDecoration(
-                                                color: isSelesai 
-                                                    ? _backgroundLight 
-                                                    : (_deskripsiControllers[index].text.isNotEmpty 
-                                                        ? _primaryLight 
+                                                color: isSelesai
+                                                    ? _backgroundLight
+                                                    : (_deskripsiControllers[
+                                                                index]
+                                                            .text
+                                                            .isNotEmpty
+                                                        ? _primaryLight
                                                         : Colors.grey[50]),
                                                 borderRadius:
                                                     BorderRadius.circular(10),
                                                 border: Border.all(
-                                                    color: errorText != null 
-                                                        ? _errorColor.withValues(alpha: 0.5)
+                                                    color: errorText != null
+                                                        ? _errorColor
+                                                            .withValues(
+                                                                alpha: 0.5)
                                                         : _borderSoft),
                                               ),
                                               child: Align(
@@ -1875,29 +3549,37 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                                       ? _deskripsiControllers[
                                                               index]
                                                           .text
-                                                      : (isSelesai ? '-' : 'Otomatis terisi'),
+                                                      : (isSelesai
+                                                          ? '-'
+                                                          : 'Otomatis terisi'),
                                                   style: TextStyle(
-                                                    color: _deskripsiControllers[index]
-                                                            .text
-                                                            .isNotEmpty
-                                                        ? _primaryColor
-                                                        : Colors.grey[500],
-                                                    fontWeight: _deskripsiControllers[index]
-                                                            .text
-                                                            .isNotEmpty
-                                                        ? FontWeight.w600
-                                                        : FontWeight.w400,
+                                                    color:
+                                                        _deskripsiControllers[
+                                                                    index]
+                                                                .text
+                                                                .isNotEmpty
+                                                            ? _primaryColor
+                                                            : Colors.grey[500],
+                                                    fontWeight:
+                                                        _deskripsiControllers[
+                                                                    index]
+                                                                .text
+                                                                .isNotEmpty
+                                                            ? FontWeight.w600
+                                                            : FontWeight.w400,
                                                     fontSize: 14,
                                                   ),
                                                   maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ),
                                             // Tampilkan pesan error jika nilai tidak valid
                                             if (errorText != null)
                                               Padding(
-                                                padding: const EdgeInsets.only(top: 4, left: 4),
+                                                padding: const EdgeInsets.only(
+                                                    top: 4, left: 4),
                                                 child: Text(
                                                   'Nilai $errorText',
                                                   style: TextStyle(
@@ -1913,6 +3595,61 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                     ],
                                   ),
                                 ),
+                                const SizedBox(height: 16),
+
+                                // ===== DESKRIPSI CAPAIAN (DITAMBAHKAN DI BAWAH SETIAP KOMPETENSI) =====
+                                if (_skorControllers[index].text.isNotEmpty &&
+                                    skorValue > 0)
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          _primaryColor.withValues(alpha: 0.03),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: _primaryColor.withValues(
+                                              alpha: 0.2)),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.description_rounded,
+                                          size: 16,
+                                          color: _primaryColor.withValues(
+                                              alpha: 0.7),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Deskripsi Capaian:',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: _primaryColor,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                _getDeskripsiKompetensi(
+                                                    nomor, skorValue),
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[800],
+                                                  height: 1.4,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                           );
@@ -2054,6 +3791,270 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                             ],
                           ),
                         ),
+                        // ===== Rata-rata Nilai Card =====
+const SizedBox(height: 20),
+
+// ===== TAMBAHKAN INI =====
+// ===== DATA PIMPINAN & PEMBIMBING INDUSTRI =====
+FutureBuilder<Map<String, dynamic>?>(
+  future: PimpinanStorage.ambilDataIndustri(widget.applicationId),
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
+    final industriData = snapshot.data;
+    if (industriData == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Data pimpinan dan pembimbing industri belum diinput',
+                style: TextStyle(
+                  color: Colors.orange.shade800,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final pimpinan = industriData['pimpinan'] ?? {};
+    final pembimbing = industriData['pembimbing_industri'] ?? {};
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _borderSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.business_center, color: _primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Data Industri',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Pimpinan Industri
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _backgroundLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _borderSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.person, size: 16, color: _primaryColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Pimpinan Industri',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: _primaryColor,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Text('Nama', style: TextStyle(color: _neutralColor, fontSize: 12)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        pimpinan['nama'] ?? '-',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Text('NIP', style: TextStyle(color: _neutralColor, fontSize: 12)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        pimpinan['nip']?.isNotEmpty == true ? pimpinan['nip'] : '-',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Text('Jabatan', style: TextStyle(color: _neutralColor, fontSize: 12)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        pimpinan['jabatan'] ?? '-',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Pembimbing Industri
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _backgroundLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _borderSoft),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.people, size: 16, color: Colors.green.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Pembimbing Industri',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Text('Nama', style: TextStyle(color: _neutralColor, fontSize: 12)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        pembimbing['nama'] ?? '-',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Text('NIP', style: TextStyle(color: _neutralColor, fontSize: 12)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        pembimbing['nip']?.isNotEmpty == true ? pembimbing['nip'] : '-',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Text('Jabatan', style: TextStyle(color: _neutralColor, fontSize: 12)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        pembimbing['jabatan'] ?? '-',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.access_time, size: 14, color: Colors.blue.shade700),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Terakhir diperbarui: ${_formatDateIndonesian(DateTime.parse(industriData['waktu_simpan'] ?? DateTime.now().toIso8601String()))}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  },
+),
+const SizedBox(height: 20),
 
                         // Tombol Generate Dokumen (untuk mode selesai)
                         if (isSelesai) ...[
@@ -2077,7 +4078,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                   label: Text(
                                     _isGeneratingAssessment
                                         ? 'Memproses...'
-                                        : 'Generate Form Penilaian',
+                                        : 'Cetak Formulir Penilaian',
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _selesaiColor,
@@ -2099,8 +4100,8 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                     ),
                   ),
                 ),
+// Di bagian BOTTOM BUTTONS, ganti dengan ini:
 
-                // ===== BOTTOM BUTTONS =====
                 if (!isSelesai)
                   Positioned(
                     left: 0,
@@ -2120,73 +4121,58 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                       ),
                       child: Row(
                         children: [
-                          // TOMBOL SIMPAN DRAFT
                           Expanded(
-                            child: ElevatedButton(
-                              onPressed: _isSaving ? null : _simpanDraft,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: _primaryColor,
-                                side:
-                                    BorderSide(color: _primaryColor, width: 2),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: _isSaving
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Simpan Draf',
+                            child: _hasIndustriData
+                                // Jika SUDAH ada data industri → Tombol Simpan & Selesaikan
+                                ? ElevatedButton.icon(
+                                    onPressed: _isSaving
+                                        ? null
+                                        : _cekDataDanSelesaikan,
+                                    icon: _isSaving
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.save_alt_rounded),
+                                    label: const Text(
+                                      'Simpan & Selesaikan',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _primaryColor,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          
-                          // TOMBOL SELESAIKAN
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _isSaving ? null : _selesaiKan,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _selesaiColor,
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: _isSaving
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Selesaikan',
+                                  )
+                                // Jika BELUM ada data industri → Tombol Input Data Industri
+                                : ElevatedButton.icon(
+                                    onPressed: _simpanDataIndustriLengkap,
+                                    icon:
+                                        const Icon(Icons.add_business_rounded),
+                                    label: const Text(
+                                      'Input Data Industri',
                                       style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _primaryColor,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                            ),
+                                  ),
                           ),
                         ],
                       ),
@@ -2197,6 +4183,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     );
   }
 }
+
 extension ColorExtension on Color {
   Color withValues({double? alpha}) {
     if (alpha != null) {
