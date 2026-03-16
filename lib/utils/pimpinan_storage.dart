@@ -11,9 +11,11 @@ class PimpinanStorage {
   static Future<void> simpanDataIndustri({
     required int applicationId,
     required String namaPimpinan,
+    required String jenisNomorPimpinan, // ✅ TAMBAHKAN INI
     required String nipPimpinan,
     required String jabatanPimpinan,
     required String namaPembimbingIndustri,
+    required String jenisNomorPembimbing, // ✅ TAMBAHKAN INI
     required String nipPembimbingIndustri,
     required String jabatanPembimbingIndustri,
     Map<String, dynamic>? dataSiswa,
@@ -30,11 +32,13 @@ class PimpinanStorage {
       'application_id': applicationId,
       'pimpinan': {
         'nama': namaPimpinan,
+        'jenis_nomor': jenisNomorPimpinan, // ✅ TAMBAHKAN INI
         'nip': nipPimpinan,
         'jabatan': jabatanPimpinan,
       },
       'pembimbing_industri': {
         'nama': namaPembimbingIndustri,
+        'jenis_nomor': jenisNomorPembimbing, // ✅ TAMBAHKAN INI
         'nip': nipPembimbingIndustri,
         'jabatan': jabatanPembimbingIndustri,
       },
@@ -45,6 +49,8 @@ class PimpinanStorage {
     
     await file.writeAsString(jsonEncode(allData));
     print('✅ Data industri tersimpan di file untuk aplikasi $applicationId');
+    print('   - Pimpinan: $namaPimpinan ($jenisNomorPimpinan: $nipPimpinan)');
+    print('   - Pembimbing: $namaPembimbingIndustri ($jenisNomorPembimbing: $nipPembimbingIndustri)');
   }
 
   static Future<Map<String, dynamic>?> ambilDataIndustri(int applicationId) async {

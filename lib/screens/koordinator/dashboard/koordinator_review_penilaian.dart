@@ -1473,13 +1473,16 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       print('\n📋 ===== DATA INDUSTRI UNTUK ${siswa.nama} =====');
 
       String namaPimpinan = '';
+      String jenisNomorPimpinan = ''; // ✅ DEFAULT JIKA TIDAK ADA
       String nipPimpinan = '';
       String jabatanPimpinan = '';
 
       String namaPembimbingIndustri = '';
+      String jenisNomorPembimbing = ''; // ✅ DEFAULT JIKA TIDAK ADA
       String nipPembimbingIndustri = '';
       String jabatanPembimbingIndustri = '';
-      // Tambahkan ini
+
+      // CEK SHAREDPREFERENCES
       print('🔍 CEK SHAREDPREFERENCES UNTUK APLIKASI ${siswa.applicationId}:');
       final prefs = await SharedPreferences.getInstance();
       prefs.getKeys().forEach((key) {
@@ -1488,7 +1491,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
         }
       });
 
-      // AMBIL HANYA DARI SHAREDPREFERENCES (INPUT PEMBIMBING)
+      // AMBIL DARI SHAREDPREFERENCES
       print('📡 Mencari data industri di SharedPreferences...');
       final industriData =
           await PimpinanStorage.ambilDataIndustri(siswa.applicationId);
@@ -1496,21 +1499,27 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
       if (industriData != null) {
         // Data Pimpinan Industri
         namaPimpinan = industriData['pimpinan']?['nama'] ?? '';
+        jenisNomorPimpinan = industriData['pimpinan']?['jenis_nomor'] ??
+            'NIP'; // ✅ AMBIL JENIS NOMOR
         nipPimpinan = industriData['pimpinan']?['nip'] ?? '-';
         jabatanPimpinan = industriData['pimpinan']?['jabatan'] ?? '';
 
         // Data Pembimbing Industri
         namaPembimbingIndustri =
             industriData['pembimbing_industri']?['nama'] ?? '';
+        jenisNomorPembimbing = industriData['pembimbing_industri']
+                ?['jenis_nomor'] ??
+            'NIP'; // ✅ AMBIL JENIS NOMOR
         nipPembimbingIndustri =
             industriData['pembimbing_industri']?['nip'] ?? '-';
         jabatanPembimbingIndustri =
             industriData['pembimbing_industri']?['jabatan'] ?? '';
 
         print('✅ Data industri ditemukan di SharedPreferences:');
-        print('   - Pimpinan: $namaPimpinan ($jabatanPimpinan)');
         print(
-            '   - Pembimbing Industri: $namaPembimbingIndustri ($jabatanPembimbingIndustri)');
+            '   - Pimpinan: $namaPimpinan ($jenisNomorPimpinan: $nipPimpinan)');
+        print(
+            '   - Pembimbing Industri: $namaPembimbingIndustri ($jenisNomorPembimbing: $nipPembimbingIndustri)');
         print('   - Waktu simpan: ${industriData['waktu_simpan']}');
       } else {
         // Jika tidak ada data di SharedPreferences
@@ -1587,8 +1596,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
         print('   - NIP: $nipPembimbingSekolah');
         print('   - Jabatan: $jabatanPembimbingSekolah');
       }
-
-      // ===== GABUNGKAN SEMUA DATA UNTUK API =====
+// ===== GABUNGKAN SEMUA DATA UNTUK API =====
       final Map<String, dynamic> requestBody = {
         'nomor_sertifikat': nomorSertifikat,
         'siswa': {
@@ -1612,11 +1620,13 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
         },
         // Data Pimpinan Industri
         'nama_pimpinan': namaPimpinan,
+        'jenis_nomor_pimpinan': jenisNomorPimpinan, // ✅ TAMBAHKAN INI
         'nip_pimpinan': nipPimpinan,
         'jabatan_pimpinan': jabatanPimpinan,
 
         // Data Pembimbing Industri
         'nama_pembimbing': namaPembimbingIndustri,
+        'jenis_nomor_pembimbing': jenisNomorPembimbing, // ✅ TAMBAHKAN INI
         'nip_pembimbing': nipPembimbingIndustri,
         'jabatan_pembimbing': jabatanPembimbingIndustri,
 
@@ -1625,7 +1635,6 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
         'nip_pembimbing_sekolah': nipPembimbingSekolah,
         'jabatan_pembimbing_sekolah': jabatanPembimbingSekolah,
       };
-
       print('\n📤 ===== REQUEST BODY FINAL =====');
       print(jsonEncode(requestBody));
       print('===============================\n');
@@ -2390,7 +2399,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                               ),
                             ),
                             child: DropdownButtonFormField<String?>(
-                              value: _selectedKelasNama,
+                              initialValue: _selectedKelasNama,
                               decoration: InputDecoration(
                                 labelText: 'Kelas',
                                 labelStyle: TextStyle(
@@ -2503,7 +2512,7 @@ class _KoordinatorReviewPenilaianState extends State<KoordinatorReviewPenilaian>
                               ),
                             ),
                             child: DropdownButtonFormField<int?>(
-                              value: _selectedIndustriId,
+                              initialValue: _selectedIndustriId,
                               decoration: InputDecoration(
                                 labelText: 'Industri/DUDI',
                                 labelStyle: TextStyle(
@@ -3968,304 +3977,302 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
       _showSnackBar('Gagal mengunduh file', isError: true);
     }
   }
+Future<void> _generateSertifikat() async {
+  setState(() => _isGeneratingCertificate = true);
 
-  Future<void> _generateSertifikat() async {
-    setState(() => _isGeneratingCertificate = true);
+  final prefs = await SharedPreferences.getInstance();
+  final token = prefs.getString('access_token');
 
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
+  if (token == null) {
+    _redirectToLogin();
+    return;
+  }
 
-    if (token == null) {
-      _redirectToLogin();
+  try {
+    if (_formItems.isEmpty) {
+      _showSnackBar('Data kompetensi tidak tersedia', isError: true);
+      setState(() => _isGeneratingCertificate = false);
       return;
     }
 
-    try {
-      if (_formItems.isEmpty) {
-        _showSnackBar('Data kompetensi tidak tersedia', isError: true);
-        setState(() => _isGeneratingCertificate = false);
-        return;
-      }
+    final rataRata = _detailData?['rata_rata'] ?? 0;
+    double rataRataDouble;
+    if (rataRata is String) {
+      rataRataDouble = double.tryParse(rataRata) ?? 0;
+    } else {
+      rataRataDouble = rataRata.toDouble();
+    }
 
-      final rataRata = _detailData?['rata_rata'] ?? 0;
-      double rataRataDouble;
-      if (rataRata is String) {
-        rataRataDouble = double.tryParse(rataRata) ?? 0;
-      } else {
-        rataRataDouble = rataRata.toDouble();
-      }
+    final hasilPKL = _getHasilPKL(rataRataDouble);
+    final jurusan = _getJurusanFromKelas(_siswaData['kelas_nama']);
 
-      final hasilPKL = _getHasilPKL(rataRataDouble);
-      final jurusan = _getJurusanFromKelas(_siswaData['kelas_nama']);
+    final now = DateTime.now();
+    final formattedDate = _formatDate(now);
+    final nomorSertifikat =
+        '420/${now.day}${now.month}${now.year}/101.6.9.19/${now.year}';
 
-      final now = DateTime.now();
-      final formattedDate = _formatDate(now);
-      final nomorSertifikat =
-          '420/${now.day}${now.month}${now.year}/101.6.9.19/${now.year}';
+    final String desc1 = _formItems.isNotEmpty
+        ? _formItems[0]['tujuan_pembelajaran'] ?? 'Kompetensi 1'
+        : 'Kompetensi 1';
+    final String desc2 = _formItems.length > 1
+        ? _formItems[1]['tujuan_pembelajaran'] ?? 'Kompetensi 2'
+        : 'Kompetensi 2';
+    final String desc3 = _formItems.length > 2
+        ? _formItems[2]['tujuan_pembelajaran'] ?? 'Kompetensi 3'
+        : 'Kompetensi 3';
+    final String desc4 = _formItems.length > 3
+        ? _formItems[3]['tujuan_pembelajaran'] ?? 'Kompetensi 4'
+        : 'Kompetensi 4';
 
-      final String desc1 = _formItems.isNotEmpty
-          ? _formItems[0]['tujuan_pembelajaran'] ?? 'Kompetensi 1'
-          : 'Kompetensi 1';
-      final String desc2 = _formItems.length > 1
-          ? _formItems[1]['tujuan_pembelajaran'] ?? 'Kompetensi 2'
-          : 'Kompetensi 2';
-      final String desc3 = _formItems.length > 2
-          ? _formItems[2]['tujuan_pembelajaran'] ?? 'Kompetensi 3'
-          : 'Kompetensi 3';
-      final String desc4 = _formItems.length > 3
-          ? _formItems[3]['tujuan_pembelajaran'] ?? 'Kompetensi 4'
-          : 'Kompetensi 4';
+    int skor1 = 0, skor2 = 0, skor3 = 0, skor4 = 0;
 
-      int skor1 = 0, skor2 = 0, skor3 = 0, skor4 = 0;
+    for (var i = 0; i < _formItems.length; i++) {
+      final formItem = _formItems[i];
+      final nilaiItem = _nilaiItems.firstWhere(
+        (item) => item['form_item_id'] == formItem['id'],
+        orElse: () => {},
+      );
 
-      for (var i = 0; i < _formItems.length; i++) {
-        final formItem = _formItems[i];
-        final nilaiItem = _nilaiItems.firstWhere(
-          (item) => item['form_item_id'] == formItem['id'],
-          orElse: () => {},
-        );
+      final skor = nilaiItem['skor'] ?? 0;
 
-        final skor = nilaiItem['skor'] ?? 0;
+      if (i == 0) {
+        skor1 = skor;
+      } else if (i == 1)
+        skor2 = skor;
+      else if (i == 2)
+        skor3 = skor;
+      else if (i == 3) skor4 = skor;
+    }
 
-        if (i == 0) {
-          skor1 = skor;
-        } else if (i == 1)
-          skor2 = skor;
-        else if (i == 2)
-          skor3 = skor;
-        else if (i == 3) skor4 = skor;
-      }
+    // FORMAT TANGGAL
+    String tanggalMulai = '';
+    String tanggalSelesai = '';
 
-      // FORMAT TANGGAL
-      String tanggalMulai = '';
-      String tanggalSelesai = '';
+    if (_detailData != null) {
+      tanggalMulai = _detailData!['tanggal_mulai'] ??
+          _detailData!['start_date'] ??
+          _detailData!['mulai'] ??
+          '';
 
-      if (_detailData != null) {
-        tanggalMulai = _detailData!['tanggal_mulai'] ??
-            _detailData!['start_date'] ??
-            _detailData!['mulai'] ??
-            '';
+      tanggalSelesai = _detailData!['tanggal_selesai'] ??
+          _detailData!['end_date'] ??
+          _detailData!['selesai'] ??
+          _detailData!['finalized_at'] ??
+          '';
+    }
 
-        tanggalSelesai = _detailData!['tanggal_selesai'] ??
-            _detailData!['end_date'] ??
-            _detailData!['selesai'] ??
-            _detailData!['finalized_at'] ??
-            '';
-      }
-
-      if (tanggalMulai.isEmpty) {
-        try {
-          if (tanggalSelesai.isNotEmpty) {
-            final dateSelesai = DateTime.parse(tanggalSelesai.split(' ')[0]);
-            final dateMulai = dateSelesai.subtract(const Duration(days: 180));
-            tanggalMulai = _formatDate(dateMulai);
-          } else {
-            tanggalMulai =
-                _formatDate(DateTime.now().subtract(const Duration(days: 180)));
-          }
-        } catch (e) {
+    if (tanggalMulai.isEmpty) {
+      try {
+        if (tanggalSelesai.isNotEmpty) {
+          final dateSelesai = DateTime.parse(tanggalSelesai.split(' ')[0]);
+          final dateMulai = dateSelesai.subtract(const Duration(days: 180));
+          tanggalMulai = _formatDate(dateMulai);
+        } else {
           tanggalMulai =
               _formatDate(DateTime.now().subtract(const Duration(days: 180)));
         }
-      } else {
-        try {
-          final dateMulai = DateTime.parse(tanggalMulai);
-          tanggalMulai = _formatDate(dateMulai);
-        } catch (e) {}
+      } catch (e) {
+        tanggalMulai =
+            _formatDate(DateTime.now().subtract(const Duration(days: 180)));
       }
-
-      if (tanggalSelesai.isNotEmpty) {
-        try {
-          final dateSelesai = DateTime.parse(tanggalSelesai.split(' ')[0]);
-          tanggalSelesai = _formatDate(dateSelesai);
-        } catch (e) {}
-      } else {
-        tanggalSelesai = formattedDate;
-      }
-
-      // ===== DATA INDUSTRI (PIMPINAN + PEMBIMBING INDUSTRI) =====
-      print(
-          '\n📋 ===== DATA INDUSTRI UNTUK ${_siswaData['siswa_username']} =====');
-
-      String namaPimpinan = '';
-      String nipPimpinan = '';
-      String jabatanPimpinan = '';
-
-      String namaPembimbingIndustri = '';
-      String nipPembimbingIndustri = '';
-      String jabatanPembimbingIndustri = '';
-
-      // AMBIL DARI SHAREDPREFERENCES
-      print('📡 Mencari data industri di SharedPreferences...');
-      final industriData =
-          await PimpinanStorage.ambilDataIndustri(widget.applicationId);
-
-      if (industriData != null) {
-        // Data Pimpinan Industri
-        namaPimpinan = industriData['pimpinan']?['nama'] ?? '';
-        nipPimpinan = industriData['pimpinan']?['nip'] ?? '-';
-        jabatanPimpinan = industriData['pimpinan']?['jabatan'] ?? '';
-
-        // Data Pembimbing Industri
-        namaPembimbingIndustri =
-            industriData['pembimbing_industri']?['nama'] ?? '';
-        nipPembimbingIndustri =
-            industriData['pembimbing_industri']?['nip'] ?? '-';
-        jabatanPembimbingIndustri =
-            industriData['pembimbing_industri']?['jabatan'] ?? '';
-
-        print('✅ Data industri ditemukan di SharedPreferences:');
-        print('   - Pimpinan: $namaPimpinan ($jabatanPimpinan)');
-        print(
-            '   - Pembimbing Industri: $namaPembimbingIndustri ($jabatanPembimbingIndustri)');
-      } else {
-        print('❌ TIDAK ADA DATA INDUSTRI DI SHAREDPREFERENCES!');
-        print(
-            '❌ Pembimbing belum menginput data untuk aplikasi ID: ${widget.applicationId}');
-
-        _showSnackBar('Data pimpinan dan pembimbing industri belum diinput',
-            isError: true);
-        setState(() => _isGeneratingCertificate = false);
-        return;
-      }
-
-      // ===== DATA PEMBIMBING SEKOLAH (KOORDINATOR) =====
-      print('\n📋 ===== DATA PEMBIMBING SEKOLAH =====');
-
-      String namaPembimbingSekolah = '';
-      String nipPembimbingSekolah = '';
-      String jabatanPembimbingSekolah = '';
-
-      // Coba ambil data guru berdasarkan user_id
-      final userId = prefs.getInt('user_id');
-      if (userId != null) {
-        try {
-          final guruResponse = await http.get(
-            Uri.parse(
-                '${dotenv.env['API_BASE_URL']}/api/guru?user_id=$userId&limit=1'),
-            headers: {
-              'accept': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          );
-
-          if (guruResponse.statusCode == 200) {
-            final guruData = jsonDecode(guruResponse.body);
-            if (guruData['success'] == true &&
-                guruData['data']['data'] != null &&
-                guruData['data']['data'].isNotEmpty) {
-              final guru = guruData['data']['data'][0];
-              namaPembimbingSekolah = guru['nama'] ?? '';
-              nipPembimbingSekolah = guru['nip'] ?? '';
-
-              // Tentukan jabatan berdasarkan role
-              if (guru['is_koordinator'] == true) {
-                jabatanPembimbingSekolah = 'Koordinator PKL';
-              } else if (guru['is_pembimbing'] == true) {
-                jabatanPembimbingSekolah = 'Guru Pembimbing PKL';
-              } else if (guru['is_wali_kelas'] == true) {
-                jabatanPembimbingSekolah = 'Wali Kelas';
-              } else {
-                jabatanPembimbingSekolah = 'Guru';
-              }
-
-              print('✅ Data guru ditemukan:');
-              print('   - Nama: $namaPembimbingSekolah');
-              print('   - NIP: $nipPembimbingSekolah');
-              print('   - Jabatan: $jabatanPembimbingSekolah');
-            }
-          }
-        } catch (e) {
-          print('❌ Error fetching guru data: $e');
-        }
-      }
-
-      // Jika data guru tidak ditemukan, pakai dari SharedPreferences
-      if (namaPembimbingSekolah.isEmpty) {
-        print('⚠️ Menggunakan data dari SharedPreferences');
-        namaPembimbingSekolah =
-            prefs.getString('user_name') ?? 'Guru Pembimbing PKL';
-        nipPembimbingSekolah = prefs.getString('user_nip') ?? '-';
-        jabatanPembimbingSekolah =
-            prefs.getString('user_jabatan') ?? 'Guru Pembimbing PKL';
-
-        print('   - Nama: $namaPembimbingSekolah');
-        print('   - NIP: $nipPembimbingSekolah');
-        print('   - Jabatan: $jabatanPembimbingSekolah');
-      }
-
-      // ===== GABUNGKAN SEMUA DATA UNTUK API =====
-      final Map<String, dynamic> requestBody = {
-        'nomor_sertifikat': nomorSertifikat,
-        'siswa': {
-          'nama': _siswaData['siswa_username'] ?? '',
-          'nisn': _siswaData['nisn'] ?? '0123456789',
-        },
-        'nama_industri': _siswaData['industri_nama'] ?? '',
-        'tanggal_mulai': tanggalMulai,
-        'tanggal_selesai': tanggalSelesai,
-        'hasil_pkl': hasilPKL,
-        'tanggal_terbit': formattedDate,
-        'nilai': {
-          'aspek_1': skor1,
-          'desc_1': desc1,
-          'aspek_2': skor2,
-          'desc_2': desc2,
-          'aspek_3': skor3,
-          'desc_3': desc3,
-          'aspek_4': skor4,
-          'desc_4': desc4,
-        },
-        // Data Pimpinan Industri
-        'nama_pimpinan': namaPimpinan,
-        'nip_pimpinan': nipPimpinan,
-        'jabatan_pimpinan': jabatanPimpinan,
-
-        // Data Pembimbing Industri
-        'nama_pembimbing': namaPembimbingIndustri,
-        'nip_pembimbing': nipPembimbingIndustri,
-        'jabatan_pembimbing': jabatanPembimbingIndustri,
-
-        // Data Pembimbing Sekolah (Koordinator)
-        'nama_pembimbing_sekolah': namaPembimbingSekolah,
-        'nip_pembimbing_sekolah': nipPembimbingSekolah,
-        'jabatan_pembimbing_sekolah': jabatanPembimbingSekolah,
-      };
-
-      print('\n📤 ===== REQUEST BODY FINAL =====');
-      print(jsonEncode(requestBody));
-      print('===============================\n');
-
-      // Kirim request ke API sertifikat
-      final response = await http.post(
-        Uri.parse('${dotenv.env['SERTIF']}/api/v1/letters/sertifikat/$jurusan'),
-        headers: {
-          'accept': 'application/json',
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(requestBody),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _showSnackBar('Sertifikat berhasil dibuat');
-        await _downloadFile(data['file_url'], data['filename']);
-      } else if (response.statusCode == 400) {
-        final error = jsonDecode(response.body);
-        _showSnackBar('Error: ${error['detail'] ?? 'Jurusan tidak valid'}',
-            isError: true);
-      } else {
-        throw Exception('Gagal membuat sertifikat: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error generating certificate: $e');
-      _showSnackBar('Gagal membuat sertifikat', isError: true);
-    } finally {
-      if (mounted) setState(() => _isGeneratingCertificate = false);
+    } else {
+      try {
+        final dateMulai = DateTime.parse(tanggalMulai);
+        tanggalMulai = _formatDate(dateMulai);
+      } catch (e) {}
     }
-  }
 
+    if (tanggalSelesai.isNotEmpty) {
+      try {
+        final dateSelesai = DateTime.parse(tanggalSelesai.split(' ')[0]);
+        tanggalSelesai = _formatDate(dateSelesai);
+      } catch (e) {}
+    } else {
+      tanggalSelesai = formattedDate;
+    }
+
+    // ===== DATA INDUSTRI (PIMPINAN + PEMBIMBING INDUSTRI) =====
+    print('\n📋 ===== DATA INDUSTRI UNTUK ${_siswaData['siswa_username']} =====');
+
+    String namaPimpinan = '';
+    String jenisNomorPimpinan = 'NIP'; // ✅ DEFAULT
+    String nipPimpinan = '';
+    String jabatanPimpinan = '';
+
+    String namaPembimbingIndustri = '';
+    String jenisNomorPembimbing = 'NIP'; // ✅ DEFAULT
+    String nipPembimbingIndustri = '';
+    String jabatanPembimbingIndustri = '';
+
+    // AMBIL DARI SHAREDPREFERENCES
+    print('📡 Mencari data industri di SharedPreferences...');
+    final industriData =
+        await PimpinanStorage.ambilDataIndustri(widget.applicationId);
+
+    if (industriData != null) {
+      // Data Pimpinan Industri
+      namaPimpinan = industriData['pimpinan']?['nama'] ?? '';
+      jenisNomorPimpinan = industriData['pimpinan']?['jenis_nomor'] ?? 'NIP'; // ✅ AMBIL JENIS NOMOR
+      nipPimpinan = industriData['pimpinan']?['nip'] ?? '-';
+      jabatanPimpinan = industriData['pimpinan']?['jabatan'] ?? '';
+
+      // Data Pembimbing Industri
+      namaPembimbingIndustri = industriData['pembimbing_industri']?['nama'] ?? '';
+      jenisNomorPembimbing = industriData['pembimbing_industri']?['jenis_nomor'] ?? 'NIP'; // ✅ AMBIL JENIS NOMOR
+      nipPembimbingIndustri = industriData['pembimbing_industri']?['nip'] ?? '-';
+      jabatanPembimbingIndustri = industriData['pembimbing_industri']?['jabatan'] ?? '';
+
+      print('✅ Data industri ditemukan di SharedPreferences:');
+      print('   - Pimpinan: $namaPimpinan ($jenisNomorPimpinan: $nipPimpinan)');
+      print('   - Pembimbing Industri: $namaPembimbingIndustri ($jenisNomorPembimbing: $nipPembimbingIndustri)');
+    } else {
+      print('❌ TIDAK ADA DATA INDUSTRI DI SHAREDPREFERENCES!');
+      print('❌ Pembimbing belum menginput data untuk aplikasi ID: ${widget.applicationId}');
+
+      _showSnackBar('Data pimpinan dan pembimbing industri belum diinput',
+          isError: true);
+      setState(() => _isGeneratingCertificate = false);
+      return;
+    }
+
+    // ===== DATA PEMBIMBING SEKOLAH (KOORDINATOR) =====
+    print('\n📋 ===== DATA PEMBIMBING SEKOLAH =====');
+
+    String namaPembimbingSekolah = '';
+    String nipPembimbingSekolah = '';
+    String jabatanPembimbingSekolah = '';
+
+    // Coba ambil data guru berdasarkan user_id
+    final userId = prefs.getInt('user_id');
+    if (userId != null) {
+      try {
+        final guruResponse = await http.get(
+          Uri.parse(
+              '${dotenv.env['API_BASE_URL']}/api/guru?user_id=$userId&limit=1'),
+          headers: {
+            'accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        );
+
+        if (guruResponse.statusCode == 200) {
+          final guruData = jsonDecode(guruResponse.body);
+          if (guruData['success'] == true &&
+              guruData['data']['data'] != null &&
+              guruData['data']['data'].isNotEmpty) {
+            final guru = guruData['data']['data'][0];
+            namaPembimbingSekolah = guru['nama'] ?? '';
+            nipPembimbingSekolah = guru['nip'] ?? '';
+
+            // Tentukan jabatan berdasarkan role
+            if (guru['is_koordinator'] == true) {
+              jabatanPembimbingSekolah = 'Koordinator PKL';
+            } else if (guru['is_pembimbing'] == true) {
+              jabatanPembimbingSekolah = 'Guru Pembimbing PKL';
+            } else if (guru['is_wali_kelas'] == true) {
+              jabatanPembimbingSekolah = 'Wali Kelas';
+            } else {
+              jabatanPembimbingSekolah = 'Guru';
+            }
+
+            print('✅ Data guru ditemukan:');
+            print('   - Nama: $namaPembimbingSekolah');
+            print('   - NIP: $nipPembimbingSekolah');
+            print('   - Jabatan: $jabatanPembimbingSekolah');
+          }
+        }
+      } catch (e) {
+        print('❌ Error fetching guru data: $e');
+      }
+    }
+
+    // Jika data guru tidak ditemukan, pakai dari SharedPreferences
+    if (namaPembimbingSekolah.isEmpty) {
+      print('⚠️ Menggunakan data dari SharedPreferences');
+      namaPembimbingSekolah =
+          prefs.getString('user_name') ?? 'Guru Pembimbing PKL';
+      nipPembimbingSekolah = prefs.getString('user_nip') ?? '-';
+      jabatanPembimbingSekolah =
+          prefs.getString('user_jabatan') ?? 'Guru Pembimbing PKL';
+
+      print('   - Nama: $namaPembimbingSekolah');
+      print('   - NIP: $nipPembimbingSekolah');
+      print('   - Jabatan: $jabatanPembimbingSekolah');
+    }
+
+    // ===== GABUNGKAN SEMUA DATA UNTUK API =====
+    final Map<String, dynamic> requestBody = {
+      'nomor_sertifikat': nomorSertifikat,
+      'siswa': {
+        'nama': _siswaData['siswa_username'] ?? '',
+        'nisn': _siswaData['nisn'] ?? '0123456789',
+      },
+      'nama_industri': _siswaData['industri_nama'] ?? '',
+      'tanggal_mulai': tanggalMulai,
+      'tanggal_selesai': tanggalSelesai,
+      'hasil_pkl': hasilPKL,
+      'tanggal_terbit': formattedDate,
+      'nilai': {
+        'aspek_1': skor1,
+        'desc_1': desc1,
+        'aspek_2': skor2,
+        'desc_2': desc2,
+        'aspek_3': skor3,
+        'desc_3': desc3,
+        'aspek_4': skor4,
+        'desc_4': desc4,
+      },
+      // Data Pimpinan Industri
+      'nama_pimpinan': namaPimpinan,
+      'jenis_nomor_pimpinan': jenisNomorPimpinan, // ✅ TAMBAHKAN INI
+      'nip_pimpinan': nipPimpinan,
+      'jabatan_pimpinan': jabatanPimpinan,
+
+      // Data Pembimbing Industri
+      'nama_pembimbing': namaPembimbingIndustri,
+      'jenis_nomor_pembimbing': jenisNomorPembimbing, // ✅ TAMBAHKAN INI
+      'nip_pembimbing': nipPembimbingIndustri,
+      'jabatan_pembimbing': jabatanPembimbingIndustri,
+
+      // Data Pembimbing Sekolah (Koordinator)
+      'nama_pembimbing_sekolah': namaPembimbingSekolah,
+      'nip_pembimbing_sekolah': nipPembimbingSekolah,
+      'jabatan_pembimbing_sekolah': jabatanPembimbingSekolah,
+    };
+
+    print('\n📤 ===== REQUEST BODY FINAL =====');
+    print(jsonEncode(requestBody));
+    print('===============================\n');
+
+    // Kirim request ke API sertifikat
+    final response = await http.post(
+      Uri.parse('${dotenv.env['SERTIF']}/api/v1/letters/sertifikat/$jurusan'),
+      headers: {
+        'accept': 'application/json',
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(requestBody),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      _showSnackBar('Sertifikat berhasil dibuat');
+      await _downloadFile(data['file_url'], data['filename']);
+    } else if (response.statusCode == 400) {
+      final error = jsonDecode(response.body);
+      _showSnackBar('Error: ${error['detail'] ?? 'Jurusan tidak valid'}',
+          isError: true);
+    } else {
+      throw Exception('Gagal membuat sertifikat: ${response.statusCode}');
+    }
+  } catch (e) {
+    print('Error generating certificate: $e');
+    _showSnackBar('Gagal membuat sertifikat', isError: true);
+  } finally {
+    if (mounted) setState(() => _isGeneratingCertificate = false);
+  }
+}
   // ==================== BUILD WIDGET ====================
   @override
   Widget build(BuildContext context) {
@@ -4911,7 +4918,6 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
 // ===== TAMBAHKAN INI =====
 // ===== DATA PIMPINAN & PEMBIMBING INDUSTRI =====
                       FutureBuilder<Map<String, dynamic>?>(
@@ -4945,7 +4951,7 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      'Data pimpinan dan pembimbing industri belum diinput',
+                                      'Data pimpinan dan pembimbing industri belum dimasukkan',
                                       style: TextStyle(
                                         color: Colors.orange.shade800,
                                         fontWeight: FontWeight.w500,
@@ -5048,10 +5054,13 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                         children: [
                                           Expanded(
                                             flex: 1,
-                                            child: Text('NIP',
-                                                style: TextStyle(
-                                                    color: _neutralColor,
-                                                    fontSize: 12)),
+                                            child: Text(
+                                              pimpinan['jenis_nomor'] ??
+                                                  'NIP', // <--- INI YANG DITAMBAHKAN
+                                              style: TextStyle(
+                                                  color: _neutralColor,
+                                                  fontSize: 12),
+                                            ),
                                           ),
                                           Expanded(
                                             flex: 2,
@@ -5148,10 +5157,13 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                         children: [
                                           Expanded(
                                             flex: 1,
-                                            child: Text('NIP',
-                                                style: TextStyle(
-                                                    color: _neutralColor,
-                                                    fontSize: 12)),
+                                            child: Text(
+                                              pembimbing['jenis_nomor'] ??
+                                                  'NIP', // <--- INI YANG DITAMBAHKAN
+                                              style: TextStyle(
+                                                  color: _neutralColor,
+                                                  fontSize: 12),
+                                            ),
                                           ),
                                           Expanded(
                                             flex: 2,
@@ -5207,7 +5219,8 @@ class _ReviewDetailScreenState extends State<ReviewDetailScreen> {
                                       const SizedBox(width: 4),
                                       Expanded(
                                         child: Text(
-                                          'Disimpan: ${_formatDateIndonesian(industriData['waktu_simpan'])}',
+                                          // PERBAIKAN: Parse String ke DateTime dulu
+                                          'Terakhir diperbarui: ${_formatDateIndonesian(industriData['waktu_simpan'])}',
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: Colors.blue.shade700,

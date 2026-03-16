@@ -1080,7 +1080,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     return false;
   }
 
-  // Tambahkan method ini di dalam class _PenilaianDetailScreenState
+// Tambahkan method ini di dalam class _PenilaianDetailScreenState
   Future<void> _tampilkanRingkasanData({
     required Map<String, String> pimpinan,
     required Map<String, String> pembimbing,
@@ -1088,14 +1088,14 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.check_circle, color: Colors.green),
-            const SizedBox(width: 8),
-            const Text('Berhasil Disimpan'),
+            SizedBox(width: 8),
+            Text('Berhasil Disimpan'),
           ],
         ),
-        content: Container(
+        content: SizedBox(
           width: double.maxFinite,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1164,7 +1164,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'NIP: ${pimpinan['nip']?.isEmpty ?? true ? '-' : pimpinan['nip']}',
+                            '${pimpinan['jenis_nomor']}: ${pimpinan['nip']?.isEmpty ?? true ? '-' : pimpinan['nip']}',
                             style: const TextStyle(fontSize: 13),
                           ),
                         ),
@@ -1227,7 +1227,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'NIP: ${pembimbing['nip']?.isEmpty ?? true ? '-' : pembimbing['nip']}',
+                            '${pembimbing['jenis_nomor']}: ${pembimbing['nip']?.isEmpty ?? true ? '-' : pembimbing['nip']}',
                             style: const TextStyle(fontSize: 13),
                           ),
                         ),
@@ -1264,21 +1264,23 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
   }
 
   Future<void> _simpanDataIndustriLengkap() async {
-    // Tahap 1: Input Pimpinan Industri
+    // Tahap 1: Input Pimpinan Industri (dengan jenis nomor)
     final pimpinan = await _dialogInputPimpinan();
     if (pimpinan == null) return;
 
-    // Tahap 2: Input Pembimbing Industri
+    // Tahap 2: Input Pembimbing Industri (dengan jenis nomor)
     final pembimbing = await _dialogInputPembimbingIndustri();
     if (pembimbing == null) return;
 
-    // Simpan ke SharedPreferences
+    // Simpan ke SharedPreferences dengan menyertakan jenis nomor
     await PimpinanStorage.simpanDataIndustri(
       applicationId: widget.applicationId,
       namaPimpinan: pimpinan['nama'] ?? '',
+      jenisNomorPimpinan: pimpinan['jenis_nomor'] ?? 'NIP', // TAMBAHKAN INI
       nipPimpinan: pimpinan['nip'] ?? '',
       jabatanPimpinan: pimpinan['jabatan'] ?? '',
       namaPembimbingIndustri: pembimbing['nama'] ?? '',
+      jenisNomorPembimbing: pembimbing['jenis_nomor'] ?? 'NIP', // TAMBAHKAN INI
       nipPembimbingIndustri: pembimbing['nip'] ?? '',
       jabatanPembimbingIndustri: pembimbing['jabatan'] ?? '',
       dataSiswa: widget.siswaData,
@@ -1289,7 +1291,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
       _hasIndustriData = true;
     });
 
-    // Tampilkan ringkasan data
+    // Tampilkan ringkasan data dengan jenis nomor
     await _tampilkanRingkasanData(
       pimpinan: pimpinan,
       pembimbing: pembimbing,
@@ -1299,213 +1301,70 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
         backgroundColor: Colors.green);
   }
 
-// Dialog 1: Input Pimpinan Industri
+// Dialog 1: Input Pimpinan Industri dengan JENIS NOMOR manual
   Future<Map<String, String>?> _dialogInputPimpinan() async {
     final namaCtrl = TextEditingController();
+    final jenisNomorCtrl = TextEditingController(text: 'NIP'); // Default NIP
     final nipCtrl = TextEditingController();
     final jabatanCtrl = TextEditingController();
 
+    // State untuk error message
+    String? nipError;
+
     return showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Container(
-          width: double.maxFinite,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: _primaryColor,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(28),
-                    topRight: Radius.circular(28),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.business_center,
-                          color: Colors.white, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pimpinan Industri',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Masukkan data pimpinan perusahaan',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Flexible(
-                child: SingleChildScrollView(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.9,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
                   padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  decoration: BoxDecoration(
+                    color: _primaryColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(28),
+                      topRight: Radius.circular(28),
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      // Nama dengan garis bawah
-                      const Text(
-                        'Nama Pimpinan',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Color(0xFF6B1B1B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
                       Container(
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: TextField(
-                          controller: namaCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'Masukkan nama pimpinan',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
-                            prefixIcon: Icon(Icons.person_outline,
-                                color: _primaryColor),
-                            border: InputBorder.none,
-                          ),
-                        ),
+                        child: const Icon(Icons.business_center,
+                            color: Colors.white, size: 24),
                       ),
-
-                      const SizedBox(height: 24),
-
-                      // NIP dengan garis bawah (HANYA ANGKA)
-                      const Text(
-                        'NIP (Opsional)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Color(0xFF6B1B1B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: TextField(
-                          controller: nipCtrl,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          decoration: InputDecoration(
-                            hintText: 'Masukkan NIP pimpinan',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
-                            prefixIcon: Icon(Icons.badge_outlined,
-                                color: _primaryColor),
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Jabatan dengan garis bawah
-                      const Text(
-                        'Jabatan',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Color(0xFF6B1B1B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: TextField(
-                          controller: jabatanCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'Masukkan jabatan pimpinan',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
-                            prefixIcon:
-                                Icon(Icons.work_outline, color: _primaryColor),
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Garis pemisah horizontal
-                      Divider(
-                        color: Colors.grey.shade200,
-                        thickness: 1,
-                        height: 1,
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Info
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: _primaryColor.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: _primaryColor.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.info_outline,
-                                size: 18, color: _primaryColor),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'Data ini akan digunakan untuk sertifikat PKL',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            Text(
+                              'Pimpinan Industri',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Masukkan data pimpinan perusahaan',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
                               ),
                             ),
                           ],
@@ -1514,69 +1373,393 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                     ],
                   ),
                 ),
-              ),
 
-              // Footer
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(28),
-                    bottomRight: Radius.circular(28),
-                  ),
-                  border: Border(
-                    top: BorderSide(color: Colors.grey.shade200, width: 1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                // Content
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Nama dengan garis bawah
+                        const Text(
+                          'Nama Pimpinan',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Color(0xFF6B1B1B),
                           ),
                         ),
-                        child: const Text('Batal'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (namaCtrl.text.trim().isEmpty ||
-                              jabatanCtrl.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('Nama dan jabatan harus diisi')),
-                            );
-                            return;
-                          }
-                          Navigator.pop(context, {
-                            'nama': namaCtrl.text.trim(),
-                            'nip': nipCtrl.text.trim(),
-                            'jabatan': jabatanCtrl.text.trim(),
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: namaCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Masukkan nama pimpinan',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(Icons.person_outline,
+                                  color: _primaryColor),
+                              border: InputBorder.none,
+                            ),
                           ),
                         ),
-                        child: const Text('Lanjut'),
-                      ),
+
+                        const SizedBox(height: 20),
+
+                        // JENIS NOMOR - Input Manual (NIP/NIK/NP/dll)
+                        const Text(
+                          'Jenis Nomor',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Color(0xFF6B1B1B),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: jenisNomorCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Contoh: NIP, NIK, NP',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(Icons.badge_outlined,
+                                  color: _primaryColor),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Ketik manual (NIP / NIK / NP / dll)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Nomor (NIP/NIK)
+                        Row(
+                          children: [
+                            const Text(
+                              'Nomor',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: Color(0xFF6B1B1B),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Opsional',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Maks. 18 digit',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: nipError != null
+                                    ? Colors.red.shade300
+                                    : Colors.grey.shade300,
+                                width: nipError != null ? 2 : 1,
+                              ),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: nipCtrl,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(18),
+                            ],
+                            decoration: InputDecoration(
+                              hintText: 'Masukkan nomor (maksimal 18 digit)',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(
+                                Icons.numbers_rounded,
+                                color: nipError != null
+                                    ? Colors.red
+                                    : _primaryColor,
+                              ),
+                              suffixIcon: nipCtrl.text.length >= 15
+                                  ? Text(
+                                      '${nipCtrl.text.length}/18',
+                                      style: TextStyle(
+                                        color: nipCtrl.text.length == 18
+                                            ? Colors.green
+                                            : Colors.orange,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              errorText: nipError,
+                              errorStyle: const TextStyle(
+                                fontSize: 11,
+                                height: 0.8,
+                              ),
+                            ),
+                            onChanged: (value) {
+                              // Validasi real-time (hanya cek maksimal digit)
+                              setState(() {
+                                if (value.length > 18) {
+                                  nipError = 'Maksimal 18 digit';
+                                } else {
+                                  nipError = null;
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                        if (nipCtrl.text.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, left: 12),
+                            child: Text(
+                              '${nipCtrl.text.length}/18 digit',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: nipCtrl.text.length == 18
+                                    ? Colors.green
+                                    : Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+
+                        const SizedBox(height: 20),
+
+                        // Jabatan dengan garis bawah
+                        const Text(
+                          'Jabatan',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Color(0xFF6B1B1B),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: jabatanCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Masukkan jabatan pimpinan',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(Icons.work_outline,
+                                  color: _primaryColor),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Garis pemisah horizontal
+                        Divider(
+                          color: Colors.grey.shade200,
+                          thickness: 1,
+                          height: 1,
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Info
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: _primaryColor.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 18, color: _primaryColor),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Nomor bersifat opsional. Jika tidak diisi akan ditampilkan tanda "-" pada sertifikat.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+
+                // Footer
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(28),
+                      bottomRight: Radius.circular(28),
+                    ),
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text('Batal'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Validasi Nama
+                            if (namaCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Nama pimpinan harus diisi'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Validasi Jenis Nomor
+                            if (jenisNomorCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Jenis nomor harus diisi'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Validasi Nomor (hanya cek maksimal 18 digit, tidak wajib)
+                            final nip = nipCtrl.text.trim();
+                            if (nip.length > 18) {
+                              setState(() {
+                                nipError = 'Maksimal 18 digit';
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Nomor maksimal 18 digit'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Validasi Jabatan
+                            if (jabatanCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Jabatan harus diisi'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            Navigator.pop(context, {
+                              'nama': namaCtrl.text.trim(),
+                              'jenis_nomor': jenisNomorCtrl.text.trim(),
+                              'nip': nipCtrl.text.trim().isEmpty
+                                  ? '-'
+                                  : nipCtrl.text.trim(),
+                              'jabatan': jabatanCtrl.text.trim(),
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _primaryColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text('Lanjut'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1642,214 +1825,72 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
     );
   }
 
-// Dialog 2: Input Pembimbing Industri
+// Dialog 2: Input Pembimbing Industri dengan JENIS NOMOR manual
   Future<Map<String, String>?> _dialogInputPembimbingIndustri() async {
     final namaCtrl = TextEditingController();
+    final jenisNomorCtrl = TextEditingController(text: 'NIP'); // Default NIP
     final nipCtrl = TextEditingController();
     final jabatanCtrl = TextEditingController();
 
+    // State untuk error message
+    String? nipError;
+
     return showDialog<Map<String, String>>(
       context: context,
-      builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Container(
-          width: double.maxFinite,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.9,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.green.shade700, Colors.green.shade600],
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(28),
-                    topRight: Radius.circular(28),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.people_alt,
-                          color: Colors.white, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pembimbing Industri',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Masukkan data pembimbing lapangan',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Content
-              Flexible(
-                child: SingleChildScrollView(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => Dialog(
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            width: double.maxFinite,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.9,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
                   padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade700, Colors.green.shade600],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(28),
+                      topRight: Radius.circular(28),
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      // Nama dengan garis bawah
-                      const Text(
-                        'Nama Pembimbing',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Color(0xFF2E7D32),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
                       Container(
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        child: TextField(
-                          controller: namaCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'Masukkan nama pembimbing',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
-                            prefixIcon: Icon(Icons.person_outline,
-                                color: Colors.green.shade700),
-                            border: InputBorder.none,
-                          ),
-                        ),
+                        child: const Icon(Icons.people_alt,
+                            color: Colors.white, size: 24),
                       ),
-
-                      const SizedBox(height: 24),
-
-                      // NIP dengan garis bawah (HANYA ANGKA)
-                      const Text(
-                        'NIP (Opsional)',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Color(0xFF2E7D32),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: TextField(
-                          controller: nipCtrl,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          decoration: InputDecoration(
-                            hintText: 'Masukkan NIP pembimbing',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
-                            prefixIcon: Icon(Icons.badge_outlined,
-                                color: Colors.green.shade700),
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Jabatan dengan garis bawah
-                      const Text(
-                        'Jabatan',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Color(0xFF2E7D32),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        child: TextField(
-                          controller: jabatanCtrl,
-                          decoration: InputDecoration(
-                            hintText: 'Masukkan jabatan pembimbing',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
-                            prefixIcon: Icon(Icons.work_outline,
-                                color: Colors.green.shade700),
-                            border: InputBorder.none,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Garis pemisah horizontal
-                      Divider(
-                        color: Colors.grey.shade200,
-                        thickness: 1,
-                        height: 1,
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Info
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.green.shade200),
-                        ),
-                        child: Row(
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.info_outline,
-                                size: 18, color: Colors.green.shade700),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'Data pembimbing yang akan ditandatangani di sertifikat',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                            Text(
+                              'Pembimbing Industri',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Masukkan data pembimbing lapangan',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
                               ),
                             ),
                           ],
@@ -1858,69 +1899,392 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                     ],
                   ),
                 ),
-              ),
 
-              // Footer dengan garis atas
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(28),
-                    bottomRight: Radius.circular(28),
-                  ),
-                  border: Border(
-                    top: BorderSide(color: Colors.grey.shade200, width: 1),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                // Content
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Nama dengan garis bawah
+                        const Text(
+                          'Nama Pembimbing',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Color(0xFF2E7D32),
                           ),
                         ),
-                        child: const Text('Batal'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (namaCtrl.text.trim().isEmpty ||
-                              jabatanCtrl.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('Nama dan jabatan harus diisi')),
-                            );
-                            return;
-                          }
-                          Navigator.pop(context, {
-                            'nama': namaCtrl.text.trim(),
-                            'nip': nipCtrl.text.trim(),
-                            'jabatan': jabatanCtrl.text.trim(),
-                          });
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade700,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: namaCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Masukkan nama pembimbing',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(Icons.person_outline,
+                                  color: Colors.green.shade700),
+                              border: InputBorder.none,
+                            ),
                           ),
                         ),
-                        child: const Text('Simpan'),
-                      ),
+
+                        const SizedBox(height: 20),
+
+                        // JENIS NOMOR - Input Manual (NIP/NIK/NP/dll)
+                        const Text(
+                          'Jenis Nomor',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Color(0xFF2E7D32),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: jenisNomorCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Contoh: NIP, NIK, NP',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(Icons.badge_outlined,
+                                  color: Colors.green.shade700),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Ketik manual (NIP / NIK / NP / dll)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Nomor (NIP/NIK)
+                        Row(
+                          children: [
+                            const Text(
+                              'Nomor',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                                color: Color(0xFF2E7D32),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Opsional',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'Maks. 18 digit',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: nipError != null
+                                    ? Colors.red.shade300
+                                    : Colors.grey.shade300,
+                                width: nipError != null ? 2 : 1,
+                              ),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: nipCtrl,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(18),
+                            ],
+                            decoration: InputDecoration(
+                              hintText: 'Masukkan nomor (maksimal 18 digit)',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(
+                                Icons.numbers_rounded,
+                                color: nipError != null
+                                    ? Colors.red
+                                    : Colors.green.shade700,
+                              ),
+                              suffixIcon: nipCtrl.text.length >= 15
+                                  ? Text(
+                                      '${nipCtrl.text.length}/18',
+                                      style: TextStyle(
+                                        color: nipCtrl.text.length == 18
+                                            ? Colors.green
+                                            : Colors.orange,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    )
+                                  : null,
+                              border: InputBorder.none,
+                              errorText: nipError,
+                              errorStyle: const TextStyle(
+                                fontSize: 11,
+                                height: 0.8,
+                              ),
+                            ),
+                            onChanged: (value) {
+                              // Validasi real-time (hanya cek maksimal digit)
+                              setState(() {
+                                if (value.length > 18) {
+                                  nipError = 'Maksimal 18 digit';
+                                } else {
+                                  nipError = null;
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                        if (nipCtrl.text.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, left: 12),
+                            child: Text(
+                              '${nipCtrl.text.length}/18 digit',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: nipCtrl.text.length == 18
+                                    ? Colors.green
+                                    : Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+
+                        const SizedBox(height: 20),
+
+                        // Jabatan dengan garis bawah
+                        const Text(
+                          'Jabatan',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: Color(0xFF2E7D32),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.shade300,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: TextField(
+                            controller: jabatanCtrl,
+                            decoration: InputDecoration(
+                              hintText: 'Masukkan jabatan pembimbing',
+                              hintStyle: TextStyle(color: Colors.grey.shade400),
+                              prefixIcon: Icon(Icons.work_outline,
+                                  color: Colors.green.shade700),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // Garis pemisah horizontal
+                        Divider(
+                          color: Colors.grey.shade200,
+                          thickness: 1,
+                          height: 1,
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Info
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.green.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 18, color: Colors.green.shade700),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Nomor bersifat opsional. Jika tidak diisi akan ditampilkan tanda "-" pada sertifikat.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+
+                // Footer dengan garis atas
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(28),
+                      bottomRight: Radius.circular(28),
+                    ),
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade200, width: 1),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text('Batal'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            // Validasi Nama
+                            if (namaCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Nama pembimbing harus diisi'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Validasi Jenis Nomor
+                            if (jenisNomorCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Jenis nomor harus diisi'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Validasi Nomor (hanya cek maksimal 18 digit, tidak wajib)
+                            final nip = nipCtrl.text.trim();
+                            if (nip.length > 18) {
+                              setState(() {
+                                nipError = 'Maksimal 18 digit';
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Nomor maksimal 18 digit'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Validasi Jabatan
+                            if (jabatanCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Jabatan harus diisi'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            Navigator.pop(context, {
+                              'nama': namaCtrl.text.trim(),
+                              'jenis_nomor': jenisNomorCtrl.text.trim(),
+                              'nip': nipCtrl.text.trim().isEmpty
+                                  ? '-'
+                                  : nipCtrl.text.trim(),
+                              'jabatan': jabatanCtrl.text.trim(),
+                            });
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text('Simpan'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2653,7 +3017,7 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                     );
-                                  }).toList(),
+                                  }),
                                 if (instrukturController.text.isNotEmpty)
                                   ActionChip(
                                     label: const Text('Ganti'),
@@ -3792,269 +4156,324 @@ class _PenilaianDetailScreenState extends State<PenilaianDetailScreen> {
                           ),
                         ),
                         // ===== Rata-rata Nilai Card =====
-const SizedBox(height: 20),
-
-// ===== TAMBAHKAN INI =====
+                        const SizedBox(height: 20),
 // ===== DATA PIMPINAN & PEMBIMBING INDUSTRI =====
-FutureBuilder<Map<String, dynamic>?>(
-  future: PimpinanStorage.ambilDataIndustri(widget.applicationId),
-  builder: (context, snapshot) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-    
-    final industriData = snapshot.data;
-    if (industriData == null) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.orange.shade200),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Data pimpinan dan pembimbing industri belum diinput',
-                style: TextStyle(
-                  color: Colors.orange.shade800,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+                        FutureBuilder<Map<String, dynamic>?>(
+                          future: PimpinanStorage.ambilDataIndustri(
+                              widget.applicationId),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: CircularProgressIndicator(),
+                                ),
+                              );
+                            }
 
-    final pimpinan = industriData['pimpinan'] ?? {};
-    final pembimbing = industriData['pembimbing_industri'] ?? {};
+                            final industriData = snapshot.data;
+                            if (industriData == null) {
+                              return Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade50,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border:
+                                      Border.all(color: Colors.orange.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded,
+                                        color: Colors.orange.shade700),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Data pimpinan dan pembimbing industri belum dimasukkan',
+                                        style: TextStyle(
+                                          color: Colors.orange.shade800,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _borderSoft),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _primaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.business_center, color: _primaryColor, size: 20),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Data Industri',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          
-          // Pimpinan Industri
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _backgroundLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _borderSoft),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.person, size: 16, color: _primaryColor),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Pimpinan Industri',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: _primaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: Text('Nama', style: TextStyle(color: _neutralColor, fontSize: 12)),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        pimpinan['nama'] ?? '-',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: Text('NIP', style: TextStyle(color: _neutralColor, fontSize: 12)),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        pimpinan['nip']?.isNotEmpty == true ? pimpinan['nip'] : '-',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: Text('Jabatan', style: TextStyle(color: _neutralColor, fontSize: 12)),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        pimpinan['jabatan'] ?? '-',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 12),
-          
-          // Pembimbing Industri
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _backgroundLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _borderSoft),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.people, size: 16, color: Colors.green.shade700),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Pembimbing Industri',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: Colors.green.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: Text('Nama', style: TextStyle(color: _neutralColor, fontSize: 12)),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        pembimbing['nama'] ?? '-',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: Text('NIP', style: TextStyle(color: _neutralColor, fontSize: 12)),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        pembimbing['nip']?.isNotEmpty == true ? pembimbing['nip'] : '-',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 1,
-                      child: Text('Jabatan', style: TextStyle(color: _neutralColor, fontSize: 12)),
-                    ),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        pembimbing['jabatan'] ?? '-',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.access_time, size: 14, color: Colors.blue.shade700),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    'Terakhir diperbarui: ${_formatDateIndonesian(DateTime.parse(industriData['waktu_simpan'] ?? DateTime.now().toIso8601String()))}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.blue.shade700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  },
-),
-const SizedBox(height: 20),
+                            final pimpinan = industriData['pimpinan'] ?? {};
+                            final pembimbing =
+                                industriData['pembimbing_industri'] ?? {};
+
+                            return Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: _borderSoft),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: _primaryColor.withValues(
+                                              alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(Icons.business_center,
+                                            color: _primaryColor, size: 20),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      const Text(
+                                        'Data Industri',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Pimpinan Industri
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: _backgroundLight,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: _borderSoft),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(Icons.person,
+                                                size: 16, color: _primaryColor),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Pimpinan Industri',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                                color: _primaryColor,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text('Nama',
+                                                  style: TextStyle(
+                                                      color: _neutralColor,
+                                                      fontSize: 12)),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                pimpinan['nama'] ?? '-',
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                pimpinan['jenis_nomor'] ??
+                                                    'NIP', // <--- INI YANG DIPERBAIKI
+                                                style: TextStyle(
+                                                    color: _neutralColor,
+                                                    fontSize: 12),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                pimpinan['nip']?.isNotEmpty ==
+                                                        true
+                                                    ? pimpinan['nip']
+                                                    : '-',
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text('Jabatan',
+                                                  style: TextStyle(
+                                                      color: _neutralColor,
+                                                      fontSize: 12)),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                pimpinan['jabatan'] ?? '-',
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 12),
+
+                                  // Pembimbing Industri
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: _backgroundLight,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: _borderSoft),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(Icons.people,
+                                                size: 16,
+                                                color: Colors.green.shade700),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              'Pembimbing Industri',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                                color: Colors.green.shade700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text('Nama',
+                                                  style: TextStyle(
+                                                      color: _neutralColor,
+                                                      fontSize: 12)),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                pembimbing['nama'] ?? '-',
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                pembimbing['jenis_nomor'] ??
+                                                    'NIP', // <--- INI YANG DIPERBAIKI
+                                                style: TextStyle(
+                                                    color: _neutralColor,
+                                                    fontSize: 12),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                pembimbing['nip']?.isNotEmpty ==
+                                                        true
+                                                    ? pembimbing['nip']
+                                                    : '-',
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text('Jabatan',
+                                                  style: TextStyle(
+                                                      color: _neutralColor,
+                                                      fontSize: 12)),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                pembimbing['jabatan'] ?? '-',
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 13),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.access_time,
+                                            size: 14,
+                                            color: Colors.blue.shade700),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            'Terakhir diperbarui: ${_formatDateIndonesian(DateTime.parse(industriData['waktu_simpan'] ?? DateTime.now().toIso8601String()))}',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.blue.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 20),
 
                         // Tombol Generate Dokumen (untuk mode selesai)
                         if (isSelesai) ...[
@@ -4158,7 +4577,7 @@ const SizedBox(height: 20),
                                     icon:
                                         const Icon(Icons.add_business_rounded),
                                     label: const Text(
-                                      'Input Data Industri',
+                                      'Masukkan Data Industri',
                                       style: TextStyle(
                                           fontWeight: FontWeight.w700,
                                           fontSize: 16),
